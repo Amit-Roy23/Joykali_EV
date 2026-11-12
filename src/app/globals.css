@@ -4,58 +4,138 @@
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
+    --background: 228 33% 97%;
+    --foreground: 240 30% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 160 84% 39%; /* Joykali EV Emerald #0E9F6E */
-    --primary-foreground: 210 40% 98%;
-    --secondary: 160 30% 94%;
-    --secondary-foreground: 160 80% 20%;
-    --muted: 210 20% 94%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 160 40% 92%;
-    --accent-foreground: 160 80% 20%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 20% 88%;
-    --input: 214 20% 88%;
-    --ring: 160 84% 39%;
-    --radius: 0.5rem;
+    --card-foreground: 240 30% 11%;
+    --primary: 245 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --muted: 228 25% 95%;
+    --muted-foreground: 225 12% 46%;
+    --border: 228 22% 90%;
+    --input: 228 20% 86%;
+    --ring: 245 75% 59%;
+    --radius: 0.875rem;
+    color-scheme: light;
   }
 
-  .dark {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 160 70% 45%;
-    --primary-foreground: 222 47% 8%;
-    --secondary: 217 33% 18%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 18%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 18%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 20%;
-    --input: 217 33% 20%;
-    --ring: 160 70% 45%;
-  }
-}
-
-@layer base {
   * {
     @apply border-border;
   }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+
   body {
-    @apply bg-background text-foreground antialiased selection:bg-emerald-500 selection:text-white;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01", "ss03";
+  }
+
+  ::selection {
+    background: #cdf264;
+    color: #0f0e29;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+  }
+
+  /* Money and codes line up in tables and KPI tiles. */
+  .tabular,
+  td,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Comfortable native controls on touch devices (avoids iOS zoom-on-focus). */
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  select {
+    @apply bg-white;
+  }
+
+  :focus-visible {
+    outline: 2px solid #6563f1;
+    outline-offset: 2px;
   }
 }
 
+@layer components {
+  /* Thin, unobtrusive scrollbars (sidebar, tables). */
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 152, 190, 0.35) transparent;
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: rgba(148, 152, 190, 0.35);
+    border-radius: 999px;
+  }
+
+  /* Ink hero surface with a soft electric glow + fine grid. */
+  .surface-ink {
+    background-color: #0f0e29;
+    background-image:
+      radial-gradient(60rem 30rem at 110% -10%, rgba(101, 99, 241, 0.35), transparent 60%),
+      radial-gradient(40rem 24rem at -10% 120%, rgba(185, 233, 55, 0.12), transparent 60%),
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: auto, auto, 28px 28px, 28px 28px;
+  }
+
+  /* Animated stripes for the "charging" bar motif. */
+  .charge-stripes {
+    background-image: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.28) 25%,
+      transparent 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.28) 50%,
+      rgba(255, 255, 255, 0.28) 75%,
+      transparent 75%,
+      transparent
+    );
+    background-size: 28px 28px;
+  }
+
+  /* Native form controls in legacy pages adopt the system look. */
+  .field {
+    @apply h-10 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 shadow-sm transition placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-4 focus:ring-brand-500/15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media print {
+  aside,
+  header,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+}

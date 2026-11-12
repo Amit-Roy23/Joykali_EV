@@ -29,3 +29,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+
+# real environment (secrets) — use .env.example as the template
+.env

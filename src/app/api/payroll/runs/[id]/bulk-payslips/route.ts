@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getScopeFilter, hasPermission } from "@/lib/rbac";
 import { connectToDatabase } from "@/lib/db";
 import { PayrollRun } from "@/models/PayrollRun";
 import { PayrollEntry } from "@/models/PayrollEntry";
 import { Setting } from "@/models/Setting";
 import { generateBulkPayslipsZIP, PayslipPDFProps } from "@/services/pdfService";
-import { authenticateAndAuthorize, errorResponse } from "@/lib/apiHelper";
+import { authenticateAndAuthorize, errorResponse, isValidId } from "@/lib/apiHelper";
 
 export async function GET(
   req: NextRequest,
@@ -16,12 +17,20 @@ export async function GET(
     if (auth.error) return auth.error;
 
     const { id } = await params;
+    if (!isValidId(id)) return errorResponse("Payroll run not found", 404);
     const run = await PayrollRun.findById(id).lean();
     if (!run) return errorResponse("Payroll run not found", 404);
+    if (!["APPROVED", "LOCKED"].includes(run.status) && !(await hasPermission(auth.user.role, "payroll.view"))) {
+      return errorResponse("Payslips for this run are not released yet", 403);
+    }
 
-    const entries = await PayrollEntry.find({ payrollRun: run._id })
+    // Only include payslips the caller is allowed to see (own / team / all).
+    const scope = await getScopeFilter(auth.user, "payslips");
+    const entries = await PayrollEntry.find({ payrollRun: run._id, ...scope })
       .populate("employee")
       .lean();
+
+    if (entries.length === 0) return errorResponse("No payslips available for you in this run", 404);
 
     const dbSetting = await Setting.findOne().lean();
     const company = {

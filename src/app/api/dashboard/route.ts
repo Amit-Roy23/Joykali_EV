@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
-import { getDashboardData } from "@/services/reportService";
+import { getDashboardData } from "@/services/dashboardService";
 import {
   authenticateAndAuthorize,
   jsonResponse,

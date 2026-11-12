@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
+import { getScopeFilter } from "@/lib/rbac";
 import { connectToDatabase } from "@/lib/db";
 import { Dealer } from "@/models/Dealer";
 import { Vehicle } from "@/models/Vehicle";
 import { Sale } from "@/models/Sale";
 import {
   authenticateAndAuthorize,
+  isValidId,
   jsonResponse,
   errorResponse,
 } from "@/lib/apiHelper";
@@ -21,7 +23,9 @@ export async function GET(
     if (auth.error) return auth.error;
 
     const { id } = await params;
-    const dealer = await Dealer.findById(id)
+    if (!isValidId(id)) return errorResponse("Dealer not found", 404);
+    const scope = await getScopeFilter(auth.user, "dealers");
+    const dealer = await Dealer.findOne({ $and: [{ _id: id }, scope] })
       .populate("assignedASM", "name employeeCode")
       .lean();
 

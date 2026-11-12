@@ -30,6 +30,7 @@ export interface ISetting extends Document {
     pfEnabled: boolean;
     esiEnabled: boolean;
     ptEnabled: boolean;
+    ptMode?: "WB_SLAB" | "FLAT";
   };
   updatedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -76,6 +77,8 @@ const SettingSchema = new Schema<ISetting>(
       pfEnabled: { type: Boolean, default: true },
       esiEnabled: { type: Boolean, default: true },
       ptEnabled: { type: Boolean, default: true },
+      // WB_SLAB = West Bengal slab table on gross; FLAT = ptMonthlyPaise for everyone
+      ptMode: { type: String, enum: ["WB_SLAB", "FLAT"], default: "WB_SLAB" },
     },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

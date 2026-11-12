@@ -1,15 +1,14 @@
 import { Sale, ISale } from "@/models/Sale";
 import { Vehicle } from "@/models/Vehicle";
+import { VehicleModel } from "@/models/VehicleModel";
 import { StockMovement } from "@/models/StockMovement";
 import { User } from "@/models/User";
-import { IncentiveScheme } from "@/models/IncentiveScheme";
-import { IncentiveLedger } from "@/models/IncentiveLedger";
 import { generateSaleCode } from "@/lib/codeGenerator";
 import { rupeesToPaise } from "@/lib/money";
-import { computeIncentives } from "./incentiveEngine";
 import { withTransaction } from "@/lib/db";
-import { JWTPayload, UserRole } from "@/types";
+import { JWTPayload } from "@/types";
 import mongoose from "mongoose";
+import { getTeamUserIds } from "@/lib/rbac";
 
 export interface CreateSaleInput {
   saleDate: Date | string;
@@ -45,110 +44,9 @@ export interface CreateSaleInput {
   };
 }
 
-/**
- * Recalculate and update the IncentiveLedger for affected employees in the month of the sale
- */
-export async function recalculateIncentivesForPeriod(
-  employeeIds: Array<string | mongoose.Types.ObjectId>,
-  date: Date
-): Promise<void> {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
-  const period = `${year}-${String(month).padStart(2, "0")}`;
-
-  const periodStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0));
-  const periodEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59));
-
-  // Fetch active schemes covering this period
-  const activeSchemes = await IncentiveScheme.find({
-    status: "ACTIVE",
-    validFrom: { $lte: periodEnd },
-    validTo: { $gte: periodStart },
-  }).lean();
-
-  // Fetch all sales for this month (delivered only)
-  const monthSales = await Sale.find({
-    saleDate: { $gte: periodStart, $lte: periodEnd },
-    status: "DELIVERED",
-  })
-    .populate("vehicle")
-    .lean();
-
-  const formattedSales = monthSales.map((s: any) => ({
-    _id: String(s._id),
-    saleCode: s.saleCode,
-    saleDate: s.saleDate,
-    soldBy: String(s.soldBy),
-    asmAtSale: s.asmAtSale ? String(s.asmAtSale) : null,
-    modelId: String(s.vehicle?.model || ""),
-    dealerId: s.dealer ? String(s.dealer) : null,
-    exShowroom: s.priceBreakdown?.exShowroom || 0,
-    totalAmount: s.totalAmount || 0,
-    status: s.status,
-  }));
-
-  for (const empId of employeeIds) {
-    if (!empId) continue;
-    const employee = await User.findById(empId).lean();
-    if (!employee) continue;
-
-    // Check if employee's ledger is locked by a locked payroll run
-    const existingLedger = await IncentiveLedger.findOne({
-      employee: employee._id,
-      period,
-    });
-    if (existingLedger?.isLocked) {
-      continue;
-    }
-
-    const output = computeIncentives(
-      {
-        _id: String(employee._id),
-        employeeCode: employee.employeeCode,
-        name: employee.name,
-        role: employee.role as UserRole,
-        reportsTo: employee.reportsTo ? String(employee.reportsTo) : null,
-      },
-      formattedSales,
-      activeSchemes,
-      periodStart,
-      periodEnd
-    );
-
-    const breakdownItems: any[] = [];
-    let totalUnits = 0;
-
-    for (const sc of output.schemes) {
-      for (const r of sc.rulesBreakdown) {
-        breakdownItems.push({
-          schemeId: new mongoose.Types.ObjectId(sc.schemeId),
-          schemeName: sc.schemeName,
-          ruleType: r.ruleType,
-          unitsCount: r.qualifyingUnits,
-          revenueCount: r.qualifyingRevenue,
-          earnedAmount: r.earnedAmount,
-          description: r.description,
-        });
-        totalUnits += r.qualifyingUnits;
-      }
-    }
-
-    await IncentiveLedger.findOneAndUpdate(
-      { employee: employee._id, period },
-      {
-        employee: employee._id,
-        period,
-        totalEarned: output.totalIncentiveEarned,
-        totalUnits,
-        breakdown: breakdownItems,
-        isLocked: false,
-        calculatedAt: new Date(),
-      },
-      { upsert: true, new: true }
-    );
-  }
-}
+// Incentive recalculation lives in incentiveService; re-exported for existing callers.
+export { recalculateIncentivesForPeriod } from "./incentiveService";
+import { recalculateIncentivesForPeriod } from "./incentiveService";
 
 /**
  * Core business service for creating a vehicle sale
@@ -157,7 +55,20 @@ export async function createSale(
   input: CreateSaleInput,
   user: JWTPayload
 ): Promise<ISale> {
-  return await withTransaction(async (session) => {
+  // Attribution guard: an FEC can only book sales under their own name, an
+  // ASM under themselves or their own downline. Previously any salesperson
+  // could credit (or steal) incentive-bearing sales for anyone.
+  if (user.role === "FEC") {
+    input.soldBy = user.userId;
+  } else if (user.role === "ASM" && String(input.soldBy) !== String(user.userId)) {
+    const team = await getTeamUserIds(user.userId);
+    if (!team.some((id) => String(id) === String(input.soldBy))) {
+      throw new Error("You can only record sales for yourself or your own team");
+    }
+  }
+
+  let affectedEmployees: mongoose.Types.ObjectId[] = [];
+  const sale = await withTransaction(async (session) => {
     // 1. Check vehicle
     const vehicle = await Vehicle.findById(input.vehicleId).session(session ?? null);
     if (!vehicle) {
@@ -176,10 +87,20 @@ export async function createSale(
     const saleDateObj = new Date(input.saleDate);
     const saleCode = await generateSaleCode(saleDateObj, session);
 
+    if (salesperson.status !== "ACTIVE" || !["FEC", "ASM"].includes(salesperson.role)) {
+      throw new Error("Sales can only be attributed to an active FEC or ASM");
+    }
+
     // Convert all amounts to integer paise
     const exShowroom = rupeesToPaise(input.priceBreakdown.exShowroom);
     const discount = rupeesToPaise(input.priceBreakdown.discount || 0);
-    const gst = rupeesToPaise(input.priceBreakdown.gst);
+    if (exShowroom <= 0) throw new Error("Ex-showroom price must be greater than zero");
+    if (discount > exShowroom) throw new Error("Discount cannot exceed the ex-showroom price");
+
+    // GST is computed here from the model's rate — never trusted from the client.
+    const model = await VehicleModel.findById(vehicle.model).session(session ?? null).lean();
+    const gstRate = model?.gstRate ?? 5;
+    const gst = Math.round(((exShowroom - discount) * gstRate) / 100);
     const registration = rupeesToPaise(input.priceBreakdown.registration || 0);
     const insurance = rupeesToPaise(input.priceBreakdown.insurance || 0);
     const accessories = rupeesToPaise(input.priceBreakdown.accessories || 0);
@@ -214,7 +135,10 @@ export async function createSale(
           saleDate: saleDateObj,
           customer: input.customer,
           vehicle: vehicle._id,
-          dealer: input.dealerId ? new mongoose.Types.ObjectId(input.dealerId) : vehicle.currentLocationDealer || null,
+          // A vehicle sitting at a dealer is always that dealer's sale.
+          dealer:
+            vehicle.currentLocationDealer ||
+            (input.dealerId ? new mongoose.Types.ObjectId(input.dealerId) : null),
           soldBy: salesperson._id,
           asmAtSale: salesperson.reportsTo || null,
           priceBreakdown: {
@@ -263,19 +187,18 @@ export async function createSale(
       { session }
     );
 
-    // 6. Recalculate incentives for salesperson and their ASM
-    const affectedEmployees = [salesperson._id];
+    affectedEmployees = [salesperson._id];
     if (salesperson.reportsTo) {
       affectedEmployees.push(salesperson.reportsTo as mongoose.Types.ObjectId);
     }
 
-    // Post-commit async or immediate update of ledger
-    setTimeout(() => {
-      recalculateIncentivesForPeriod(affectedEmployees, saleDateObj).catch(console.error);
-    }, 50);
-
     return sale;
   });
+
+  // 6. Recalculate incentives for the salesperson and their ASM only after the
+  // sale has committed, so the ledger always reflects persisted data.
+  await recalculateIncentivesForPeriod(affectedEmployees, sale.saleDate);
+  return sale;
 }
 
 /**
@@ -286,7 +209,7 @@ export async function cancelSale(
   reason: string,
   user: JWTPayload
 ): Promise<ISale> {
-  return await withTransaction(async (session) => {
+  const cancelled = await withTransaction(async (session) => {
     const sale = await Sale.findById(saleId).session(session ?? null);
     if (!sale) {
       throw new Error("Sale not found");
@@ -326,17 +249,13 @@ export async function cancelSale(
       );
     }
 
-    // Recalculate incentives for affected employees
-    const affected = [sale.soldBy];
-    if (sale.asmAtSale) {
-      affected.push(sale.asmAtSale);
-    }
-
-    setTimeout(() => {
-      recalculateIncentivesForPeriod(affected, sale.saleDate).catch(console.error);
-    }, 50);
-
     return sale;
   });
+
+  // Reverse the incentive impact once the cancellation is committed.
+  const affected = [cancelled.soldBy];
+  if (cancelled.asmAtSale) affected.push(cancelled.asmAtSale);
+  await recalculateIncentivesForPeriod(affected, cancelled.saleDate);
+  return cancelled;
 }
 

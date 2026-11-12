@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, verifyAccessToken, getTokenFromRequest } from "@/lib/auth";
 import { hasPermission } from "@/lib/rbac";
 import { Permission, JWTPayload, ApiResponse } from "@/types";
+import mongoose from "mongoose";
+
+/** Guard route params so malformed IDs return 404 instead of a 500 CastError. */
+export function isValidId(id: string): boolean {
+  return mongoose.isValidObjectId(id);
+}
 
 export function jsonResponse<T>(
   data?: T,

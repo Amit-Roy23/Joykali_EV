@@ -2,163 +2,223 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Lock, Mail, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Lock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { BrandLogo, BrandMark } from "@/components/layout/BrandMark";
+import { RoleBadge } from "@/components/ui/kit";
+import { cn } from "@/components/ui/button";
+
+/**
+ * Demo accounts are only listed when NEXT_PUBLIC_DEMO_MODE=true. They simply
+ * pre-fill the normal login form — there is no bypass on the server.
+ */
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+const DEMO_PASSWORD = "Joykali@123";
+const DEMO_ACCOUNTS = [
+  { role: "ADMIN", name: "Rajib Chakraborty", login: "admin@joykaliev.in", blurb: "Users, roles, settings, audit trail" },
+  { role: "MANAGING_PARTNER", name: "Joydeb Kali Sarkar", login: "mp@joykaliev.in", blurb: "Approves schemes & locks payroll" },
+  { role: "BUSINESS_HEAD", name: "Ananya Bhattacharya", login: "bh@joykaliev.in", blurb: "Runs payroll, dealers & stock" },
+  { role: "ASM", name: "Moumita Banerjee", login: "asm.kolkata@joykaliev.in", blurb: "Kolkata team & leaderboard" },
+  { role: "FEC", name: "Arnab Chatterjee", login: "fec5@joykaliev.in", blurb: "Books sales, tracks incentives" },
+];
 
 export default function LoginPage() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const signIn = async (id: string, pw: string, key = "form") => {
+    setLoading(key);
     setError(null);
-
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password }),
+        body: JSON.stringify({ identifier: id, password: pw }),
       });
-
       const data = await res.json();
-
       if (!res.ok || !data.success) {
-        setError(data.error || "Login failed. Please check credentials.");
-        setLoading(false);
+        setError(data.error || "Login failed. Please check your credentials.");
+        setLoading(null);
         return;
       }
-
-      if (data.data?.mustChangePassword) {
-        router.push("/change-password");
-      } else {
-        router.push("/");
-      }
+      const from = new URLSearchParams(window.location.search).get("from");
+      const next = from && from.startsWith("/") && !from.startsWith("//") ? from : "/";
+      router.push(data.data?.mustChangePassword ? "/change-password" : next);
       router.refresh();
     } catch (err: any) {
       setError(err.message || "Network error. Please try again.");
-      setLoading(false);
+      setLoading(null);
     }
   };
 
-  const fillTestCredentials = (id: string, pass: string) => {
-    setIdentifier(id);
-    setPassword(pass);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Background Glows */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-teal-600/20 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-dvh bg-background lg:grid lg:grid-cols-[1.05fr_1fr]">
+      {/* ---------------------------------------------------------- hero */}
+      <section className="surface-ink relative overflow-hidden px-6 pb-10 pt-[max(2rem,env(safe-area-inset-top))] text-white sm:px-10 lg:flex lg:flex-col lg:justify-between lg:px-14 lg:py-12">
+        <BrandMark />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center">
-        <div className="mx-auto w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-500/25 mb-4">
-          <Zap className="w-8 h-8 fill-current" />
+        <div className="mt-10 max-w-xl lg:mt-0">
+          <p className="inline-flex items-center gap-2 rounded-full border border-volt-300/30 bg-volt-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-volt-300">
+            <span className="h-1.5 w-1.5 animate-pulse2 rounded-full bg-volt-300" /> Dealer network · Live
+          </p>
+          <h1 className="mt-5 font-display text-[32px] font-bold leading-[1.08] tracking-tight sm:text-5xl">
+            Every sale, every dealer, <br className="hidden sm:block" />
+            every rupee — <span className="bg-gradient-to-r from-volt-300 to-brand-300 bg-clip-text text-transparent">fully charged.</span>
+          </h1>
+          <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300 sm:text-base">
+            One place for Joykali&apos;s vehicle stock, dealer allocations, field sales, incentive schemes and payroll —
+            with the right view for every role from FEC to Admin.
+          </p>
+
+          {/* Signature visual: the "charge" stack */}
+          <div className="mt-8 hidden max-w-md gap-3 sm:grid sm:grid-cols-3">
+            {[
+              { k: "Schemes → payouts", v: "Auto-synced" },
+              { k: "Invoices", v: "GST-ready" },
+              { k: "Payslips", v: "One click" },
+            ].map((s) => (
+              <div key={s.k} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5 backdrop-blur">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{s.k}</p>
+                <p className="mt-1 font-display text-sm font-semibold text-white">{s.v}</p>
+              </div>
+            ))}
+          </div>
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-white">
-          Joykali EV Mobility
-        </h2>
-        <p className="mt-1 text-sm text-slate-400">
-          Electric Vehicle Dealership & Enterprise Management System
-        </p>
-      </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0">
-        <div className="bg-slate-900/90 backdrop-blur-xl border border-slate-800 py-8 px-6 shadow-2xl rounded-2xl sm:px-10">
-          <form className="space-y-5" onSubmit={handleSubmit}>
+        <div className="mt-10 hidden items-center gap-6 text-xs text-slate-400 lg:flex">
+          <HierarchyStrip />
+        </div>
+
+        {/* decorative bolt */}
+        <BrandLogo className="pointer-events-none absolute -right-16 -top-10 h-72 w-72 opacity-[0.07] sm:-right-10 lg:-bottom-16 lg:top-auto lg:h-[26rem] lg:w-[26rem]" />
+      </section>
+
+      {/* ---------------------------------------------------------- form */}
+      <section className="relative -mt-6 rounded-t-[28px] bg-background px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 sm:px-10 lg:mt-0 lg:flex lg:items-center lg:justify-center lg:rounded-none lg:py-12">
+        <div className="mx-auto w-full max-w-md">
+          <h2 className="font-display text-2xl font-bold tracking-tight text-slate-900">Sign in</h2>
+          <p className="mt-1 text-sm text-slate-500">Use your employee code (e.g. JKE-FEC-0001) or work email.</p>
+
+          <form
+            className="mt-6 space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              signIn(identifier, password);
+            }}
+          >
             {error && (
-              <div className="p-3 bg-red-950/60 border border-red-800 text-red-200 text-xs rounded-lg flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+              <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700" role="alert">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
-
-            <div>
-              <Label className="text-slate-300">Employee Code or Email</Label>
-              <div className="mt-1.5 relative">
+            <div className="space-y-1.5">
+              <Label htmlFor="identifier">Employee code or email</Label>
+              <div className="relative">
+                <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
-                  type="text"
+                  id="identifier"
+                  autoComplete="username"
                   required
-                  placeholder="e.g. admin@joykali.com or JKE-ADM-0001"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 pl-3 focus-visible:ring-emerald-500"
+                  placeholder="JKE-FEC-0001"
+                  className="h-11 pl-9"
                 />
               </div>
             </div>
-
-            <div>
-              <Label className="text-slate-300">Password</Label>
-              <div className="mt-1.5 relative">
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
-                  type="password"
+                  id="password"
+                  type={showPw ? "text" : "password"}
+                  autoComplete="current-password"
                   required
-                  placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="bg-slate-950 border-slate-700 text-white placeholder:text-slate-500 pl-3 focus-visible:ring-emerald-500"
+                  placeholder="••••••••"
+                  className="h-11 px-9"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? "Hide password" : "Show password"}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:text-slate-700"
+                >
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
             </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 h-auto text-sm transition-all"
-            >
-              {loading ? "Authenticating..." : "Sign In to Portal"}
-              {!loading && <ArrowRight className="w-4 h-4" />}
+            <Button type="submit" size="lg" className="w-full" disabled={!!loading}>
+              {loading === "form" ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Sign in <ArrowRight className="h-4 w-4" />
             </Button>
           </form>
 
-          {/* Quick Demo Credentials */}
-          <div className="mt-6 pt-6 border-t border-slate-800/80">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">
-              Quick Demo Accounts
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <button
-                type="button"
-                onClick={() => fillTestCredentials("admin@joykali.com", "Admin@123")}
-                className="p-2 rounded bg-slate-950/70 border border-slate-800 hover:border-emerald-600 text-slate-300 text-left transition-colors"
-              >
-                <span className="font-semibold text-white block">👑 Admin</span>
-                admin@joykali.com
-              </button>
-              <button
-                type="button"
-                onClick={() => fillTestCredentials("mp@joykali.com", "Admin@123")}
-                className="p-2 rounded bg-slate-950/70 border border-slate-800 hover:border-emerald-600 text-slate-300 text-left transition-colors"
-              >
-                <span className="font-semibold text-white block">💼 Partner</span>
-                mp@joykali.com
-              </button>
-              <button
-                type="button"
-                onClick={() => fillTestCredentials("asm1@joykali.com", "Admin@123")}
-                className="p-2 rounded bg-slate-950/70 border border-slate-800 hover:border-emerald-600 text-slate-300 text-left transition-colors"
-              >
-                <span className="font-semibold text-white block">📈 ASM</span>
-                asm1@joykali.com
-              </button>
-              <button
-                type="button"
-                onClick={() => fillTestCredentials("fec1@joykali.com", "Admin@123")}
-                className="p-2 rounded bg-slate-950/70 border border-slate-800 hover:border-emerald-600 text-slate-300 text-left transition-colors"
-              >
-                <span className="font-semibold text-white block">🛵 FEC (Sales)</span>
-                fec1@joykali.com
-              </button>
+          {DEMO_MODE && (
+            <div className="mt-8">
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-200" />
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Explore the demo as</p>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+              <div className="mt-4 grid gap-2">
+                {DEMO_ACCOUNTS.map((a) => (
+                  <button
+                    key={a.role}
+                    disabled={!!loading}
+                    onClick={() => {
+                      setIdentifier(a.login);
+                      setPassword(DEMO_PASSWORD);
+                      signIn(a.login, DEMO_PASSWORD, a.role);
+                    }}
+                    className={cn(
+                      "group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-card transition",
+                      "hover:border-brand-300 hover:shadow-lift disabled:opacity-60"
+                    )}
+                  >
+                    <RoleBadge role={a.role} short className="w-16 justify-center py-1" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-900">{a.name}</p>
+                      <p className="truncate text-xs text-slate-500">{a.blurb}</p>
+                    </div>
+                    {loading === a.role ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-brand-600" />
+                    ) : (
+                      <ArrowRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 text-center text-[11px] text-slate-400">
+                Demo password for every account: <span className="font-mono font-semibold text-slate-600">{DEMO_PASSWORD}</span>
+              </p>
             </div>
-          </div>
+          )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }
 
+function HierarchyStrip() {
+  const chain = ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"];
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="mr-1 text-slate-500">Access hierarchy</span>
+      {chain.map((r, i) => (
+        <React.Fragment key={r}>
+          <RoleBadge role={r} short className="ring-white/10" />
+          {i < chain.length - 1 && <span className="text-slate-600">‹</span>}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}

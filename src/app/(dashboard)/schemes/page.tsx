@@ -1,4 +1,5 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 
 export default function SchemesListPage() {
+  const { can } = useSession();
   const [schemes, setSchemes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,11 +54,13 @@ export default function SchemesListPage() {
             Define performance payout rules: Per-Unit, Slabs, Target Bonuses, and Team Overrides
           </p>
         </div>
-        <Link href="/schemes/builder">
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
-            <PlusCircle className="w-4 h-4" /> Build New Scheme
-          </Button>
-        </Link>
+        {can("scheme.create") && (
+          <Link href="/schemes/builder">
+            <Button size="sm">
+              <PlusCircle className="w-4 h-4" /> Build New Scheme
+            </Button>
+          </Link>
+        )}
       </div>
 
       <Card>
@@ -127,12 +131,12 @@ export default function SchemesListPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {s.status === "DRAFT" && (
+                        {s.status === "DRAFT" && can("scheme.approve") && (
                           <Button
                             size="sm"
                             variant="secondary"
                             onClick={() => handleApprove(s._id)}
-                            className="text-xs h-7 text-emerald-800 bg-emerald-100 hover:bg-emerald-200"
+                            className="text-xs h-7 text-brand-800 bg-brand-100 hover:bg-brand-200"
                           >
                             Approve & Activate
                           </Button>

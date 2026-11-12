@@ -1,16 +1,19 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Users, PlusCircle, Search, GitBranch, Eye, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, cn } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/badge";
+import { Avatar, EmptyState, PageHeader, RoleBadge, Skeleton } from "@/components/ui/kit";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
 
 export default function EmployeesListPage() {
+  const { can } = useSession();
   const [employees, setEmployees] = useState<any[]>([]);
   const [managers, setManagers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,18 +41,18 @@ export default function EmployeesListPage() {
         professionalTax: true,
       },
       bankDetails: {
-        accountNo: "123456789012",
-        ifsc: "SBIN0001234",
-        bankName: "State Bank of India",
+        accountNo: "",
+        ifsc: "",
+        bankName: "",
       },
-      pan: "ABCDE1234F",
+      pan: "",
     },
   });
   const [submitting, setSubmitting] = useState(false);
 
   const fetchEmployees = () => {
     setLoading(true);
-    fetch(`/api/employees?search=${search}&role=${role}`)
+    fetch(`/api/employees?limit=100&search=${encodeURIComponent(search)}&role=${role}`)
       .then((res) => res.json())
       .then((res) => {
         if (res.success) setEmployees(res.data);
@@ -90,129 +93,141 @@ export default function EmployeesListPage() {
     }
   };
 
+  const ROLES = [
+    { id: "", label: "Everyone" },
+    { id: "FEC", label: "FEC" },
+    { id: "ASM", label: "ASM" },
+    { id: "BUSINESS_HEAD", label: "BH" },
+    { id: "MANAGING_PARTNER", label: "MP" },
+    { id: "ADMIN", label: "Admin" },
+  ];
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Workforce & Employees</h1>
-          <p className="text-xs text-slate-500">
-            Field executives, area managers, business heads, and salary structures
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/employees/tree">
-            <Button size="sm" variant="outline">
-              <GitBranch className="w-4 h-4" /> Org Hierarchy Tree
-            </Button>
-          </Link>
-          <Button
-            size="sm"
-            onClick={() => setIsModalOpen(true)}
-            className="bg-emerald-600 hover:bg-emerald-500"
-          >
-            <PlusCircle className="w-4 h-4" /> Add Employee
-          </Button>
+    <div className="animate-fade-up">
+      <PageHeader
+        eyebrow="People"
+        title="Employees"
+        description={`${employees.length} people · codes, roles, reporting lines and salary structures`}
+        actions={
+          <>
+            <Link href="/employees/tree">
+              <Button size="sm" variant="outline">
+                <GitBranch className="h-4 w-4" /> Org chart
+              </Button>
+            </Link>
+            {can("employee.manage") && (
+              <Button size="sm" onClick={() => setIsModalOpen(true)}>
+                <PlusCircle className="h-4 w-4" /> Add employee
+              </Button>
+            )}
+          </>
+        }
+      />
+
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center">
+        <form
+          className="relative flex-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            fetchEmployees();
+          }}
+        >
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, code or email — press Enter" className="pl-9" />
+        </form>
+        <div className="scroll-thin -mx-1 flex gap-1.5 overflow-x-auto px-1">
+          {ROLES.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => setRole(r.id)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                role === r.id ? "border-ink-900 bg-ink-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+              )}
+            >
+              {r.label}
+            </button>
+          ))}
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-4 border-b border-slate-100">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-              <Input
-                placeholder="Search by code, employee name, phone or email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && fetchEmployees()}
-                className="pl-9"
-              />
-            </div>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
-            >
-              <option value="">All Roles</option>
-              <option value="FEC">FEC (Field Executive)</option>
-              <option value="ASM">ASM (Area Sales Manager)</option>
-              <option value="BUSINESS_HEAD">Business Head</option>
-              <option value="MANAGING_PARTNER">Managing Partner</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-            <Button size="sm" variant="secondary" onClick={fetchEmployees}>
-              Search
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee Code</TableHead>
-                <TableHead>Full Name</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Designation</TableHead>
-                <TableHead>Reports To</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-16" />
+          ))}
+        </div>
+      ) : employees.length === 0 ? (
+        <Card>
+          <EmptyState icon={Users} title="No employees match" />
+        </Card>
+      ) : (
+        <>
+          <ul className="space-y-2 md:hidden">
+            {employees.map((emp) => (
+              <li key={emp._id}>
+                <Link href={`/employees/${emp._id}`} className="flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card active:bg-slate-50">
+                  <Avatar name={emp.name} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-slate-900">{emp.name}</p>
+                    <p className="truncate font-mono text-[11px] text-slate-500">{emp.employeeCode}</p>
+                    {emp.reportsTo && <p className="truncate text-[11px] text-slate-500">Reports to {emp.reportsTo.name}</p>}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <RoleBadge role={emp.role} short />
+                    {emp.status !== "ACTIVE" && <StatusBadge status={emp.status} />}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          <Card className="hidden overflow-hidden md:block">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-6 text-slate-400">
-                    Loading employee directory...
-                  </TableCell>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Reports to</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ) : employees.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-6 text-slate-500">
-                    No employees found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                employees.map((emp) => (
-                  <TableRow key={emp._id}>
-                    <TableCell className="font-mono font-bold text-xs text-emerald-700">
-                      {emp.employeeCode}
+              </TableHeader>
+              <TableBody>
+                {employees.map((emp) => (
+                  <TableRow key={emp._id} className="cursor-pointer" onClick={() => (window.location.href = `/employees/${emp._id}`)}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar name={emp.name} size="sm" />
+                        <div className="min-w-0">
+                          <Link href={`/employees/${emp._id}`} className="font-semibold text-slate-900 hover:text-brand-700">
+                            {emp.name}
+                          </Link>
+                          <p className="truncate text-[11px] text-slate-500">{emp.designation}</p>
+                        </div>
+                      </div>
                     </TableCell>
-                    <TableCell className="font-semibold text-xs text-slate-900">
-                      {emp.name}
+                    <TableCell className="font-mono text-xs font-semibold text-brand-700">{emp.employeeCode}</TableCell>
+                    <TableCell>
+                      <RoleBadge role={emp.role} />
+                    </TableCell>
+                    <TableCell className="text-slate-700">{emp.reportsTo?.name || <span className="text-slate-400">—</span>}</TableCell>
+                    <TableCell>
+                      <p className="text-xs text-slate-700">{emp.email}</p>
+                      <p className="text-[11px] text-slate-500">{emp.phone}</p>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{emp.role.replace(/_/g, " ")}</Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-600">{emp.designation}</TableCell>
-                    <TableCell className="text-xs text-slate-700">
-                      {emp.reportsTo ? `${emp.reportsTo.name}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-500">
-                      {emp.phone} <br />
-                      <span className="text-[10px] text-slate-400">{emp.email}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={emp.status === "ACTIVE" ? "success" : "secondary"}>
-                        {emp.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/employees/${emp._id}`}>
-                        <Button variant="ghost" size="icon" title="View Profile">
-                          <Eye className="w-4 h-4 text-slate-600" />
-                        </Button>
-                      </Link>
+                      <StatusBadge status={emp.status} />
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </>
+      )}
 
-      {/* Add Employee Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -259,7 +274,7 @@ export default function EmployeesListPage() {
             <div>
               <Label>Role *</Label>
               <select
-                className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-emerald-500 font-semibold"
+                className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500 font-semibold"
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
               >
@@ -284,7 +299,7 @@ export default function EmployeesListPage() {
             <div>
               <Label>Reports To (Manager)</Label>
               <select
-                className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-emerald-500"
+                className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500"
                 value={form.reportsTo}
                 onChange={(e) => setForm({ ...form, reportsTo: e.target.value })}
               >
@@ -424,6 +439,26 @@ export default function EmployeesListPage() {
                     })
                   }
                   className="mt-1 font-mono uppercase"
+                  placeholder="SBIN0001234"
+                  required
+                />
+              </div>
+              <div>
+                <Label>Bank Name</Label>
+                <Input
+                  value={form.salary.bankDetails.bankName}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      salary: {
+                        ...form.salary,
+                        bankDetails: { ...form.salary.bankDetails, bankName: e.target.value },
+                      },
+                    })
+                  }
+                  className="mt-1"
+                  placeholder="State Bank of India"
+                  required
                 />
               </div>
             </div>
@@ -436,7 +471,7 @@ export default function EmployeesListPage() {
             <Button
               type="submit"
               disabled={submitting}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-brand-600 hover:bg-brand-500 text-white"
             >
               {submitting ? "Onboarding..." : "Onboard Employee"}
             </Button>

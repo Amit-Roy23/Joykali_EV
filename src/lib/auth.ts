@@ -4,12 +4,7 @@ import { JWTPayload } from "@/types";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
-const ACCESS_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_SECRET || "joykali_jwt_access_secret_super_secure_key_12345"
-);
-const REFRESH_SECRET = new TextEncoder().encode(
-  process.env.JWT_REFRESH_SECRET || "joykali_jwt_refresh_secret_super_secure_key_67890"
-);
+import { accessSecret, refreshSecret } from "@/lib/secrets";
 
 export const ACCESS_COOKIE_NAME = "joykali_access_token";
 export const REFRESH_COOKIE_NAME = "joykali_refresh_token";
@@ -37,7 +32,7 @@ export async function signAccessToken(payload: JWTPayload): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("15m")
-    .sign(ACCESS_SECRET);
+    .sign(accessSecret());
 }
 
 /**
@@ -48,7 +43,7 @@ export async function signRefreshToken(payload: JWTPayload): Promise<string> {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(REFRESH_SECRET);
+    .sign(refreshSecret());
 }
 
 /**
@@ -56,7 +51,7 @@ export async function signRefreshToken(payload: JWTPayload): Promise<string> {
  */
 export async function verifyAccessToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, ACCESS_SECRET);
+    const { payload } = await jwtVerify(token, accessSecret());
     return payload as unknown as JWTPayload;
   } catch (error) {
     return null;
@@ -68,7 +63,7 @@ export async function verifyAccessToken(token: string): Promise<JWTPayload | nul
  */
 export async function verifyRefreshToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, REFRESH_SECRET);
+    const { payload } = await jwtVerify(token, refreshSecret());
     return payload as unknown as JWTPayload;
   } catch (error) {
     return null;

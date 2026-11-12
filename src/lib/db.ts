@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+// Side-effect import: registers every schema before any query/populate runs.
+import "@/models";
 
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/joykali_ev";
 

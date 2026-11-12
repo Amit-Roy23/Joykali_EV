@@ -37,7 +37,7 @@ export default function ReportsPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Filter className="w-4 h-4 text-emerald-600" /> Date Range Filter
+            <Filter className="w-4 h-4 text-brand-600" /> Date Range Filter
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -66,9 +66,9 @@ export default function ReportsPage() {
 
       {/* Reports Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <Card className="hover:border-emerald-300 transition-all">
+        <Card className="hover:border-brand-300 transition-all">
           <CardHeader>
-            <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center mb-2">
+            <div className="w-10 h-10 rounded-lg bg-brand-100 text-brand-800 flex items-center justify-center mb-2">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <CardTitle className="text-sm">Sales Register</CardTitle>
@@ -78,7 +78,7 @@ export default function ReportsPage() {
               Detailed list of all delivered sales invoices, customer details, chassis numbers, GST breakdown, and salesperson attribution.
             </p>
             <Button
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-xs"
+              className="w-full bg-brand-600 hover:bg-brand-500 text-xs"
               onClick={() =>
                 downloadReport(
                   "/api/reports/sales-register/excel",

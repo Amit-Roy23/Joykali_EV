@@ -8,10 +8,11 @@ import { IncentiveLedger } from "@/models/IncentiveLedger";
 import { PayrollEntry } from "@/models/PayrollEntry";
 import {
   authenticateAndAuthorize,
+  isValidId,
   jsonResponse,
   errorResponse,
 } from "@/lib/apiHelper";
-import { canManageRole } from "@/lib/rbac";
+import { canManageRole, getScopeFilter } from "@/lib/rbac";
 import { hashPassword } from "@/lib/auth";
 import { rupeesToPaise } from "@/lib/money";
 import { logAudit } from "@/lib/audit";
@@ -27,7 +28,11 @@ export async function GET(
     if (auth.error) return auth.error;
 
     const { id } = await params;
-    const user = await User.findById(id)
+    if (!isValidId(id)) return errorResponse("Employee not found", 404);
+    // Scoped lookup: salary, bank and PAN details are only visible to the
+    // employee themselves, their reporting chain, and BH and above.
+    const scope = await getScopeFilter(auth.user, "employees");
+    const user = await User.findOne({ $and: [{ _id: id }, scope] })
       .populate("reportsTo", "name employeeCode role")
       .populate("dealer", "name dealerCode")
       .select("-passwordHash")
@@ -101,6 +106,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await req.json();
+    if (!isValidId(id)) return errorResponse("Employee not found", 404);
 
     const existingUser = await User.findById(id);
     if (!existingUser) return errorResponse("Employee not found", 404);
@@ -126,7 +132,7 @@ export async function PUT(
             {
               employee: existingUser._id,
               previousManager: existingUser.reportsTo || null,
-              newManager: new mongoose.Types.ObjectId(body.reportsTo),
+              newManager: body.reportsTo ? new mongoose.Types.ObjectId(body.reportsTo) : null,
               changedBy: new mongoose.Types.ObjectId(auth.user.userId),
               changedAt: new Date(),
               reason: body.reassignmentReason || "Manager reassignment",

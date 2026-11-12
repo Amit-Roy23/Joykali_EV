@@ -1,4 +1,5 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -26,6 +27,7 @@ export default function SaleDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { can } = useSession();
   const { id } = use(params);
   const router = useRouter();
 
@@ -140,12 +142,12 @@ export default function SaleDetailPage({
             target="_blank"
             rel="noreferrer"
           >
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
+            <Button size="sm" className="bg-brand-600 hover:bg-brand-500">
               <Download className="w-4 h-4" /> Download Tax Invoice (PDF)
             </Button>
           </a>
 
-          {sale.status !== "CANCELLED" && (
+          {sale.status !== "CANCELLED" && can("sales.cancel") && (
             <Button
               variant="outline"
               size="sm"
@@ -305,9 +307,9 @@ export default function SaleDetailPage({
                 </div>
               )}
 
-              <div className="flex justify-between py-3 border-t-2 border-emerald-500 font-bold text-sm text-slate-900">
+              <div className="flex justify-between py-3 border-t-2 border-brand-500 font-bold text-sm text-slate-900">
                 <span>Total Invoice Amount</span>
-                <span className="text-emerald-700 text-base">{formatINR(sale.totalAmount)}</span>
+                <span className="text-brand-700 text-base">{formatINR(sale.totalAmount)}</span>
               </div>
             </div>
           </CardContent>

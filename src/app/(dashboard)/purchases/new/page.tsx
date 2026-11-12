@@ -189,7 +189,7 @@ export default function NewPurchasePage() {
                 required
                 value={supplierId}
                 onChange={(e) => setSupplierId(e.target.value)}
-                className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-emerald-500"
+                className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500"
               >
                 {suppliers.map((s) => (
                   <option key={s._id} value={s._id}>
@@ -236,7 +236,7 @@ export default function NewPurchasePage() {
                   required
                   value={selectedModel}
                   onChange={(e) => handleModelChange(e.target.value)}
-                  className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-emerald-500"
+                  className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500"
                 >
                   {models.map((m) => (
                     <option key={m._id} value={m._id}>
@@ -278,7 +278,7 @@ export default function NewPurchasePage() {
                 <span className="mx-2">•</span>
                 <span>GST (5%): ₹{gstAmount.toLocaleString("en-IN")}</span>
               </div>
-              <div className="text-sm font-bold text-emerald-400">
+              <div className="text-sm font-bold text-brand-400">
                 Total Cost: {formatINR(rupeesToPaise(grandTotal))}
               </div>
             </div>
@@ -357,7 +357,7 @@ export default function NewPurchasePage() {
           <Button
             type="submit"
             disabled={loading}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-36"
+            className="bg-brand-600 hover:bg-brand-500 text-white min-w-36"
           >
             {loading ? "Inwarding..." : "Confirm & Inward to Stock"}
           </Button>

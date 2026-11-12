@@ -1,5 +1,30 @@
 import { numberToWordsINR, paiseToRupees } from "@/lib/money";
 
+/**
+ * West Bengal Professional Tax schedule (monthly, on gross salary). The
+ * previous flat ₹200 overcharged everyone earning ₹40,000 or less.
+ * Amounts in paise; `upTo` is an inclusive upper bound in paise (null = no cap).
+ */
+export interface PtSlab {
+  upTo: number | null;
+  amount: number;
+}
+
+export const WEST_BENGAL_PT_SLABS: PtSlab[] = [
+  { upTo: 1000000, amount: 0 }, // up to ₹10,000: nil
+  { upTo: 1500000, amount: 11000 }, // ₹10,001 – ₹15,000: ₹110
+  { upTo: 2500000, amount: 13000 }, // ₹15,001 – ₹25,000: ₹130
+  { upTo: 4000000, amount: 15000 }, // ₹25,001 – ₹40,000: ₹150
+  { upTo: null, amount: 20000 }, // above ₹40,000: ₹200
+];
+
+export function professionalTaxFor(grossPaise: number, slabs: PtSlab[]): number {
+  for (const slab of slabs) {
+    if (slab.upTo == null || grossPaise <= slab.upTo) return slab.amount;
+  }
+  return 0;
+}
+
 export interface SalaryStructureInput {
   basic: number; // in paise
   hra: number; // in paise
@@ -35,6 +60,8 @@ export interface PayrollCalculationParams {
     pfEnabled?: boolean;
     esiEnabled?: boolean;
     ptEnabled?: boolean;
+    /** When provided, PT is looked up from these slabs on gross pay instead of the flat amount. */
+    ptSlabs?: PtSlab[];
   };
 }
 
@@ -141,7 +168,10 @@ export function calculatePayrollEntry(
 
   let ptDeduction = 0;
   if (ptGlobalEnabled && salary.fixedDeductions?.professionalTax && paidDays > 0) {
-    ptDeduction = ptDefault;
+    ptDeduction =
+      settings.ptSlabs && settings.ptSlabs.length > 0
+        ? professionalTaxFor(grossPay, settings.ptSlabs)
+        : ptDefault;
   }
 
   const totalDeductions =
@@ -182,3 +212,27 @@ export function calculatePayrollEntry(
   };
 }
 
+
+/** Map the stored company settings onto the engine's statutory settings. */
+export function statutorySettingsFrom(
+  sd?: {
+    pfRate?: number;
+    esiRate?: number;
+    ptMonthlyPaise?: number;
+    pfEnabled?: boolean;
+    esiEnabled?: boolean;
+    ptEnabled?: boolean;
+    ptMode?: "WB_SLAB" | "FLAT";
+  } | null
+): PayrollCalculationParams["settings"] {
+  if (!sd) return { ptSlabs: WEST_BENGAL_PT_SLABS };
+  return {
+    pfRate: sd.pfRate,
+    esiRate: sd.esiRate,
+    ptMonthlyPaise: sd.ptMonthlyPaise,
+    pfEnabled: sd.pfEnabled,
+    esiEnabled: sd.esiEnabled,
+    ptEnabled: sd.ptEnabled,
+    ptSlabs: sd.ptMode === "FLAT" ? undefined : WEST_BENGAL_PT_SLABS,
+  };
+}

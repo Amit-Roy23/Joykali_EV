@@ -73,7 +73,7 @@ export default function SchemeDetailPage({
           </CardHeader>
           <CardContent>
             {scheme.approvedBy ? (
-              <p className="font-semibold text-emerald-800">
+              <p className="font-semibold text-brand-800">
                 Approved by {scheme.approvedBy.name} ({scheme.approvedBy.employeeCode})
               </p>
             ) : (
@@ -105,7 +105,7 @@ export default function SchemeDetailPage({
                       <span>
                         Tier {idx + 1}: {slab.minUnits} {slab.maxUnits ? `to ${slab.maxUnits}` : "+"} units
                       </span>
-                      <span className="font-bold text-emerald-700">
+                      <span className="font-bold text-brand-700">
                         {formatINR(slab.amountPerUnit)} / unit
                       </span>
                     </div>
@@ -114,13 +114,13 @@ export default function SchemeDetailPage({
               )}
 
               {rule.ruleType === "PER_UNIT" && (
-                <p className="text-sm font-semibold text-emerald-700">
+                <p className="text-sm font-semibold text-brand-700">
                   {formatINR(rule.perUnitAmount)} per vehicle delivered
                 </p>
               )}
 
               {rule.ruleType === "TARGET_BONUS" && (
-                <p className="text-sm font-semibold text-emerald-700">
+                <p className="text-sm font-semibold text-brand-700">
                   Target: {rule.targetUnits} units → Lump sum bonus: {formatINR(rule.targetBonusAmount)}
                 </p>
               )}

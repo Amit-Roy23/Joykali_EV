@@ -176,7 +176,8 @@ export function computeIncentives(
   let totalIncentiveEarned = 0;
 
   for (const scheme of schemes) {
-    if (scheme.status !== "ACTIVE") continue;
+    // EXPIRED schemes still pay out for sales inside their validity window.
+    if (scheme.status !== "ACTIVE" && scheme.status !== "EXPIRED") continue;
 
     // Check if role is applicable
     if (

@@ -4,8 +4,8 @@ import { PayrollEntry } from "@/models/PayrollEntry";
 import { PayrollRun } from "@/models/PayrollRun";
 import { Setting } from "@/models/Setting";
 import { generatePayslipPDF } from "@/services/pdfService";
-import { authenticateAndAuthorize, errorResponse } from "@/lib/apiHelper";
-import { hasPermission } from "@/lib/rbac";
+import { authenticateAndAuthorize, errorResponse, isValidId } from "@/lib/apiHelper";
+import { getScopeFilter, hasPermission } from "@/lib/rbac";
 
 export async function GET(
   req: NextRequest,
@@ -17,7 +17,10 @@ export async function GET(
     if (auth.error) return auth.error;
 
     const { id } = await params;
-    const entry = await PayrollEntry.findById(id)
+    if (!isValidId(id)) return errorResponse("Payslip entry not found", 404);
+    // Scoped lookup: own payslip, downline payslips (ASM), or all (BH and above).
+    const scope = await getScopeFilter(auth.user, "payslips");
+    const entry = await PayrollEntry.findOne({ $and: [{ _id: id }, scope] })
       .populate("employee")
       .populate("payrollRun")
       .lean();
@@ -27,13 +30,9 @@ export async function GET(
     const emp = entry.employee as any;
     const run = entry.payrollRun as any;
 
-    // Permissions check: user can view own; with team permission can view downline; admin/MP can view all
-    const isOwn = String(emp._id) === String(auth.user.userId);
-    const canViewAll = await hasPermission(auth.user.role, "payslip.view.all");
-    const canViewTeam = await hasPermission(auth.user.role, "payslip.view.team");
-
-    if (!isOwn && !canViewAll && !canViewTeam) {
-      return errorResponse("Forbidden: You cannot view this payslip", 403);
+    // Employees without payroll access can't download a payslip that is still a draft.
+    if (!["APPROVED", "LOCKED"].includes(run?.status) && !(await hasPermission(auth.user.role, "payroll.view"))) {
+      return errorResponse("This payslip is not released yet", 403);
     }
 
     const dbSetting = await Setting.findOne().lean();

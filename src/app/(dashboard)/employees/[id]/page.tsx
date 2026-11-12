@@ -1,4 +1,5 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -28,6 +29,7 @@ export default function EmployeeDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { can } = useSession();
   const { id } = use(params);
   const [data, setData] = useState<any>(null);
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
@@ -121,14 +123,14 @@ export default function EmployeeDetailPage({
           </div>
         </div>
 
-        <Button
+        {can("employee.manage") && <Button
           size="sm"
           variant="outline"
           onClick={() => setIsReassignModalOpen(true)}
           className="text-slate-700"
         >
           <GitBranch className="w-4 h-4" /> Reassign Manager
-        </Button>
+        </Button>}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -160,7 +162,7 @@ export default function EmployeeDetailPage({
             {user.reportsTo ? (
               <>
                 <p className="font-bold text-slate-800 text-sm">{user.reportsTo.name}</p>
-                <p className="font-mono text-emerald-700">{user.reportsTo.employeeCode}</p>
+                <p className="font-mono text-brand-700">{user.reportsTo.employeeCode}</p>
                 <p className="text-slate-500">{user.reportsTo.role}</p>
               </>
             ) : (
@@ -175,7 +177,7 @@ export default function EmployeeDetailPage({
             <CardTitle className="text-xs text-slate-400 uppercase">Lifetime Delivered Sales</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-700">
+            <div className="text-2xl font-bold text-brand-700">
               {performance?.totalSalesCount || 0}{" "}
               <span className="text-xs font-normal text-slate-500">Vehicles</span>
             </div>
@@ -291,7 +293,7 @@ export default function EmployeeDetailPage({
               ) : (
                 recentPayslips.map((ps: any) => (
                   <TableRow key={ps._id}>
-                    <TableCell className="font-mono text-xs font-semibold text-emerald-700">
+                    <TableCell className="font-mono text-xs font-semibold text-brand-700">
                       {ps.payslipCode}
                     </TableCell>
                     <TableCell className="text-xs font-medium">
@@ -308,7 +310,7 @@ export default function EmployeeDetailPage({
                     <TableCell className="text-right">
                       <a href={`/api/payslips/${ps._id}/pdf`} target="_blank" rel="noreferrer">
                         <Button variant="ghost" size="icon">
-                          <Download className="w-4 h-4 text-emerald-600" />
+                          <Download className="w-4 h-4 text-brand-600" />
                         </Button>
                       </a>
                     </TableCell>
@@ -334,7 +336,7 @@ export default function EmployeeDetailPage({
               required
               value={newManagerId}
               onChange={(e) => setNewManagerId(e.target.value)}
-              className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-emerald-500"
+              className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500"
             >
               <option value="">-- Choose New Manager --</option>
               {allEmployees
@@ -364,7 +366,7 @@ export default function EmployeeDetailPage({
             <Button
               type="submit"
               disabled={savingReassignment || !newManagerId}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-brand-600 hover:bg-brand-500 text-white"
             >
               {savingReassignment ? "Updating..." : "Save Reassignment"}
             </Button>

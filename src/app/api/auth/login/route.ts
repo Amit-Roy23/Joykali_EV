@@ -22,10 +22,15 @@ export async function POST(req: NextRequest) {
     }
 
     const { identifier, password } = parseResult.data;
-    const ip = req.headers.get("x-forwarded-for") || "127.0.0.1";
+    const ip = (req.headers.get("x-forwarded-for") || "127.0.0.1").split(",")[0].trim();
 
-    // Rate limiting: max 5 login attempts per minute per IP
-    if (!checkRateLimit(`login_${ip}`, 5, 60 * 1000)) {
+    // Rate limiting per IP + account (a whole showroom often shares one IP, so
+    // a per-IP-only limit locked out colleagues). Per-account lockout below
+    // still stops password guessing.
+    if (
+      !checkRateLimit(`login_${ip}_${identifier.trim().toLowerCase()}`, 8, 60 * 1000) ||
+      !checkRateLimit(`login_ip_${ip}`, 60, 60 * 1000)
+    ) {
       return errorResponse(
         "Too many login attempts. Please wait a minute and try again.",
         429

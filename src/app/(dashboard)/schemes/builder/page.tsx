@@ -217,7 +217,7 @@ export default function SchemeBuilderPage() {
                     onClick={() => handleRoleToggle(r)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                       applicableRoles.includes(r)
-                        ? "bg-emerald-600 text-white border-emerald-600"
+                        ? "bg-brand-600 text-white border-brand-600"
                         : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"
                     }`}
                   >
@@ -249,13 +249,13 @@ export default function SchemeBuilderPage() {
                   onClick={() => setRuleType(item.type as any)}
                   className={`p-3 rounded-lg border text-left transition-all ${
                     ruleType === item.type
-                      ? "bg-emerald-50 border-emerald-500 shadow-sm"
+                      ? "bg-brand-50 border-brand-500 shadow-sm"
                       : "bg-white border-slate-200 hover:border-slate-300"
                   }`}
                 >
                   <p
                     className={`text-xs font-bold ${
-                      ruleType === item.type ? "text-emerald-800" : "text-slate-800"
+                      ruleType === item.type ? "text-brand-800" : "text-slate-800"
                     }`}
                   >
                     {item.label}
@@ -310,9 +310,9 @@ export default function SchemeBuilderPage() {
                     {slabs.map((slab, i) => (
                       <div
                         key={i}
-                        className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs"
                       >
-                        <span className="font-semibold text-slate-700 w-16">
+                        <span className="w-14 font-semibold text-slate-700">
                           Tier #{i + 1}
                         </span>
                         <div className="flex items-center gap-1">
@@ -342,7 +342,7 @@ export default function SchemeBuilderPage() {
                           />
                           <span>units:</span>
                         </div>
-                        <div className="flex items-center gap-1 ml-auto">
+                        <div className="ml-auto flex items-center gap-1">
                           <span className="font-semibold">₹</span>
                           <Input
                             type="number"
@@ -352,7 +352,7 @@ export default function SchemeBuilderPage() {
                               updated[i].amountPerUnit = Number(e.target.value);
                               setSlabs(updated);
                             }}
-                            className="w-24 h-8 text-xs font-bold"
+                            className="h-8 w-20 text-xs font-bold sm:w-24"
                           />
                           <span className="text-slate-500">/unit</span>
                           {slabs.length > 1 && (
@@ -441,10 +441,10 @@ export default function SchemeBuilderPage() {
         </Card>
 
         {/* Live Simulator Preview Card */}
-        <Card className="border-2 border-emerald-500/50 bg-gradient-to-br from-emerald-50/50 to-teal-50/30">
+        <Card className="border-2 border-brand-500/50 bg-gradient-to-br from-brand-50/50 to-teal-50/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2 text-emerald-800">
-              <Sparkles className="w-4 h-4 text-emerald-600" /> Live Simulation Calculator
+            <CardTitle className="text-sm flex items-center gap-2 text-brand-800">
+              <Sparkles className="w-4 h-4 text-brand-600" /> Live Simulation Calculator
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -458,7 +458,7 @@ export default function SchemeBuilderPage() {
                     max={30}
                     value={simUnits}
                     onChange={(e) => setSimUnits(Number(e.target.value))}
-                    className="w-full accent-emerald-600 cursor-pointer"
+                    className="w-full accent-brand-600 cursor-pointer"
                   />
                   <span className="font-bold text-sm text-slate-800 w-12 text-right">
                     {simUnits} units
@@ -467,14 +467,14 @@ export default function SchemeBuilderPage() {
               </div>
             </div>
 
-            <div className="p-4 rounded-lg bg-white border border-emerald-200 shadow-sm flex items-center justify-between">
+            <div className="p-4 rounded-lg bg-white border border-brand-200 shadow-sm flex items-center justify-between">
               <div>
                 <p className="text-xs text-slate-500">Projected Employee Incentive Payout:</p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   If an employee sells <span className="font-bold text-slate-700">{simUnits} units</span>, they will earn:
                 </p>
               </div>
-              <div className="text-2xl font-black text-emerald-600">
+              <div className="text-2xl font-black text-brand-600">
                 {formatINR(previewEarnedPaise)}
               </div>
             </div>
@@ -490,7 +490,7 @@ export default function SchemeBuilderPage() {
           <Button
             type="submit"
             disabled={loading}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-36"
+            className="bg-brand-600 hover:bg-brand-500 text-white min-w-36"
           >
             {loading ? "Saving Scheme..." : "Save Scheme as Draft"}
           </Button>
