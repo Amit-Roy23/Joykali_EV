@@ -10,6 +10,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import mongoose from "mongoose";
+import { useReliableDnsForSrv } from "./dns-fix";
 import { connectToDatabase } from "../src/lib/db";
 import { hashPassword } from "../src/lib/auth";
 import { DEFAULT_ROLE_PERMISSIONS } from "../src/lib/rbac";
@@ -31,6 +32,7 @@ async function main() {
   if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Pass a valid --email=...");
   if (password.length < 8) throw new Error("Pass --password=... with at least 8 characters");
 
+  useReliableDnsForSrv(process.env.MONGODB_URI);
   await connectToDatabase();
 
   for (const [role, permissions] of Object.entries(DEFAULT_ROLE_PERMISSIONS)) {

@@ -14,6 +14,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import mongoose from "mongoose";
+import { useReliableDnsForSrv } from "./dns-fix";
 import { connectToDatabase } from "../src/lib/db";
 import { hashPassword } from "../src/lib/auth";
 import { rupeesToPaise } from "../src/lib/money";
@@ -113,6 +114,7 @@ function confirmTarget() {
 
 async function main() {
   confirmTarget();
+  useReliableDnsForSrv(process.env.MONGODB_URI);
   await connectToDatabase();
   const db = mongoose.connection.db!;
   console.log(`Connected to ${db.databaseName}. Resetting database…`);
