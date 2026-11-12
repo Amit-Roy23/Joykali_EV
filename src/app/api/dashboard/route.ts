@@ -1,0 +1,22 @@
+import { NextRequest } from "next/server";
+import { connectToDatabase } from "@/lib/db";
+import { getDashboardData } from "@/services/reportService";
+import {
+  authenticateAndAuthorize,
+  jsonResponse,
+  errorResponse,
+} from "@/lib/apiHelper";
+
+export async function GET(req: NextRequest) {
+  try {
+    await connectToDatabase();
+    const auth = await authenticateAndAuthorize(req);
+    if (auth.error) return auth.error;
+
+    const data = await getDashboardData(auth.user);
+    return jsonResponse(data);
+  } catch (error: any) {
+    return errorResponse(error.message || "Failed to fetch dashboard data", 500);
+  }
+}
+
