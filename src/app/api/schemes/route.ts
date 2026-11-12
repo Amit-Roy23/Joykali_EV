@@ -10,12 +10,19 @@ import { IncentiveSchemeCreateSchema } from "@/validators";
 import { rupeesToPaise } from "@/lib/money";
 import { logAudit } from "@/lib/audit";
 import mongoose from "mongoose";
+import { parseBusinessDate } from "@/lib/period";
 
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
     const auth = await authenticateAndAuthorize(req, "scheme.view");
     if (auth.error) return auth.error;
+
+    // Lifecycle: ACTIVE schemes whose validity has ended become EXPIRED.
+    await IncentiveScheme.updateMany(
+      { status: "ACTIVE", validTo: { $lt: new Date() } },
+      { $set: { status: "EXPIRED" } }
+    );
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
@@ -49,6 +56,9 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parseResult.data;
+    if (parseBusinessDate(data.validTo, "end") < parseBusinessDate(data.validFrom, "start")) {
+      return errorResponse("Valid To date must be on or after Valid From date", 400);
+    }
 
     // Convert money amounts in rules to paise
     const formattedRules = data.rules.map((rule) => {
@@ -85,8 +95,8 @@ export async function POST(req: NextRequest) {
       name: data.name.trim(),
       description: data.description?.trim(),
       status: "DRAFT", // New schemes start as DRAFT
-      validFrom: new Date(data.validFrom),
-      validTo: new Date(data.validTo),
+      validFrom: parseBusinessDate(data.validFrom, "start"),
+      validTo: parseBusinessDate(data.validTo, "end"),
       applicableRoles: data.applicableRoles,
       applicableEmployees: data.applicableEmployees?.map((id) => new mongoose.Types.ObjectId(id)),
       applicableModels: data.applicableModels?.map((id) => new mongoose.Types.ObjectId(id)),

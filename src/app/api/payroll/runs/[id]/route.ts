@@ -4,6 +4,7 @@ import { PayrollRun } from "@/models/PayrollRun";
 import { PayrollEntry } from "@/models/PayrollEntry";
 import {
   authenticateAndAuthorize,
+  isValidId,
   jsonResponse,
   errorResponse,
 } from "@/lib/apiHelper";
@@ -19,6 +20,7 @@ export async function GET(
     if (auth.error) return auth.error;
 
     const { id } = await params;
+    if (!isValidId(id)) return errorResponse("Payroll run not found", 404);
     const run = await PayrollRun.findById(id)
       .populate("createdBy", "name employeeCode")
       .populate("approvedBy", "name employeeCode")

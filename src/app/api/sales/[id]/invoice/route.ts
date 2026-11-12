@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { Sale } from "@/models/Sale";
+import { getScopeFilter } from "@/lib/rbac";
 import { Setting } from "@/models/Setting";
 import { generateInvoicePDF } from "@/services/pdfService";
-import { authenticateAndAuthorize, errorResponse } from "@/lib/apiHelper";
+import { authenticateAndAuthorize, errorResponse, isValidId } from "@/lib/apiHelper";
+
+// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
+export const maxDuration = 60;
 
 export async function GET(
   req: NextRequest,
@@ -15,7 +19,10 @@ export async function GET(
     if (auth.error) return auth.error;
 
     const { id } = await params;
-    const sale = await Sale.findById(id)
+    if (!isValidId(id)) return errorResponse("Sale not found", 404);
+    // Scoped lookup: an FEC/ASM gets 404 for sales outside their own/team scope.
+    const scope = await getScopeFilter(auth.user, "sales");
+    const sale = await Sale.findOne({ $and: [{ _id: id }, scope] })
       .populate({
         path: "vehicle",
         populate: { path: "model" },

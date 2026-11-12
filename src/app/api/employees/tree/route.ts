@@ -31,6 +31,12 @@ export async function GET(req: NextRequest) {
       }
     });
 
+    // ASMs and FECs only see their own branch of the organisation.
+    if (auth.user.role === "FEC" || auth.user.role === "ASM") {
+      const own = empMap.get(String(auth.user.userId));
+      return jsonResponse(own ? [own] : []);
+    }
+
     return jsonResponse(roots);
   } catch (error: any) {
     return errorResponse(error.message || "Failed to fetch org tree", 500);

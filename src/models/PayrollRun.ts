@@ -18,6 +18,7 @@ export interface IPayrollRun extends Document {
   reviewedBy?: mongoose.Types.ObjectId | null;
   approvedBy?: mongoose.Types.ObjectId | null;
   approvedAt?: Date | null;
+  lockedBy?: mongoose.Types.ObjectId | null;
   lockedAt?: Date | null;
   notes?: string;
   createdAt: Date;
@@ -50,6 +51,7 @@ const PayrollRunSchema = new Schema<IPayrollRun>(
     reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     approvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     approvedAt: { type: Date, default: null },
+    lockedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     lockedAt: { type: Date, default: null },
     notes: { type: String },
   },

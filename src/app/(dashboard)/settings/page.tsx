@@ -62,7 +62,7 @@ export default function SettingsPage() {
           </p>
         </div>
         {savedSuccess && (
-          <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+          <span className="text-xs font-semibold text-brand-600 bg-brand-50 px-3 py-1 rounded-full border border-brand-200 flex items-center gap-1">
             <Check className="w-3.5 h-3.5" /> Settings Saved!
           </span>
         )}
@@ -225,7 +225,7 @@ export default function SettingsPage() {
           <Button
             type="submit"
             disabled={saving}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white min-w-36"
+            className="bg-brand-600 hover:bg-brand-500 text-white min-w-36"
           >
             {saving ? "Saving Changes..." : "Save Settings"}
           </Button>

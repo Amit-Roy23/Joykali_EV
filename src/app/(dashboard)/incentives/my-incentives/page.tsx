@@ -39,14 +39,14 @@ export default function MyIncentivesPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/20">
+        <Card className="border-l-4 border-l-brand-500 bg-brand-50/20">
           <CardHeader className="pb-1">
             <CardTitle className="text-xs text-slate-500 uppercase">
               Total Incentive Projected (This Month)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-extrabold text-emerald-600">
+            <div className="text-3xl font-extrabold text-brand-600">
               {formatINR(data.totalEarned)}
             </div>
             <p className="text-xs text-slate-500 mt-1">
@@ -73,7 +73,7 @@ export default function MyIncentivesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-600" /> Slab Advancement Progress
+              <TrendingUp className="w-4 h-4 text-brand-600" /> Slab Advancement Progress
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -82,12 +82,12 @@ export default function MyIncentivesPage() {
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-bold text-slate-800">{prog.schemeName}</span>
                   {prog.nextTier ? (
-                    <span className="text-emerald-700 font-semibold">
+                    <span className="text-brand-700 font-semibold">
                       Need {prog.unitsNeededForNextTier} more unit(s) for next slab @{" "}
                       {formatINR(prog.nextTier.amountPerUnit)}/unit!
                     </span>
                   ) : (
-                    <span className="text-emerald-600 font-bold flex items-center gap-1">
+                    <span className="text-brand-600 font-bold flex items-center gap-1">
                       <CheckCircle className="w-3.5 h-3.5" /> Highest Slab Reached!
                     </span>
                   )}
@@ -95,7 +95,7 @@ export default function MyIncentivesPage() {
 
                 <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden border border-slate-200">
                   <div
-                    className="bg-emerald-500 h-full rounded-full transition-all duration-500 shadow-sm"
+                    className="bg-brand-500 h-full rounded-full transition-all duration-500 shadow-sm"
                     style={{ width: `${prog.percentToNextTier}%` }}
                   />
                 </div>
@@ -134,7 +134,7 @@ export default function MyIncentivesPage() {
                     <span className="text-slate-500">{item.description}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-sm font-bold text-emerald-700 block">
+                    <span className="text-sm font-bold text-brand-700 block">
                       {formatINR(item.earnedAmount)}
                     </span>
                     <span className="text-[10px] text-slate-400">{item.unitsCount} units</span>

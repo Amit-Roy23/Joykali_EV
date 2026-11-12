@@ -1,10 +1,11 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Store, Truck, ShoppingCart, MapPin, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { formatINR } from "@/lib/money";
@@ -14,6 +15,7 @@ export default function DealerDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { can } = useSession();
   const { id } = use(params);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +50,7 @@ export default function DealerDetailPage({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-slate-900">{dealer.name}</h1>
-            <Badge variant="success">{dealer.status}</Badge>
+            <StatusBadge status={dealer.status} />
           </div>
           <p className="text-xs text-slate-500">
             Dealer Code: <span className="font-mono font-bold">{dealer.dealerCode}</span> • Owner:{" "}
@@ -104,11 +106,13 @@ export default function DealerDetailPage({
           <CardTitle className="text-sm">
             Current Stock at Dealer ({allocatedVehicles.length} Units)
           </CardTitle>
-          <Link href="/inventory">
-            <Button size="sm" variant="outline">
-              Allocate More Vehicles
-            </Button>
-          </Link>
+          {can("inventory.manage") && (
+            <Link href="/inventory">
+              <Button size="sm" variant="outline">
+                Allocate More Vehicles
+              </Button>
+            </Link>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -185,7 +189,7 @@ export default function DealerDetailPage({
               ) : (
                 salesHistory.map((s: any) => (
                   <TableRow key={s._id}>
-                    <TableCell className="font-mono font-bold text-xs text-emerald-700">
+                    <TableCell className="font-mono font-bold text-xs text-brand-700">
                       <Link href={`/sales/${s._id}`} className="hover:underline">
                         {s.saleCode}
                       </Link>
@@ -199,7 +203,7 @@ export default function DealerDetailPage({
                       {formatINR(s.totalAmount)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="success">{s.status}</Badge>
+                      <StatusBadge status={s.status} />
                     </TableCell>
                   </TableRow>
                 ))

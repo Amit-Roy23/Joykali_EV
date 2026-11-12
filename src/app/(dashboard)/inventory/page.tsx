@@ -1,4 +1,5 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -11,6 +12,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Modal } from "@/components/ui/modal";
 
 export default function InventoryPage() {
+  const { can } = useSession();
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [dealers, setDealers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,20 +121,21 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {selectedIds.length > 0 && (
+          {selectedIds.length > 0 && can("inventory.manage") && (
             <Button
               size="sm"
               onClick={() => setIsAllocateModalOpen(true)}
-              className="bg-teal-600 hover:bg-teal-500"
             >
               Allocate Selected ({selectedIds.length}) to Dealer
             </Button>
           )}
-          <a href="/api/reports/stock/excel" download>
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4" /> Stock Report
-            </Button>
-          </a>
+          {can("reports.view") && (
+            <a href="/api/reports/stock/excel" download>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4" /> Stock Report
+              </Button>
+            </a>
+          )}
           <Link href="/inventory/models">
             <Button size="sm" variant="outline">
               <Layers className="w-4 h-4" /> Vehicle Models
@@ -315,7 +318,7 @@ export default function InventoryPage() {
               required
               value={targetDealer}
               onChange={(e) => setTargetDealer(e.target.value)}
-              className="mt-1 w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-emerald-500"
+              className="mt-1 w-full h-10 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500"
             >
               <option value="">-- Choose Dealer --</option>
               {dealers.map((d) => (

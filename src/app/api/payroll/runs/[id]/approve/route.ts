@@ -8,6 +8,9 @@ import {
 } from "@/lib/apiHelper";
 import { logAudit } from "@/lib/audit";
 
+// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
+export const maxDuration = 60;
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

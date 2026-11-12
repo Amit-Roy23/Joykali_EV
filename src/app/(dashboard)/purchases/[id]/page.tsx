@@ -4,7 +4,7 @@ import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Truck, Calendar, Store, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { formatINR } from "@/lib/money";
 
@@ -48,7 +48,7 @@ export default function PurchaseDetailPage({
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-bold font-mono text-slate-900">{purchase.purchaseCode}</h1>
-              <Badge variant="secondary">{purchase.paymentStatus}</Badge>
+              <StatusBadge status={purchase.paymentStatus} />
             </div>
             <p className="text-xs text-slate-500">
               Supplier Invoice #{purchase.invoiceNumber} • Date:{" "}
@@ -85,7 +85,7 @@ export default function PurchaseDetailPage({
               <span className="text-slate-500">GST (5%):</span>
               <span className="font-semibold">{formatINR(purchase.gstAmount)}</span>
             </div>
-            <div className="flex justify-between text-sm font-bold text-emerald-700 pt-1 border-t border-slate-100">
+            <div className="flex justify-between text-sm font-bold text-brand-700 pt-1 border-t border-slate-100">
               <span>Total Cost:</span>
               <span>{formatINR(purchase.totalAmount)}</span>
             </div>
@@ -117,7 +117,7 @@ export default function PurchaseDetailPage({
                   </Badge>
                   <Link
                     href={`/inventory/${v._id}`}
-                    className="block text-[10px] text-emerald-600 hover:underline mt-1"
+                    className="block text-[10px] text-brand-600 hover:underline mt-1"
                   >
                     View Timeline
                   </Link>

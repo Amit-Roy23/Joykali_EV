@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, ShieldAlert, CheckCircle } from "lucide-react";
@@ -47,14 +48,14 @@ export default function ChangePasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="surface-ink flex min-h-dvh flex-col justify-center px-4 py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="mx-auto w-12 h-12 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl flex items-center justify-center mb-3">
           <KeyRound className="w-6 h-6" />
         </div>
-        <h2 className="text-xl font-bold text-white">Password Change Required</h2>
-        <p className="text-xs text-slate-400 mt-1">
-          For system security, you must set a new password on your first login.
+        <h2 className="font-display text-2xl font-bold text-white">Set a new password</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Required on first login; you can also change it any time from your profile menu.
         </p>
       </div>
 
@@ -76,7 +77,7 @@ export default function ChangePasswordPage() {
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Current password"
-                className="mt-1 bg-slate-950 border-slate-700 text-white"
+                className="mt-1 border-white/15 bg-white/5 text-white placeholder:text-slate-500"
               />
             </div>
 
@@ -88,7 +89,7 @@ export default function ChangePasswordPage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="New password"
-                className="mt-1 bg-slate-950 border-slate-700 text-white"
+                className="mt-1 border-white/15 bg-white/5 text-white placeholder:text-slate-500"
               />
             </div>
 
@@ -100,20 +101,23 @@ export default function ChangePasswordPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
-                className="mt-1 bg-slate-950 border-slate-700 text-white"
+                className="mt-1 border-white/15 bg-white/5 text-white placeholder:text-slate-500"
               />
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold mt-4"
+              className="w-full bg-brand-600 hover:bg-brand-500 text-white font-semibold mt-4"
             >
               {loading ? "Updating Password..." : "Set Password & Continue"}
             </Button>
           </form>
         </div>
       </div>
+      <Link href="/" className="mx-auto mt-6 text-xs font-semibold text-slate-400 hover:text-white">
+        ← Back to dashboard
+      </Link>
     </div>
   );
 }

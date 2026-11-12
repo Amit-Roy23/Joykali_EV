@@ -1,0 +1,135 @@
+# Deploying Joykali EV Mobility on Vercel
+
+One Vercel project serves everything: the pages **and** the backend (all `/api/*` routes run as
+Vercel serverless functions). The only outside service is **MongoDB Atlas**.
+
+```
+Browser ──► Vercel (Next.js pages + /api functions, region: Mumbai bom1) ──► MongoDB Atlas
+```
+
+---
+
+## 1. MongoDB Atlas (≈10 minutes)
+
+1. Create a cluster at https://cloud.mongodb.com. The free **M0** tier is fine for a demo.
+   Choose **AWS / Mumbai (ap-south-1)** so it sits next to the Vercel functions (`bom1`).
+2. **Database Access** → *Add New Database User* → username + password, role *Read and write to any database*.
+   Avoid `@ : / ? # [ ] %` in the password, or URL-encode them (`@` → `%40`), otherwise the URI breaks.
+3. **Network Access** → *Add IP Address* → **`0.0.0.0/0`** (Allow access from anywhere).
+   Vercel functions have no fixed IP addresses, so this is required. Access is still protected by the
+   username/password in the URI.
+4. **Connect** → *Drivers* → copy the string and **add the database name** `joykali_ev` before the `?`:
+
+   ```
+   mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/joykali_ev?retryWrites=true&w=majority
+   ```
+
+Atlas clusters are replica sets, so the multi-document transactions this app uses (sales, purchases,
+payroll) work out of the box.
+
+---
+
+## 2. Environment variables on Vercel
+
+Vercel → your project → **Settings → Environment Variables**. Add these four, ticking
+**Production, Preview and Development** for each:
+
+| Name | Value | Notes |
+| --- | --- | --- |
+| `MONGODB_URI` | your Atlas string from step 1.4 | Must include `/joykali_ev` before `?` |
+| `JWT_ACCESS_SECRET` | 64 random hex characters | Generate below. Keep secret. |
+| `JWT_REFRESH_SECRET` | 64 **different** random hex characters | Must not equal the access secret |
+| `NEXT_PUBLIC_DEMO_MODE` | `true` for the client demo, `false` for real use | Shows one-click demo logins. Redeploy after changing. |
+
+Generate each secret separately (run twice, use one output per variable):
+
+```bash
+openssl rand -hex 32
+```
+
+No `openssl`? Use Node instead:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Do **not** add `NODE_ENV` — Vercel sets it. The app deliberately refuses to sign logins in production
+if a secret is missing, shorter than 32 characters, or still the public development default.
+
+---
+
+## 3. Create the Vercel project
+
+1. https://vercel.com/new → **Import** the GitHub repository and pick the branch you want live
+   (or merge this branch into `main` first).
+2. Framework preset: **Next.js** (auto-detected). Leave Build/Install/Output settings on default —
+   `vercel.json` already sets them (`pnpm install --frozen-lockfile`, `pnpm run build`, region `bom1`).
+3. Add the environment variables from step 2 **before** the first deploy (or redeploy afterwards).
+4. **Deploy**.
+
+---
+
+## 4. Load data into Atlas (from your own computer, once)
+
+Vercel can't run the seed script, so run it locally against Atlas. In your local project folder put the
+Atlas string in `.env`:
+
+```env
+MONGODB_URI=mongodb+srv://USER:PASSWORD@cluster0.xxxxx.mongodb.net/joykali_ev?retryWrites=true&w=majority
+```
+
+Then **choose one**:
+
+**A — Client demo (sample data).** Erases that database and builds ~6 months of realistic history
+(18 staff, 6 dealers, ~310 sales, payroll runs). Takes about 3–10 minutes over the internet.
+
+```bash
+pnpm seed --yes
+```
+
+Every demo account uses the password `Joykali@123` — see README §6.
+
+**B — Real production (empty, no sample data).** Never deletes anything; creates the role matrix,
+company settings and the first Admin, who must change the password on first login.
+
+```bash
+pnpm setup:admin --email=you@yourcompany.in --password="Choose-A-Strong-1" --name="Your Name"
+```
+
+The seed refuses to touch a non-local database unless you add `--yes`, so it can't wipe production by accident.
+
+---
+
+## 5. Check the deployment
+
+Open **`https://<your-project>.vercel.app/api/health`**. It shows only yes/no flags, never your values:
+
+```json
+{ "ok": true, "problems": [], "checks": { "database_connected": true, "transactions_supported": true, "users": 18, ... } }
+```
+
+If `ok` is `false`, `problems` says exactly what to fix:
+
+| Problem shown | Fix |
+| --- | --- |
+| `MONGODB_URI is missing` | Add it (step 2), then **Redeploy** |
+| `JWT_…_SECRET missing, too short…` | Use a 64-character value from `openssl rand -hex 32`, redeploy |
+| `Cannot reach MongoDB…` | Atlas → Network Access → add `0.0.0.0/0`; re-check the URI |
+| `MongoDB rejected the username/password…` | Fix the user/password; URL-encode special characters |
+| `Database is empty…` | Run step 4 |
+
+Then open the site, sign in, and you're live.
+
+---
+
+## Notes
+
+- **Changing env vars** only takes effect after a redeploy (Deployments → ⋯ → Redeploy).
+  `NEXT_PUBLIC_DEMO_MODE` in particular is baked into the build.
+- **Custom domain**: Vercel → Settings → Domains. Nothing in the app needs changing.
+- **Time zone**: Vercel runs in UTC; the app computes all business months (incentives, payroll) in IST itself.
+- **Function time limit**: heavy routes (payroll generation, scheme approval, payslip ZIP, Excel) are set to
+  60 s, which is within every Vercel plan.
+- **Login rate limit** is per serverless instance (in memory). Per-account lockout after 5 wrong passwords
+  is stored in the database and always applies.
+- **Backups**: enable Atlas backups (paid tiers) or schedule `mongodump` before relying on it for real payroll.

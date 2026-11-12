@@ -5,8 +5,9 @@ import { SalaryStructure } from "@/models/SalaryStructure";
 import { IncentiveLedger } from "@/models/IncentiveLedger";
 import { Setting } from "@/models/Setting";
 import { generatePayrollRunCode, generatePayslipCode } from "@/lib/codeGenerator";
-import { calculatePayrollEntry } from "./payrollEngine";
-import { recalculateIncentivesForPeriod } from "./salesService";
+import { calculatePayrollEntry, statutorySettingsFrom } from "./payrollEngine";
+import { recalculateIncentivesForPeriod } from "./incentiveService";
+import { periodFor } from "@/lib/period";
 import { withTransaction } from "@/lib/db";
 import { JWTPayload } from "@/types";
 import { rupeesToPaise } from "@/lib/money";
@@ -18,6 +19,20 @@ export async function generateDraftPayrollRun(
   user: JWTPayload,
   notes?: string
 ): Promise<IPayrollRun> {
+  if (!Number.isInteger(month) || month < 1 || month > 12) {
+    throw new Error("Month must be between 1 and 12");
+  }
+  const { period, start: periodStart, daysInMonth } = periodFor(year, month);
+
+  // Refresh incentive ledgers first, outside the payroll transaction, so the
+  // run is generated from up-to-date figures (and the transaction stays short).
+  const activeForRecalc = await User.find({ status: "ACTIVE" }, { _id: 1 }).lean();
+  await recalculateIncentivesForPeriod(
+    activeForRecalc.map((e: any) => e._id),
+    periodStart,
+    { syncPayroll: false }
+  );
+
   return await withTransaction(async (session) => {
     const runCode = generatePayrollRunCode(year, month);
     const existingRun = await PayrollRun.findOne({ year, month }).session(session ?? null);
@@ -26,18 +41,11 @@ export async function generateDraftPayrollRun(
       throw new Error(`Payroll run for ${runCode} is LOCKED and cannot be regenerated`);
     }
 
-    const period = `${year}-${String(month).padStart(2, "0")}`;
-    const periodDate = new Date(Date.UTC(year, month - 1, 15));
-
     // Get company settings for statutory deduction rules
     const settings = await Setting.findOne().session(session ?? null).lean();
 
     // Fetch active employees
     const employees = await User.find({ status: "ACTIVE" }).session(session ?? null).lean();
-
-    // Ensure all incentives for the month are calculated
-    const empIds = employees.map((e: any) => e._id);
-    await recalculateIncentivesForPeriod(empIds, periodDate);
 
     // Create or find PayrollRun
     let payrollRun = existingRun;
@@ -58,8 +66,11 @@ export async function generateDraftPayrollRun(
       payrollRun = createdRuns[0];
     } else {
       payrollRun.status = "DRAFT";
+      payrollRun.approvedBy = undefined;
+      payrollRun.approvedAt = undefined;
       payrollRun.notes = notes || payrollRun.notes;
     }
+    const includedEmployees: mongoose.Types.ObjectId[] = [];
 
     let totalGrossPaise = 0;
     let totalDeductionsPaise = 0;
@@ -98,7 +109,7 @@ export async function generateDraftPayrollRun(
         employee: emp._id,
       }).session(session ?? null);
 
-      const workingDays = existingEntry?.workingDays || 30;
+      const workingDays = existingEntry?.workingDays || daysInMonth;
       const lopDays = existingEntry?.lopDays || 0;
       const adjustments = existingEntry?.adjustments || [];
       const tds = existingEntry?.deductions?.tds || 0;
@@ -122,7 +133,7 @@ export async function generateDraftPayrollRun(
         })),
         tds,
         advanceRecovery,
-        settings: settings?.statutoryDeductions,
+        settings: statutorySettingsFrom(settings?.statutoryDeductions),
       });
 
       const payslipCode = generatePayslipCode(year, month, emp.employeeCode);
@@ -150,13 +161,21 @@ export async function generateDraftPayrollRun(
       totalGrossPaise += calc.grossPay;
       totalDeductionsPaise += calc.totalDeductions;
       totalNetPaise += calc.netPay;
+      includedEmployees.push(emp._id as mongoose.Types.ObjectId);
     }
+
+    // Drop entries of employees who left / lost their salary structure since
+    // the last generation, so totals and payslips match the current roster.
+    await PayrollEntry.deleteMany(
+      { payrollRun: payrollRun._id, employee: { $nin: includedEmployees } },
+      { session }
+    );
 
     payrollRun.totals = {
       totalGross: totalGrossPaise,
       totalDeductions: totalDeductionsPaise,
       totalNet: totalNetPaise,
-      totalEmployees: employees.length,
+      totalEmployees: includedEmployees.length,
     };
     await payrollRun.save({ session });
 
@@ -187,6 +206,9 @@ export async function adjustPayrollEntry(
 
     const settings = await Setting.findOne().session(session ?? null).lean();
     const workingDays = data.workingDays ?? entry.workingDays;
+    if (data.lopDays !== undefined && data.lopDays < 0) {
+      throw new Error("LOP days cannot be negative");
+    }
     const lopDays = data.lopDays ?? entry.lopDays;
 
     const adjustments = [...(entry.adjustments || [])];
@@ -227,7 +249,7 @@ export async function adjustPayrollEntry(
       })),
       tds: tdsPaise,
       advanceRecovery: advanceRecoveryPaise,
-      settings: settings?.statutoryDeductions,
+      settings: statutorySettingsFrom(settings?.statutoryDeductions),
     });
 
     entry.workingDays = calc.workingDays;
@@ -249,6 +271,12 @@ export async function adjustPayrollEntry(
       totalNet: allEntries.reduce((s, e) => s + e.netPay, 0),
       totalEmployees: allEntries.length,
     };
+    // Changing a figure on an approved run invalidates the approval.
+    if (run.status === "APPROVED") {
+      run.status = "DRAFT";
+      run.approvedBy = undefined;
+      run.approvedAt = undefined;
+    }
     await run.save({ session });
 
     return entry;
@@ -262,6 +290,10 @@ export async function approvePayrollRun(
   const run = await PayrollRun.findById(runId);
   if (!run) throw new Error("Payroll run not found");
   if (run.status === "LOCKED") throw new Error("Payroll run is already locked");
+  if (run.status === "APPROVED") throw new Error("Payroll run is already approved");
+  if (!run.totals || run.totals.totalEmployees === 0) {
+    throw new Error("Cannot approve an empty payroll run");
+  }
 
   run.status = "APPROVED";
   run.approvedBy = new mongoose.Types.ObjectId(user.userId);
@@ -278,9 +310,14 @@ export async function lockPayrollRun(
     const run = await PayrollRun.findById(runId).session(session ?? null);
     if (!run) throw new Error("Payroll run not found");
     if (run.status === "LOCKED") throw new Error("Payroll run is already locked");
+    // Workflow is DRAFT -> APPROVED -> LOCKED; locking an unapproved run would
+    // let payslips be finalised without the Managing Partner's sign-off.
+    if (run.status !== "APPROVED") {
+      throw new Error("Payroll run must be APPROVED before it can be locked");
+    }
 
     run.status = "LOCKED";
-    run.approvedBy = run.approvedBy || new mongoose.Types.ObjectId(user.userId);
+    run.lockedBy = new mongoose.Types.ObjectId(user.userId);
     run.lockedAt = new Date();
     await run.save({ session });
 

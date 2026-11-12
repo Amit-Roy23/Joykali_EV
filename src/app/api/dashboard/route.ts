@@ -1,11 +1,14 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
-import { getDashboardData } from "@/services/reportService";
+import { getDashboardData } from "@/services/dashboardService";
 import {
   authenticateAndAuthorize,
   jsonResponse,
   errorResponse,
 } from "@/lib/apiHelper";
+
+// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   try {

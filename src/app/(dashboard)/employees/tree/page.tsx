@@ -16,7 +16,7 @@ function OrgNode({ node }: { node: any }) {
     MANAGING_PARTNER: "bg-indigo-100 text-indigo-800 border-indigo-200",
     BUSINESS_HEAD: "bg-blue-100 text-blue-800 border-blue-200",
     ASM: "bg-teal-100 text-teal-800 border-teal-200",
-    FEC: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    FEC: "bg-brand-100 text-brand-800 border-brand-200",
   };
 
   return (
@@ -44,7 +44,7 @@ function OrgNode({ node }: { node: any }) {
           </div>
           <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500">
             <span>{node.designation}</span>
-            <span className="font-mono text-emerald-700 font-semibold">{node.employeeCode}</span>
+            <span className="font-mono text-brand-700 font-semibold">{node.employeeCode}</span>
           </div>
         </div>
 
@@ -56,7 +56,7 @@ function OrgNode({ node }: { node: any }) {
       </div>
 
       {hasSubs && isOpen && (
-        <div className="pl-8 border-l-2 border-emerald-500/30 ml-4 space-y-3 pt-2">
+        <div className="pl-8 border-l-2 border-brand-500/30 ml-4 space-y-3 pt-2">
           {node.subordinates.map((sub: any) => (
             <OrgNode key={sub._id} node={sub} />
           ))}

@@ -9,6 +9,7 @@ import {
   errorResponse,
 } from "@/lib/apiHelper";
 import mongoose from "mongoose";
+import { periodOf } from "@/lib/period";
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
     if (auth.error) return auth.error;
 
     const now = new Date();
-    const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const { period: currentPeriod, start: startOfMonth, end: endOfMonth } = periodOf(now);
     const userObjectId = new mongoose.Types.ObjectId(auth.user.userId);
 
     const ledger = await IncentiveLedger.findOne({
@@ -34,8 +35,6 @@ export async function GET(req: NextRequest) {
     }).lean();
 
     // Personal sales count this month
-    const startOfMonth = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
-    const endOfMonth = new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59));
 
     const salesThisMonth = await Sale.find({
       soldBy: userObjectId,

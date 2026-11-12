@@ -1,6 +1,19 @@
 import mongoose from "mongoose";
+// Side-effect import: registers every schema before any query/populate runs.
+import "@/models";
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/joykali_ev";
+/**
+ * Local development falls back to a local MongoDB. In production (Vercel) the
+ * URI must be configured — failing loudly beats silently trying localhost.
+ */
+function mongoUri(): string {
+  const uri = process.env.MONGODB_URI;
+  if (uri) return uri;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("MONGODB_URI is not set. Add it in Vercel → Project → Settings → Environment Variables.");
+  }
+  return "mongodb://localhost:27017/joykali_ev";
+}
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -26,10 +39,15 @@ export async function connectToDatabase(): Promise<typeof mongoose> {
   if (!cached.promise) {
     const opts: mongoose.ConnectOptions = {
       bufferCommands: false,
+      // Serverless: each warm function instance keeps its own small pool.
       maxPoolSize: 10,
+      minPoolSize: 0,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      appName: "joykali-ev",
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((m) => {
+    cached.promise = mongoose.connect(mongoUri(), opts).then((m) => {
       return m;
     });
   }

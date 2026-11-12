@@ -1,16 +1,18 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { PlusCircle, Search, Download, Eye, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { formatINR } from "@/lib/money";
 
 export default function PurchasesListPage() {
+  const { can } = useSession();
   const [purchases, setPurchases] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -44,16 +46,20 @@ export default function PurchasesListPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <a href="/api/reports/purchase-register/excel" download>
-            <Button variant="outline" size="sm">
-              <Download className="w-4 h-4" /> Export Register
-            </Button>
-          </a>
-          <Link href="/purchases/new">
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
-              <PlusCircle className="w-4 h-4" /> New Purchase Inward
-            </Button>
-          </Link>
+          {can("reports.view") && (
+            <a href="/api/reports/purchase-register/excel" download>
+              <Button variant="outline" size="sm">
+                <Download className="w-4 h-4" /> Export Register
+              </Button>
+            </a>
+          )}
+          {can("purchase.manage") && (
+            <Link href="/purchases/new">
+              <Button size="sm">
+                <PlusCircle className="w-4 h-4" /> New Purchase Inward
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -105,7 +111,7 @@ export default function PurchasesListPage() {
               ) : (
                 purchases.map((p) => (
                   <TableRow key={p._id}>
-                    <TableCell className="font-mono font-bold text-xs text-emerald-700">
+                    <TableCell className="font-mono font-bold text-xs text-brand-700">
                       {p.purchaseCode}
                     </TableCell>
                     <TableCell className="text-xs">
@@ -122,7 +128,7 @@ export default function PurchasesListPage() {
                       {formatINR(p.totalAmount)}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">{p.paymentStatus}</Badge>
+                      <StatusBadge status={p.paymentStatus} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Link href={`/purchases/${p._id}`}>
@@ -138,6 +144,19 @@ export default function PurchasesListPage() {
           </Table>
         </CardContent>
       </Card>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            Previous
+          </Button>
+          <span className="text-xs text-slate-500 tabular">
+            Page {page} of {totalPages}
+          </span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

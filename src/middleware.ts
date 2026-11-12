@@ -2,14 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const ACCESS_SECRET = new TextEncoder().encode(
-  process.env.JWT_ACCESS_SECRET || "joykali_jwt_access_secret_super_secure_key_12345"
-);
+import { accessSecret } from "@/lib/secrets";
 
 const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
   "/api/auth/refresh",
+  "/api/health",
   "/favicon.ico",
   "/_next",
 ];
@@ -26,6 +25,17 @@ export async function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get("joykali_access_token")?.value;
+  const hasRefresh = Boolean(request.cookies.get("joykali_refresh_token")?.value);
+
+  // Access token missing/expired but a refresh token exists: renew silently.
+  // 307 keeps the method and body, so in-flight POSTs survive the hop.
+  const renew = () => {
+    const url = new URL("/api/auth/refresh", request.url);
+    url.searchParams.set("next", pathname + request.nextUrl.search);
+    return NextResponse.redirect(url, 307);
+  };
+
+  if (!token && hasRefresh) return renew();
 
   if (!token) {
     if (pathname.startsWith("/api/")) {
@@ -40,7 +50,7 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, ACCESS_SECRET);
+    const { payload } = await jwtVerify(token, accessSecret());
 
     // If user must change password, redirect away from dashboard to change-password
     if (
@@ -71,7 +81,8 @@ export async function middleware(request: NextRequest) {
         headers: requestHeaders,
       },
     });
-  } catch (err) {
+  } catch {
+    if (hasRefresh) return renew();
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
         { success: false, error: "Session expired or invalid" },

@@ -1,4 +1,5 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -26,6 +27,7 @@ export default function PayrollRunDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { can } = useSession();
   const { id } = use(params);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -173,30 +175,32 @@ export default function PayrollRunDetailPage({
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Excel Register */}
-          <a href={`/api/payroll/runs/${run._id}/excel`} download>
-            <Button variant="outline" size="sm">
-              <FileSpreadsheet className="w-4 h-4" /> Export Register (Excel)
-            </Button>
-          </a>
+          {can("payroll.view") && (
+            <a href={`/api/payroll/runs/${run._id}/excel`} download>
+              <Button variant="outline" size="sm">
+                <FileSpreadsheet className="w-4 h-4" /> Export Register (Excel)
+              </Button>
+            </a>
+          )}
 
           {/* Bulk ZIP Payslips */}
           {isApproved && (
             <a href={`/api/payroll/runs/${run._id}/bulk-payslips`} download>
-              <Button size="sm" variant="secondary" className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
+              <Button size="sm" variant="secondary" className="bg-brand-100 text-brand-800 hover:bg-brand-200">
                 <FileArchive className="w-4 h-4" /> Download All Payslips (ZIP)
               </Button>
             </a>
           )}
 
           {/* Approve Button */}
-          {run.status === "DRAFT" && (
-            <Button size="sm" onClick={handleApprove} className="bg-emerald-600 hover:bg-emerald-500 text-white">
+          {run.status === "DRAFT" && can("payroll.approve") && (
+            <Button size="sm" onClick={handleApprove} className="bg-brand-600 hover:bg-brand-500 text-white">
               <CheckCircle className="w-4 h-4" /> Approve Run
             </Button>
           )}
 
           {/* Lock Button */}
-          {run.status === "APPROVED" && (
+          {run.status === "APPROVED" && can("payroll.lock") && (
             <Button size="sm" onClick={handleLock} className="bg-slate-900 hover:bg-slate-800 text-white">
               <Lock className="w-4 h-4" /> Lock Payout
             </Button>
@@ -215,7 +219,7 @@ export default function PayrollRunDetailPage({
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-emerald-500">
+        <Card className="border-l-4 border-l-brand-500">
           <CardHeader className="pb-1">
             <CardTitle className="text-xs text-slate-400 uppercase">Total Gross Earnings</CardTitle>
           </CardHeader>
@@ -242,7 +246,7 @@ export default function PayrollRunDetailPage({
             <CardTitle className="text-xs text-slate-400 uppercase">Net Disbursable</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-700">
+            <div className="text-2xl font-bold text-brand-700">
               {formatINR(run.totals?.totalNet || 0)}
             </div>
           </CardContent>
@@ -296,7 +300,7 @@ export default function PayrollRunDetailPage({
                     <TableCell className="text-right text-xs">
                       {formatINR(allowances)}
                     </TableCell>
-                    <TableCell className="text-right text-xs font-semibold text-emerald-600">
+                    <TableCell className="text-right text-xs font-semibold text-brand-600">
                       {formatINR(entry.earnings.incentives)}
                     </TableCell>
                     <TableCell className="text-right text-xs font-medium">
@@ -310,7 +314,7 @@ export default function PayrollRunDetailPage({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {!isLocked && (
+                        {!isLocked && can("payroll.adjust") && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -327,7 +331,7 @@ export default function PayrollRunDetailPage({
                           title="Download Payslip PDF"
                         >
                           <Button variant="ghost" size="icon">
-                            <Download className="w-4 h-4 text-emerald-600" />
+                            <Download className="w-4 h-4 text-brand-600" />
                           </Button>
                         </a>
                       </div>
@@ -425,7 +429,7 @@ export default function PayrollRunDetailPage({
             <Button
               type="submit"
               disabled={savingAdj}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-brand-600 hover:bg-brand-500 text-white"
             >
               {savingAdj ? "Updating..." : "Save Adjustments"}
             </Button>

@@ -4,7 +4,7 @@ import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Clock, MapPin, Truck, User, ArrowDownRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 export default function VehicleDetailPage({
@@ -46,7 +46,7 @@ export default function VehicleDetailPage({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold font-mono text-slate-900">{vehicle.chassisNumber}</h1>
-            <Badge variant="default">{vehicle.status}</Badge>
+            <StatusBadge status={vehicle.status} />
           </div>
           <p className="text-xs text-slate-500">
             {vehicle.model?.name} ({vehicle.model?.variant}) • Color: {vehicle.color}
@@ -84,7 +84,7 @@ export default function VehicleDetailPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm font-bold text-emerald-700">
+            <p className="text-sm font-bold text-brand-700">
               {vehicle.currentLocationDealer
                 ? `Dealer: ${vehicle.currentLocationDealer.name}`
                 : "Central Warehouse"}
@@ -105,7 +105,7 @@ export default function VehicleDetailPage({
             <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
               {movements.map((m: any, idx: number) => (
                 <div key={idx} className="relative group">
-                  <div className="absolute -left-6 top-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white shadow-sm flex items-center justify-center">
+                  <div className="absolute -left-6 top-1 w-4 h-4 rounded-full bg-brand-500 border-2 border-white shadow-sm flex items-center justify-center">
                     <div className="w-1.5 h-1.5 bg-white rounded-full" />
                   </div>
 
@@ -125,7 +125,7 @@ export default function VehicleDetailPage({
                     <div className="mt-2 text-xs text-slate-600 flex items-center gap-2">
                       <span className="font-medium text-slate-500">{m.fromLocation}</span>
                       <ArrowDownRight className="w-3 h-3 text-slate-400 rotate-[-45deg]" />
-                      <span className="font-semibold text-emerald-800">{m.toLocation}</span>
+                      <span className="font-semibold text-brand-800">{m.toLocation}</span>
                     </div>
 
                     {m.notes && <p className="text-xs text-slate-500 mt-1 italic">{m.notes}</p>}

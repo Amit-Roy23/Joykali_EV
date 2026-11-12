@@ -119,7 +119,7 @@ export default function RolesPermissionsPage() {
 
         <div className="flex items-center gap-2">
           {savedSuccess && (
-            <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1">
+            <span className="text-xs font-semibold text-brand-600 bg-brand-50 px-3 py-1 rounded-full border border-brand-200 flex items-center gap-1">
               <Check className="w-3.5 h-3.5" /> Matrix Saved!
             </span>
           )}
@@ -128,7 +128,7 @@ export default function RolesPermissionsPage() {
               size="sm"
               disabled={saving}
               onClick={handleSave}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-brand-600 hover:bg-brand-500 text-white"
             >
               <Save className="w-3.5 h-3.5" /> {saving ? "Saving..." : "Save Role Permissions"}
             </Button>
@@ -145,7 +145,7 @@ export default function RolesPermissionsPage() {
             onClick={() => setSelectedRole(r)}
             className={`px-4 py-2 rounded-md text-xs font-bold transition-all shrink-0 ${
               selectedRole === r
-                ? "bg-white text-emerald-800 shadow-sm"
+                ? "bg-white text-brand-800 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
@@ -185,7 +185,7 @@ export default function RolesPermissionsPage() {
                       checked={isChecked}
                       disabled={selectedRole === "ADMIN"}
                       onChange={() => handleToggle(perm.key)}
-                      className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                      className="w-4 h-4 rounded text-brand-600 border-slate-300 focus:ring-brand-500 cursor-pointer"
                     />
                     <div>
                       <p className="font-semibold text-slate-800">{perm.label}</p>

@@ -136,3 +136,18 @@ export function numberToWordsINR(paise: number): string {
   result += " Only";
   return result;
 }
+
+/** Compact Indian notation for rupee amounts: ₹950, ₹45.2K, ₹12.4 L, ₹1.25 Cr. */
+export function formatRupeesShort(rupees: number): string {
+  const abs = Math.abs(rupees);
+  const sign = rupees < 0 ? "-" : "";
+  if (abs >= 1e7) return `${sign}₹${(abs / 1e7).toFixed(abs >= 1e8 ? 1 : 2)} Cr`;
+  if (abs >= 1e5) return `${sign}₹${(abs / 1e5).toFixed(abs >= 1e6 ? 1 : 2)} L`;
+  if (abs >= 1e3) return `${sign}₹${(abs / 1e3).toFixed(1)}K`;
+  return `${sign}₹${Math.round(abs)}`;
+}
+
+/** Full rupee amount with Indian digit grouping, no paise: ₹1,23,456. */
+export function formatRupees(rupees: number): string {
+  return `₹${Math.round(rupees).toLocaleString("en-IN")}`;
+}

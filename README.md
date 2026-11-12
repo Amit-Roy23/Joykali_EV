@@ -83,7 +83,7 @@ Every query enforces data isolation on the server:
 │   │   ├── pdfService.tsx      # React-PDF tax invoices & payslips
 │   │   └── reportService.ts    # ExcelJS register builders & dashboards
 │   └── validators/             # Shared Zod validation schemas
-├── middleware.ts               # Route protection & mustChangePassword redirect
+│   ├── middleware.ts           # Route protection, silent session renewal, mustChangePassword redirect
 └── vitest.config.ts            # Test suite runner
 ```
 
@@ -118,60 +118,73 @@ The engine (`src/services/incentiveEngine.ts`) supports 5 rule architectures:
 
 ---
 
+## Deploying
+
+**Vercel (frontend + backend in one project) with MongoDB Atlas:** follow [DEPLOY-VERCEL.md](./DEPLOY-VERCEL.md) —
+environment variables, Atlas setup, loading data, and the `/api/health` check.
+
 ## 5. Getting Started & Setup
 
 ### Prerequisites
-- Node.js v20+ or v22+
-- pnpm v11+
-- MongoDB instance (local or MongoDB Atlas connection string)
+- Node.js v20+ (v22 recommended) and pnpm
+- **MongoDB running as a replica set** (MongoDB Atlas works out of the box). Sales, purchases and payroll use
+  multi-document transactions, which MongoDB only supports on a replica set. For a local single-node replica set:
+  ```bash
+  docker run -d --name joykali-mongo -p 27017:27017 mongo:7 --replSet rs0
+  ```
+  ```bash
+  docker exec joykali-mongo mongosh --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"localhost:27017"}]})'
+  ```
 
-### 1. Environment Setup
-Copy the example environment file:
+### 1. Environment
 ```bash
 cp .env.example .env
 ```
-Ensure `MONGODB_URI` points to your active MongoDB instance:
-```env
-MONGODB_URI=mongodb://localhost:27017/joykali_ev
-JWT_ACCESS_SECRET=joykali_jwt_access_secret_super_secure_key_12345
-JWT_REFRESH_SECRET=joykali_jwt_refresh_secret_super_secure_key_67890
-```
+`.env` is git-ignored. For **production** set `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` to unique random values
+of at least 32 characters (e.g. `openssl rand -hex 32`) — the server refuses to issue tokens with the public
+development defaults. Set `NEXT_PUBLIC_DEMO_MODE=false` to hide the one-click demo accounts on the login page.
 
-### 2. Install Dependencies
+### 2. Install, seed, test, run
 ```bash
 pnpm install
 ```
-
-### 3. Seed Database
-Execute the automated seed script to populate users, dealers, vehicles, sample sales, and active schemes:
 ```bash
 pnpm seed
 ```
-
-### 4. Run Unit Tests
-Run the Vitest test suite to verify code generation, incentive calculations, and payroll formulas:
 ```bash
 pnpm test
 ```
-
-### 5. Start Development Server
 ```bash
 pnpm dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open http://localhost:3000.
+
+`pnpm seed` **wipes the database** and rebuilds ~6 months of history ending today (dealers, stock purchases, dealer
+allocations, ~310 sales, incentive ledgers, and 5 payroll runs — 4 locked, the latest approved), all generated through
+the real service layer so every figure on screen is produced by the same code the app runs.
 
 ---
 
-## 6. Seed Accounts & Credentials
+## 6. Demo Accounts
 
-| Role | Email | Password | Code |
+Password for every account: **`Joykali@123`** (login with email or employee code). With
+`NEXT_PUBLIC_DEMO_MODE=true` the login page offers one-click sign-in for each role.
+
+| Role | Login | Code | Good for showing |
 | :--- | :--- | :--- | :--- |
-| **System Admin** | `admin@joykali.com` | `Admin@123` | `JKE-ADM-0001` |
-| **Managing Partner** | `mp@joykali.com` | `Admin@123` | `JKE-MP-0001` |
-| **Business Head** | `bh@joykali.com` | `Admin@123` | `JKE-BH-0001` |
-| **Area Sales Manager 1** | `asm1@joykali.com` | `Admin@123` | `JKE-ASM-0001` |
-| **Area Sales Manager 2** | `asm2@joykali.com` | `Admin@123` | `JKE-ASM-0002` |
-| **Field Executive (FEC 1)**| `fec1@joykali.com` | `Admin@123` | `JKE-FEC-0001` |
+| Admin | `admin@joykaliev.in` | `JKE-ADM-0001` | Roles & permission matrix, settings, audit log |
+| Managing Partner | `mp@joykaliev.in` | `JKE-MP-0001` | Approve the draft scheme, lock the approved payroll |
+| Business Head | `bh@joykaliev.in` | `JKE-BH-0001` | Generate this month's payroll, dealers, stock |
+| ASM — Kolkata | `asm.kolkata@joykaliev.in` | `JKE-ASM-0002` | Team leaderboard, override earnings |
+| ASM — North / South | `asm.north@…`, `asm.south@…` | `JKE-ASM-0001/3` | |
+| FEC (top seller) | `fec5@joykaliev.in` | `JKE-FEC-0005` | Record a sale on a phone, watch incentive update |
+| FEC 1–12 | `fec1@joykaliev.in` … `fec12@…` | `JKE-FEC-0001…` | |
 
-*(Note: First login prompts for a mandatory password update per enterprise security policy)*
-
+### Suggested 5-minute client demo
+1. **FEC on a phone** — sign in as Arnab (FEC), tap **+**, pick an E-Rickshaw, fill the customer, confirm. The
+   dashboard's incentive and "next milestone" charge bar update immediately.
+2. **Managing Partner** — Dashboard → "1 incentive scheme awaiting approval" → approve *Commercial EV Push*. Every FEC
+   who sold a commercial vehicle this month gets the per-unit bonus, and any open payroll draft re-prices on its own.
+3. **Business Head** — Payroll Runs → run this month's draft → adjust LOP for one person.
+4. **Managing Partner** — approve, then lock. Payslips are released; employees see them under **Payslips**.
+5. **Admin** — Roles & Access: toggle a permission and show the menu change for that role.

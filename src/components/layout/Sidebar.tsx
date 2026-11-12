@@ -1,310 +1,117 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  PlusCircle,
-  Truck,
-  Layers,
-  Store,
-  Users,
-  GitBranch,
-  Award,
-  Sliders,
-  DollarSign,
-  FileText,
-  BarChart3,
-  Settings,
-  ShieldCheck,
-  History,
-  ChevronDown,
-  ChevronRight,
-  Zap,
-} from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/components/ui/button";
+import { Avatar, RoleBadge } from "@/components/ui/kit";
+import { NAV_GROUPS, canSee, isActive } from "./nav";
+import { BrandMark } from "./BrandMark";
 
-interface NavItem {
-  title: string;
-  href: string;
-  icon: any;
-  requiredPermission?: string;
-  roles?: string[];
+interface SidebarProps {
+  user: any;
+  permissions?: string[];
+  /** Mobile drawer state; ignored on desktop where the sidebar is always shown. */
+  open?: boolean;
+  onClose?: () => void;
 }
 
-interface NavGroup {
-  label: string;
-  items: NavItem[];
-}
-
-export function Sidebar({ user, permissions = [] }: { user: any; permissions?: string[] }) {
+function NavContent({ user, permissions = [], onNavigate }: { user: any; permissions: string[]; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-
-  const toggleGroup = (label: string) => {
-    setCollapsedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
-  };
-
-  const hasAccess = (item: NavItem) => {
-    if (user?.role === "ADMIN") return true;
-    if (item.roles && !item.roles.includes(user?.role)) return false;
-    if (item.requiredPermission && !permissions.includes(item.requiredPermission)) return false;
-    return true;
-  };
-
-  const navGroups: NavGroup[] = [
-    {
-      label: "Main",
-      items: [
-        {
-          title: "Dashboard",
-          href: "/",
-          icon: LayoutDashboard,
-        },
-      ],
-    },
-    {
-      label: "Sales",
-      items: [
-        {
-          title: "Sales Invoices",
-          href: "/sales",
-          icon: ShoppingCart,
-          requiredPermission: "sales.view.own",
-        },
-        {
-          title: "Record Sale",
-          href: "/sales/new",
-          icon: PlusCircle,
-          requiredPermission: "sales.create",
-        },
-      ],
-    },
-    {
-      label: "Inventory",
-      items: [
-        {
-          title: "Vehicles Stock",
-          href: "/inventory",
-          icon: Truck,
-          requiredPermission: "inventory.view",
-        },
-        {
-          title: "Vehicle Models",
-          href: "/inventory/models",
-          icon: Layers,
-          requiredPermission: "inventory.view",
-        },
-      ],
-    },
-    {
-      label: "Purchases",
-      items: [
-        {
-          title: "Purchase Orders",
-          href: "/purchases",
-          icon: Truck,
-          requiredPermission: "purchase.view",
-        },
-        {
-          title: "Suppliers",
-          href: "/suppliers",
-          icon: Store,
-          requiredPermission: "purchase.view",
-        },
-      ],
-    },
-    {
-      label: "Dealer Network",
-      items: [
-        {
-          title: "Dealers",
-          href: "/dealers",
-          icon: Store,
-          requiredPermission: "dealer.view",
-        },
-      ],
-    },
-    {
-      label: "People & Org",
-      items: [
-        {
-          title: "Employees",
-          href: "/employees",
-          icon: Users,
-          requiredPermission: "employee.view",
-        },
-        {
-          title: "Org Hierarchy Tree",
-          href: "/employees/tree",
-          icon: GitBranch,
-          requiredPermission: "employee.view",
-        },
-      ],
-    },
-    {
-      label: "Incentive Engine",
-      items: [
-        {
-          title: "My Incentives",
-          href: "/incentives/my-incentives",
-          icon: Award,
-        },
-        {
-          title: "Schemes",
-          href: "/schemes",
-          icon: Award,
-          requiredPermission: "scheme.view",
-        },
-        {
-          title: "Scheme Builder",
-          href: "/schemes/builder",
-          icon: Sliders,
-          requiredPermission: "scheme.create",
-        },
-      ],
-    },
-    {
-      label: "Payroll",
-      items: [
-        {
-          title: "Payroll Runs",
-          href: "/payroll",
-          icon: DollarSign,
-          requiredPermission: "payroll.view",
-        },
-      ],
-    },
-    {
-      label: "Analytics",
-      items: [
-        {
-          title: "Reports Hub",
-          href: "/reports",
-          icon: BarChart3,
-          requiredPermission: "reports.view",
-        },
-      ],
-    },
-    {
-      label: "Administration",
-      items: [
-        {
-          title: "Company Settings",
-          href: "/settings",
-          icon: Settings,
-          requiredPermission: "settings.manage",
-        },
-        {
-          title: "Roles & Permissions",
-          href: "/settings/roles",
-          icon: ShieldCheck,
-          requiredPermission: "settings.manage",
-        },
-        {
-          title: "Audit Log",
-          href: "/settings/audit",
-          icon: History,
-          requiredPermission: "audit.view",
-        },
-      ],
-    },
-  ];
-
   return (
-    <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen border-r border-slate-800 shrink-0 select-none">
-      {/* Brand Header */}
-      <div className="h-16 flex items-center px-5 gap-3 border-b border-slate-800 bg-slate-950/60">
-        <div className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-          <Zap className="w-5 h-5 fill-current" />
-        </div>
-        <div>
-          <h1 className="font-bold text-sm tracking-tight text-white flex items-center gap-1.5">
-            Joykali EV
-            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 font-semibold px-1.5 py-0.5 rounded border border-emerald-500/30">
-              PRO
-            </span>
-          </h1>
-          <p className="text-[10px] text-slate-400 font-medium">Mobility Dealership System</p>
-        </div>
-      </div>
-
-      {/* Navigation List */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-thin scrollbar-thumb-slate-800">
-        {navGroups.map((group) => {
-          const visibleItems = group.items.filter(hasAccess);
-          if (visibleItems.length === 0) return null;
-
-          const isCollapsed = collapsedGroups[group.label];
-
+    <>
+      <nav className="scroll-thin flex-1 space-y-6 overflow-y-auto px-3 py-5" aria-label="Main">
+        {NAV_GROUPS.map((group) => {
+          const items = group.items.filter((i) => canSee(i, user?.role, permissions));
+          if (items.length === 0) return null;
           return (
-            <div key={group.label} className="space-y-1">
-              <button
-                onClick={() => toggleGroup(group.label)}
-                className="w-full flex items-center justify-between px-2 py-1 text-[11px] font-semibold text-slate-500 uppercase tracking-wider hover:text-slate-300"
-              >
-                <span>{group.label}</span>
-                {isCollapsed ? (
-                  <ChevronRight className="w-3 h-3 text-slate-600" />
-                ) : (
-                  <ChevronDown className="w-3 h-3 text-slate-600" />
-                )}
-              </button>
-
-              {!isCollapsed && (
-                <div className="space-y-0.5 pt-1">
-                  {visibleItems.map((item) => {
-                    const isActive =
-                      item.href === "/"
-                        ? pathname === "/"
-                        : pathname.startsWith(item.href);
-                    const Icon = item.icon;
-
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
+            <div key={group.label}>
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {group.label}
+              </p>
+              <div className="space-y-0.5">
+                {items.map((item) => {
+                  const active = isActive(item.href, pathname);
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={onNavigate}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "group relative flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors",
+                        active
+                          ? "bg-white/[0.08] text-white"
+                          : "text-slate-400 hover:bg-white/[0.04] hover:text-slate-100"
+                      )}
+                    >
+                      {active && (
+                        <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-volt-300 shadow-[0_0_12px_rgba(205,242,100,0.8)]" />
+                      )}
+                      <Icon
                         className={cn(
-                          "flex items-center gap-3 px-3 py-2 rounded-md text-xs font-medium transition-all group",
-                          isActive
-                            ? "bg-emerald-600 text-white font-semibold shadow-sm shadow-emerald-900/30"
-                            : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
+                          "h-[18px] w-[18px] shrink-0 transition-colors",
+                          active ? "text-volt-300" : "text-slate-500 group-hover:text-slate-300"
                         )}
-                      >
-                        <Icon
-                          className={cn(
-                            "w-4 h-4 transition-colors",
-                            isActive
-                              ? "text-white"
-                              : "text-slate-400 group-hover:text-emerald-400"
-                          )}
-                        />
-                        <span>{item.title}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
+                      />
+                      <span className="truncate">{item.title}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
-      </div>
+      </nav>
 
-      {/* User Footer Profile */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/40">
-        <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-900/80 border border-slate-800">
-          <div className="w-8 h-8 rounded-full bg-emerald-700 text-emerald-100 flex items-center justify-center font-bold text-xs uppercase">
-            {user?.name?.slice(0, 2) || "JK"}
-          </div>
-          <div className="overflow-hidden flex-1">
-            <p className="text-xs font-semibold text-white truncate">{user?.name}</p>
-            <p className="text-[10px] text-emerald-400 font-mono truncate">{user?.employeeCode}</p>
+      <div className="border-t border-white/[0.06] p-3">
+        <div className="flex items-center gap-3 rounded-xl bg-white/[0.04] p-2.5 ring-1 ring-white/[0.06]">
+          <Avatar name={user?.name} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold text-white">{user?.name}</p>
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <RoleBadge role={user?.role} short />
+              <span className="truncate font-mono text-[10px] text-slate-500">{user?.employeeCode}</span>
+            </div>
           </div>
         </div>
       </div>
-    </aside>
+    </>
   );
 }
 
+export function Sidebar({ user, permissions = [], open = false, onClose }: SidebarProps) {
+  return (
+    <>
+      {/* Desktop rail */}
+      <aside className="surface-ink hidden h-dvh w-[264px] shrink-0 flex-col border-r border-white/[0.06] lg:flex">
+        <div className="flex h-16 items-center px-5">
+          <BrandMark />
+        </div>
+        <NavContent user={user} permissions={permissions} />
+      </aside>
+
+      {/* Mobile / tablet drawer */}
+      {open && (
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+          <div className="absolute inset-0 bg-ink-950/60 backdrop-blur-sm" onClick={onClose} />
+          <aside className="surface-ink absolute inset-y-0 left-0 flex w-[84%] max-w-[300px] animate-slide-in flex-col shadow-2xl">
+            <div className="flex h-16 items-center justify-between px-5 pt-[env(safe-area-inset-top)]">
+              <BrandMark />
+              <button
+                onClick={onClose}
+                aria-label="Close menu"
+                className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <NavContent user={user} permissions={permissions} onNavigate={onClose} />
+          </aside>
+        </div>
+      )}
+    </>
+  );
+}

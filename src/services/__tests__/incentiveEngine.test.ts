@@ -331,3 +331,39 @@ describe("Incentive Engine", () => {
   });
 });
 
+
+describe("Scheme lifecycle in the engine", () => {
+  const fec = { _id: "f1", employeeCode: "JKE-FEC-0001", name: "F", role: "FEC" as const, reportsTo: "a1" };
+  const sale = (n: number) => ({
+    _id: `s${n}`,
+    saleCode: `JKS/${n}`,
+    saleDate: new Date("2026-10-10T00:00:00Z"),
+    soldBy: "f1",
+    asmAtSale: "a1",
+    modelId: "m1",
+    exShowroom: 10000000,
+    totalAmount: 10500000,
+    status: "DELIVERED" as const,
+  });
+  const scheme = (status: string) => ({
+    _id: "507f1f77bcf86cd799439011",
+    name: "Oct per-unit",
+    status,
+    validFrom: new Date("2026-10-01T00:00:00Z"),
+    validTo: new Date("2026-10-31T23:59:59Z"),
+    applicableRoles: ["FEC"],
+    rules: [{ ruleType: "PER_UNIT", perUnitAmount: 50000 }],
+  });
+  const start = new Date("2026-10-01T00:00:00Z");
+  const end = new Date("2026-10-31T23:59:59Z");
+
+  it("still pays an EXPIRED scheme for sales inside its validity window", () => {
+    const r = computeIncentives(fec, [sale(1), sale(2)], [scheme("EXPIRED")], start, end);
+    expect(r.totalIncentiveEarned).toBe(100000);
+  });
+
+  it("ignores DRAFT and ARCHIVED schemes", () => {
+    expect(computeIncentives(fec, [sale(1)], [scheme("DRAFT")], start, end).totalIncentiveEarned).toBe(0);
+    expect(computeIncentives(fec, [sale(1)], [scheme("ARCHIVED")], start, end).totalIncentiveEarned).toBe(0);
+  });
+});

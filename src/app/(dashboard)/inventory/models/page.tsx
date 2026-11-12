@@ -1,4 +1,5 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -11,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { formatINR } from "@/lib/money";
 
 export default function VehicleModelsPage() {
+  const { can } = useSession();
   const [models, setModels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,13 +84,15 @@ export default function VehicleModelsPage() {
             </p>
           </div>
         </div>
+        {can("inventory.manage") && (
         <Button
           size="sm"
           onClick={() => setIsModalOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-500"
+          className="bg-brand-600 hover:bg-brand-500"
         >
           <PlusCircle className="w-4 h-4" /> Add Model
         </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -96,7 +100,7 @@ export default function VehicleModelsPage() {
           <p className="text-xs text-slate-400">Loading models...</p>
         ) : (
           models.map((m) => (
-            <Card key={m._id} className="hover:border-emerald-300 transition-colors">
+            <Card key={m._id} className="hover:border-brand-300 transition-colors">
               <CardHeader className="pb-3 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-base text-slate-900">{m.name}</CardTitle>
@@ -107,7 +111,7 @@ export default function VehicleModelsPage() {
               <CardContent className="space-y-3 text-xs">
                 <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <BatteryCharging className="w-4 h-4 text-emerald-600" />
+                    <BatteryCharging className="w-4 h-4 text-brand-600" />
                     <div>
                       <span className="text-[10px] text-slate-400 block">Battery</span>
                       <span className="font-semibold text-slate-700">{m.batteryType}</span>
@@ -125,7 +129,7 @@ export default function VehicleModelsPage() {
                 <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                   <div>
                     <span className="text-[10px] text-slate-400 block">Ex-Showroom Price</span>
-                    <span className="text-sm font-bold text-emerald-700">
+                    <span className="text-sm font-bold text-brand-700">
                       {formatINR(m.sellingPrice)}
                     </span>
                   </div>
@@ -238,7 +242,7 @@ export default function VehicleModelsPage() {
             <Button
               type="submit"
               disabled={submitting}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-brand-600 hover:bg-brand-500 text-white"
             >
               {submitting ? "Saving..." : "Save Vehicle Model"}
             </Button>

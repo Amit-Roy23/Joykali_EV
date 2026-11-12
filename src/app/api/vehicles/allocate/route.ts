@@ -9,6 +9,9 @@ import {
 import { VehicleAllocateSchema } from "@/validators";
 import { logAudit } from "@/lib/audit";
 
+// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();

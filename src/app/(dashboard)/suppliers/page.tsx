@@ -1,4 +1,5 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import { Store, PlusCircle } from "lucide-react";
@@ -9,6 +10,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Modal } from "@/components/ui/modal";
 
 export default function SuppliersPage() {
+  const { can } = useSession();
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -72,13 +74,15 @@ export default function SuppliersPage() {
             Registered vehicle manufacturers, parts suppliers, and procurement vendors
           </p>
         </div>
+        {can("purchase.manage") && (
         <Button
           size="sm"
           onClick={() => setIsModalOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-500"
+          className="bg-brand-600 hover:bg-brand-500"
         >
           <PlusCircle className="w-4 h-4" /> Add Supplier
         </Button>
+        )}
       </div>
 
       <Card>
@@ -202,7 +206,7 @@ export default function SuppliersPage() {
             <Button
               type="submit"
               disabled={submitting}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-brand-600 hover:bg-brand-500 text-white"
             >
               {submitting ? "Saving..." : "Save Supplier"}
             </Button>

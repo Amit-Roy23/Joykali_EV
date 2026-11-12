@@ -1,16 +1,18 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Store, PlusCircle, Search, Eye, MapPin, Truck, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/badge";
+import { ChargeBar, EmptyState, PageHeader, Skeleton } from "@/components/ui/kit";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
 
 export default function DealersListPage() {
+  const { can } = useSession();
   const [dealers, setDealers] = useState<any[]>([]);
   const [asms, setAsms] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,120 +75,96 @@ export default function DealersListPage() {
     }
   };
 
+  const totalStock = dealers.reduce((n, d) => n + (d.stockCount || 0), 0);
+  const totalSold = dealers.reduce((n, d) => n + (d.soldCount || 0), 0);
+  const maxStock = Math.max(1, ...dealers.map((d) => d.stockCount || 0));
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Dealer Network</h1>
-          <p className="text-xs text-slate-500">
-            Authorized franchise dealers, inventory allocation, and outlet sales tracking
-          </p>
-        </div>
-        <Button
-          size="sm"
-          onClick={() => setIsModalOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-500"
-        >
-          <PlusCircle className="w-4 h-4" /> Onboard Dealer
-        </Button>
-      </div>
-
-      <Card>
-        <CardHeader className="pb-4 border-b border-slate-100">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-              <Input
-                placeholder="Search dealers by code, business name, owner or city..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && fetchDealers()}
-                className="pl-9"
-              />
-            </div>
-            <Button size="sm" variant="secondary" onClick={fetchDealers}>
-              Search
+    <div className="animate-fade-up">
+      <PageHeader
+        eyebrow="Network"
+        title="Dealer network"
+        description={`${dealers.length} dealers · ${totalStock} vehicles on dealer floors · ${totalSold} delivered through dealers`}
+        actions={
+          can("dealer.manage") && (
+            <Button size="sm" onClick={() => setIsModalOpen(true)}>
+              <PlusCircle className="h-4 w-4" /> Onboard dealer
             </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Dealer Code</TableHead>
-                <TableHead>Dealership Name</TableHead>
-                <TableHead>Owner / Contact</TableHead>
-                <TableHead>City, State</TableHead>
-                <TableHead>Assigned ASM</TableHead>
-                <TableHead className="text-center">Live Stock</TableHead>
-                <TableHead className="text-center">Vehicles Sold</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-6 text-slate-400">
-                    Loading dealer network...
-                  </TableCell>
-                </TableRow>
-              ) : dealers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-6 text-slate-500">
-                    No dealers registered yet.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                dealers.map((d) => (
-                  <TableRow key={d._id}>
-                    <TableCell className="font-mono font-bold text-xs text-emerald-700">
-                      {d.dealerCode}
-                    </TableCell>
-                    <TableCell className="font-semibold text-xs text-slate-900">
-                      {d.name}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      {d.ownerName} <br />
-                      <span className="text-[10px] text-slate-400">{d.phone}</span>
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-600">
-                      {d.city}, {d.state}
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-700">
-                      {d.assignedASM ? d.assignedASM.name : "Unassigned"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200">
-                        {d.stockCount} Units
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {d.soldCount} Units
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={d.status === "ACTIVE" ? "success" : "secondary"}>
-                        {d.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Link href={`/dealers/${d._id}`}>
-                        <Button variant="ghost" size="icon" title="View Dealership Details">
-                          <Eye className="w-4 h-4 text-slate-600" />
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          )
+        }
+      />
 
-      {/* Onboard Dealer Modal */}
+      <form
+        className="relative mb-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          fetchDealers();
+        }}
+      >
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search dealer, code, owner or city — press Enter" className="pl-9" />
+      </form>
+
+      {loading ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-48" />
+          ))}
+        </div>
+      ) : dealers.length === 0 ? (
+        <Card>
+          <EmptyState icon={Store} title="No dealers found" description="Try another search, or onboard a new dealer." />
+        </Card>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {dealers.map((d) => (
+            <Link
+              key={d._id}
+              href={`/dealers/${d._id}`}
+              className="group flex flex-col rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lift sm:p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <span className="inline-flex rounded-md bg-ink-900 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-volt-300">{d.dealerCode}</span>
+                  <p className="mt-2 truncate font-display text-base font-semibold text-slate-900">{d.name}</p>
+                  <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-slate-500">
+                    <MapPin className="h-3 w-3 shrink-0" /> {d.city}, {d.state}
+                  </p>
+                </div>
+                <StatusBadge status={d.status} />
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <Truck className="h-3 w-3" /> On floor
+                  </p>
+                  <p className="mt-1 font-display text-xl font-bold text-slate-900 tabular">{d.stockCount}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <ShoppingCart className="h-3 w-3" /> Delivered
+                  </p>
+                  <p className="mt-1 font-display text-xl font-bold text-slate-900 tabular">{d.soldCount}</p>
+                </div>
+              </div>
+              <ChargeBar value={d.stockCount || 0} max={maxStock} segments={8} tone="brand" animated={false} className="mt-3" label="Stock level" />
+
+              <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs">
+                <div className="min-w-0">
+                  <p className="text-slate-500">Owner</p>
+                  <p className="truncate font-medium text-slate-800">{d.ownerName}</p>
+                </div>
+                <div className="min-w-0 text-right">
+                  <p className="text-slate-500">Area manager</p>
+                  <p className="truncate font-medium text-slate-800">{d.assignedASM?.name || "Unassigned"}</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -286,7 +264,7 @@ export default function DealersListPage() {
           <div>
             <Label>Assigned Area Sales Manager (ASM)</Label>
             <select
-              className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-emerald-500"
+              className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500"
               value={form.assignedASM}
               onChange={(e) => setForm({ ...form, assignedASM: e.target.value })}
             >
@@ -306,7 +284,7 @@ export default function DealersListPage() {
             <Button
               type="submit"
               disabled={submitting}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-brand-600 hover:bg-brand-500 text-white"
             >
               {submitting ? "Onboarding..." : "Register Dealership"}
             </Button>

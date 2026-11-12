@@ -1,4 +1,5 @@
 "use client";
+import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -12,6 +13,7 @@ import { Input, Label } from "@/components/ui/input";
 import { formatINR } from "@/lib/money";
 
 export default function PayrollPage() {
+  const { can } = useSession();
   const [runs, setRuns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,13 +76,15 @@ export default function PayrollPage() {
             Monthly salary processing, automatic incentive integration, statutory deductions and payslip generation
           </p>
         </div>
+        {can("payroll.run") && (
         <Button
           size="sm"
           onClick={() => setIsModalOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-500"
+          className="bg-brand-600 hover:bg-brand-500"
         >
           <PlusCircle className="w-4 h-4" /> Run Payroll Draft
         </Button>
+        )}
       </div>
 
       <Card>
@@ -114,7 +118,7 @@ export default function PayrollPage() {
               ) : (
                 runs.map((r) => (
                   <TableRow key={r._id}>
-                    <TableCell className="font-mono font-bold text-xs text-emerald-700">
+                    <TableCell className="font-mono font-bold text-xs text-brand-700">
                       {r.runCode}
                     </TableCell>
                     <TableCell className="text-xs font-semibold text-slate-800">
@@ -172,7 +176,7 @@ export default function PayrollPage() {
             <div>
               <Label>Month (1–12) *</Label>
               <select
-                className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-emerald-500"
+                className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500"
                 value={month}
                 onChange={(e) => setMonth(Number(e.target.value))}
               >
@@ -212,7 +216,7 @@ export default function PayrollPage() {
             <Button
               type="submit"
               disabled={generating}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="bg-brand-600 hover:bg-brand-500 text-white"
             >
               {generating ? "Processing..." : "Generate Payroll Draft"}
             </Button>
