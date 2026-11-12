@@ -7,6 +7,9 @@ import {
   errorResponse,
 } from "@/lib/apiHelper";
 
+// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();

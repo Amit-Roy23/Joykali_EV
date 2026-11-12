@@ -95,7 +95,24 @@ const LAST = ["Das", "Ghosh", "Banerjee", "Mukherjee", "Chatterjee", "Sarkar", "
 const FINANCIERS = ["Bajaj Finance", "Shriram Finance", "IDFC First Bank", "State Bank of India", "Bandhan Bank", "Hero FinCorp"];
 const COLORS = ["Pearl White", "Matte Black", "Racing Red", "Electric Blue", "Lime Green", "Graphite Grey"];
 
+/** The seed wipes the database: never let it run against a remote DB by accident. */
+function confirmTarget() {
+  const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/joykali_ev";
+  const isLocal = /@?(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//.test(uri.replace(/^mongodb(\+srv)?:\/\//, "//"));
+  const host = uri.replace(/^mongodb(\+srv)?:\/\/([^@]*@)?/, "").split(/[/?]/)[0];
+  if (!isLocal && !process.argv.includes("--yes")) {
+    console.error(
+      `\n  Refusing to seed ${host}: this ERASES every collection in that database.\n` +
+        `  If this is your demo database, run again with:  pnpm seed --yes\n` +
+        `  For a real production database use instead:     pnpm setup:admin\n`
+    );
+    process.exit(1);
+  }
+  console.log(`Target: ${host}${isLocal ? " (local)" : " (remote — confirmed with --yes)"}`);
+}
+
 async function main() {
+  confirmTarget();
   await connectToDatabase();
   const db = mongoose.connection.db!;
   console.log(`Connected to ${db.databaseName}. Resetting database…`);

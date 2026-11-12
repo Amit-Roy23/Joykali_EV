@@ -10,6 +10,9 @@ import {
 import { logAudit } from "@/lib/audit";
 import mongoose from "mongoose";
 
+// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
+export const maxDuration = 60;
+
 /**
  * Approve a DRAFT scheme. Activation immediately recalculates incentive
  * ledgers for every month the scheme covers (up to today) and pushes the new

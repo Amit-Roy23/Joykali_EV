@@ -1,2 +1,7 @@
+# Single-package repo. Listing "." keeps installs working on pnpm 9 as well as
+# pnpm 10 (Vercel may pick either from the lockfile version).
+packages:
+  - "."
+
 allowBuilds:
   esbuild: true

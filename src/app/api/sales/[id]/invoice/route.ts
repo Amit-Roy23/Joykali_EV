@@ -6,6 +6,9 @@ import { Setting } from "@/models/Setting";
 import { generateInvoicePDF } from "@/services/pdfService";
 import { authenticateAndAuthorize, errorResponse, isValidId } from "@/lib/apiHelper";
 
+// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
+export const maxDuration = 60;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }

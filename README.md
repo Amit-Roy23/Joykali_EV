@@ -118,6 +118,11 @@ The engine (`src/services/incentiveEngine.ts`) supports 5 rule architectures:
 
 ---
 
+## Deploying
+
+**Vercel (frontend + backend in one project) with MongoDB Atlas:** follow [DEPLOY-VERCEL.md](./DEPLOY-VERCEL.md) —
+environment variables, Atlas setup, loading data, and the `/api/health` check.
+
 ## 5. Getting Started & Setup
 
 ### Prerequisites

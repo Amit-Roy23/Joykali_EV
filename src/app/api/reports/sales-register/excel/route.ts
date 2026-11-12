@@ -4,6 +4,9 @@ import { generateSalesRegisterExcel } from "@/services/reportService";
 import { authenticateAndAuthorize, errorResponse } from "@/lib/apiHelper";
 import { getScopeFilter } from "@/lib/rbac";
 
+// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
