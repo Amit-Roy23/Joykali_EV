@@ -62,6 +62,8 @@ export interface PayrollCalculationParams {
     ptEnabled?: boolean;
     /** When provided, PT is looked up from these slabs on gross pay instead of the flat amount. */
     ptSlabs?: PtSlab[];
+    /** Cap PF at pfRate × min(basic, ceiling). Ceiling in paise (₹15,000 = 1500000). */
+    pfWageCeilingPaise?: number;
   };
 }
 
@@ -152,7 +154,11 @@ export function calculatePayrollEntry(
   let pfDeduction = 0;
   if (pfGlobalEnabled && salary.fixedDeductions?.pf) {
     // 12% of basic
-    pfDeduction = Math.round(proratedBasic * (pfRate / 100));
+    const pfWage =
+      settings.pfWageCeilingPaise && settings.pfWageCeilingPaise > 0
+        ? Math.min(proratedBasic, settings.pfWageCeilingPaise)
+        : proratedBasic;
+    pfDeduction = Math.round(pfWage * (pfRate / 100));
   }
 
   let esiDeduction = 0;
@@ -223,9 +229,11 @@ export function statutorySettingsFrom(
     esiEnabled?: boolean;
     ptEnabled?: boolean;
     ptMode?: "WB_SLAB" | "FLAT";
+    pfWageCeilingPaise?: number;
+    pfCapAtCeiling?: boolean;
   } | null
 ): PayrollCalculationParams["settings"] {
-  if (!sd) return { ptSlabs: WEST_BENGAL_PT_SLABS };
+  if (!sd) return { ptSlabs: WEST_BENGAL_PT_SLABS, pfWageCeilingPaise: 1500000 };
   return {
     pfRate: sd.pfRate,
     esiRate: sd.esiRate,
@@ -234,5 +242,96 @@ export function statutorySettingsFrom(
     esiEnabled: sd.esiEnabled,
     ptEnabled: sd.ptEnabled,
     ptSlabs: sd.ptMode === "FLAT" ? undefined : WEST_BENGAL_PT_SLABS,
+    pfWageCeilingPaise: sd.pfCapAtCeiling === false ? undefined : sd.pfWageCeilingPaise ?? 1500000,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Automatic salary structure                                          */
+/* ------------------------------------------------------------------ */
+export interface SalaryRules {
+  basicPct: number; // % of gross
+  hraPctOfBasic: number; // % of basic
+  conveyancePaise: number; // fixed monthly
+}
+export const DEFAULT_SALARY_RULES: SalaryRules = { basicPct: 50, hraPctOfBasic: 40, conveyancePaise: 160000 };
+
+export interface SalaryBreakup {
+  gross: number;
+  basic: number;
+  hra: number;
+  conveyance: number;
+  otherAllowances: number;
+  employee: { pf: number; esi: number; professionalTax: number; total: number };
+  employer: { pf: number; esi: number; total: number };
+  netTakeHome: number;
+  monthlyCtc: number;
+  annualCtc: number;
+}
+
+/**
+ * Split a monthly gross salary into components using the company's rules,
+ * then compute statutory deductions, employer contributions, take-home and CTC.
+ * Pure and deterministic — every amount is integer paise and the components
+ * always add back up to the gross exactly (rounding goes to other allowances).
+ */
+export function buildSalaryFromGross(
+  grossPaise: number,
+  flags: { pf: boolean; esi: boolean; professionalTax: boolean },
+  rules: SalaryRules = DEFAULT_SALARY_RULES,
+  statutory: PayrollCalculationParams["settings"] & { employerEsiRate?: number } = statutorySettingsFrom(null)!
+): SalaryBreakup {
+  const gross = Math.max(0, Math.round(grossPaise));
+  const basic = Math.round((gross * rules.basicPct) / 100);
+  const hra = Math.min(gross - basic, Math.round((basic * rules.hraPctOfBasic) / 100));
+  const conveyance = Math.min(gross - basic - hra, rules.conveyancePaise);
+  const otherAllowances = gross - basic - hra - conveyance;
+  return costSalary({ basic, hra, conveyance, otherAllowances }, flags, statutory);
+}
+
+/** Deductions, employer cost and CTC for given monthly components (paise). */
+export function costSalary(
+  c: { basic: number; hra: number; conveyance: number; otherAllowances: number },
+  flags: { pf: boolean; esi: boolean; professionalTax: boolean },
+  statutory: PayrollCalculationParams["settings"] & { employerEsiRate?: number } = statutorySettingsFrom(null)!
+): SalaryBreakup {
+  const gross = c.basic + c.hra + c.conveyance + c.otherAllowances;
+  const calc = calculatePayrollEntry({
+    salary: { ...c, fixedDeductions: flags },
+    workingDays: 30,
+    lopDays: 0,
+    incentives: 0,
+    settings: statutory,
+  });
+  // Employer matches 12% of the same PF wage; employer ESI only where employee ESI applies.
+  const employerPf = calc.deductions.pf;
+  const employerEsi = calc.deductions.esi > 0 ? Math.round((gross * (statutory?.employerEsiRate ?? 3.25)) / 100) : 0;
+  const employeeTotal = calc.deductions.pf + calc.deductions.esi + calc.deductions.professionalTax;
+  const monthlyCtc = gross + employerPf + employerEsi;
+  return {
+    gross,
+    ...c,
+    employee: { pf: calc.deductions.pf, esi: calc.deductions.esi, professionalTax: calc.deductions.professionalTax, total: employeeTotal },
+    employer: { pf: employerPf, esi: employerEsi, total: employerPf + employerEsi },
+    netTakeHome: gross - employeeTotal,
+    monthlyCtc,
+    annualCtc: monthlyCtc * 12,
+  };
+}
+
+/** Inverse: the monthly gross that produces a given annual CTC (binary search, ±1 paise). */
+export function grossFromAnnualCtc(
+  annualCtcPaise: number,
+  flags: { pf: boolean; esi: boolean; professionalTax: boolean },
+  rules: SalaryRules = DEFAULT_SALARY_RULES,
+  statutory: PayrollCalculationParams["settings"] & { employerEsiRate?: number } = statutorySettingsFrom(null)!
+): number {
+  let lo = 0;
+  let hi = Math.ceil(annualCtcPaise / 12);
+  for (let i = 0; i < 60 && lo < hi; i++) {
+    const mid = Math.floor((lo + hi + 1) / 2);
+    if (buildSalaryFromGross(mid, flags, rules, statutory).annualCtc <= annualCtcPaise) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
 }

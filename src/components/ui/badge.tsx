@@ -51,6 +51,7 @@ export function StatusBadge({ status, className }: { status?: string | null; cla
     PAID: "success",
     ACTIVE: "success",
     LOCKED: "default",
+    COMPLETED: "success",
     APPROVED: "info",
     BOOKED: "info",
     IN_STOCK: "info",
@@ -65,8 +66,36 @@ export function StatusBadge({ status, className }: { status?: string | null; cla
     ARCHIVED: "secondary",
     SOLD: "secondary",
     RETURNED: "warning",
+    // orders, approvals, delivery orders, fleet
+    PENDING_APPROVAL: "warning",
+    PENDING: "warning",
+    REJECTED: "destructive",
+    PARTIALLY_DISPATCHED: "info",
+    CREATED: "secondary",
+    SUBMITTED: "info",
+    LOADING: "warning",
+    LOADED: "volt",
+    DISPATCHED: "default",
+    DELIVERED_WITH_ISSUES: "warning",
+    RESERVED: "warning",
+    IN_TRANSIT: "default",
+    WITH_DISTRIBUTOR: "volt",
+    MISSING: "destructive",
+    SUPERSEDED: "secondary",
+    ON_HOLD: "warning",
+    LOCKED_FLEET: "destructive",
   };
-  const label = s === "ALLOCATED_TO_DEALER" ? "AT DEALER" : s.replace(/_/g, " ");
+  const LABELS: Record<string, string> = {
+    ALLOCATED_TO_DEALER: "AT DEALER",
+    PENDING_APPROVAL: "AWAITING APPROVAL",
+    PARTIALLY_DISPATCHED: "PART ON DO",
+    COMPLETED: "FULLY ON DO",
+    DELIVERED_WITH_ISSUES: "DELIVERED · ISSUES",
+    WITH_DISTRIBUTOR: "WITH DISTRIBUTOR",
+    UNDER_REVIEW: "BH APPROVED",
+    LOCKED_FLEET: "LOCKED",
+  };
+  const label = LABELS[s] || s.replace(/_/g, " ");
   return (
     <Badge variant={map[s] || "secondary"} dot className={className}>
       {label || "—"}

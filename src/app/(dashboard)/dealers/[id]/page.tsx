@@ -1,5 +1,6 @@
 "use client";
 import { useSession } from "@/components/layout/session";
+import { CreditPanel } from "@/components/party";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -100,16 +101,47 @@ export default function DealerDetailPage({
         </Card>
       </div>
 
+      {/* Credit: consignment stock + open orders against an approved limit */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
+        <CreditPanel partyType="dealer" partyId={String(dealer._id)} />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">Stock orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(data.orders || []).length === 0 ? (
+              <p className="text-sm text-slate-500">No stock orders yet.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {data.orders.map((o: any) => (
+                  <li key={o._id}>
+                    <Link href={`/orders/${o._id}`} className="flex items-center justify-between gap-3 py-2 hover:text-brand-700">
+                      <span className="text-sm">
+                        <span className="font-mono font-semibold">{o.orderCode}</span>
+                        <span className="block text-xs text-slate-500">
+                          {o.lines.reduce((s: number, l: any) => s + l.quantity, 0)} vehicles · {new Date(o.createdAt).toLocaleDateString("en-IN")}
+                        </span>
+                      </span>
+                      <StatusBadge status={o.status} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Vehicles In Stock at Dealer */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-sm">
             Current Stock at Dealer ({allocatedVehicles.length} Units)
           </CardTitle>
-          {can("inventory.manage") && (
-            <Link href="/inventory">
+          {can("order.create") && (
+            <Link href={`/orders/new?partyType=DEALER&partyId=${dealer._id}`}>
               <Button size="sm" variant="outline">
-                Allocate More Vehicles
+                Order more stock
               </Button>
             </Link>
           )}

@@ -46,6 +46,7 @@ const ROLE_PREFIX_MAP: Record<UserRole, string> = {
   BUSINESS_HEAD: "BH",
   MANAGING_PARTNER: "MP",
   ADMIN: "ADM",
+  DISTRIBUTOR: "DST",
 };
 
 /**
@@ -116,3 +117,36 @@ export function generatePayslipCode(
   return `PS/${year}-${monthStr}/${employeeCode}`;
 }
 
+
+/** Distributor code: JKDB-0001 (also the distributor's login ID). */
+export async function generateDistributorCode(session?: any): Promise<string> {
+  const seq = await getNextSequence("DISTRIBUTOR", session);
+  return `JKDB-${String(seq).padStart(4, "0")}`;
+}
+
+/**
+ * Financial-year document series (atomic, resets every 1 April):
+ *   ORDER JKO · DO JKDO · INVOICE JKI · CHALLAN JKC · GRN JKG · CREDIT_NOTE JKCN · RECEIPT JKR
+ */
+export const FY_SERIES = {
+  ORDER: "JKO",
+  DO: "JKDO",
+  INVOICE: "JKI",
+  CHALLAN: "JKC",
+  GRN: "JKG",
+  CREDIT_NOTE: "JKCN",
+  RECEIPT: "JKR",
+} as const;
+
+export async function generateFyCode(
+  series: keyof typeof FY_SERIES,
+  date: Date = new Date(),
+  session?: any
+): Promise<string> {
+  // Indian FY (April–March) from the IST calendar date, independent of server timezone.
+  const ist = new Date(date.getTime() + 330 * 60000);
+  const start = ist.getUTCMonth() < 3 ? ist.getUTCFullYear() - 1 : ist.getUTCFullYear();
+  const fy = `${start}-${String((start + 1) % 100).padStart(2, "0")}`;
+  const seq = await getNextSequence(`${series}_${fy}`, session);
+  return `${FY_SERIES[series]}/${fy}/${String(seq).padStart(4, "0")}`;
+}

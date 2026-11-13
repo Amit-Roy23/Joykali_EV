@@ -131,15 +131,14 @@ export default function SchemesListPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {s.status === "DRAFT" && can("scheme.approve") && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleApprove(s._id)}
-                            className="text-xs h-7 text-brand-800 bg-brand-100 hover:bg-brand-200"
-                          >
-                            Approve & Activate
-                          </Button>
+                        {s.status === "DRAFT" && (
+                          <Link href={`/schemes/${s._id}`}>
+                            <Button size="sm" variant="secondary" className="h-7 text-xs">
+                              {(s.approvals || []).some((x: any) => x.level === "BUSINESS_HEAD")
+                                ? "Awaiting MP"
+                                : "Awaiting BH"}
+                            </Button>
+                          </Link>
                         )}
                         <Link href={`/schemes/${s._id}`}>
                           <Button variant="ghost" size="icon" title="View Details">

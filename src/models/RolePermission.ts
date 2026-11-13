@@ -4,6 +4,8 @@ import { Permission, UserRole } from "@/types";
 export interface IRolePermission extends Document {
   role: UserRole;
   permissions: Permission[];
+  /** Every permission that existed when this matrix was saved — newer ones get their default. */
+  knownPermissions?: string[];
   updatedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -15,10 +17,11 @@ const RolePermissionSchema = new Schema<IRolePermission>(
       type: String,
       required: true,
       unique: true,
-      enum: ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"],
+      enum: ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "DISTRIBUTOR"],
       index: true,
     },
     permissions: [{ type: String, required: true }],
+    knownPermissions: [{ type: String }],
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }

@@ -11,6 +11,15 @@ import { VehicleModel } from "@/models/VehicleModel";
 import { getTeamUserIds } from "@/lib/rbac";
 import { periodFor, periodOf, PeriodInfo } from "@/lib/period";
 import { JWTPayload } from "@/types";
+import { ChannelOrder } from "@/models/ChannelOrder";
+import { DeliveryOrder } from "@/models/DeliveryOrder";
+import { FleetVehicle } from "@/models/FleetVehicle";
+import { LedgerEntry } from "@/models/LedgerEntry";
+import { Distributor } from "@/models/Distributor";
+import { distributorOf } from "@/lib/partyAccess";
+import { fleetCompliance } from "@/lib/fleet";
+import { creditSummary } from "./creditService";
+import { listPending } from "./approvalService";
 
 const MONTH_FMT = (p: PeriodInfo) =>
   new Date(Date.UTC(p.year, p.month - 1, 15)).toLocaleString("en-IN", { month: "short", timeZone: "UTC" });
@@ -136,6 +145,33 @@ export async function getDashboardData(user: JWTPayload) {
   const uid = new mongoose.Types.ObjectId(user.userId);
   const inMonth = (p: PeriodInfo) => ({ $gte: p.start, $lte: p.end });
 
+  // ------------------------------------------------------------- DISTRIBUTOR
+  // External partner: only their own account — never company figures.
+  if (user.role === "DISTRIBUTOR") {
+    const distId = await distributorOf(user);
+    if (!distId) return { role: "DISTRIBUTOR", period: cur.period, distributor: null };
+    const [dist, credit, orders, inTransit, invoices] = await Promise.all([
+      Distributor.findById(distId).select("name distributorCode city").lean(),
+      creditSummary("DISTRIBUTOR", distId),
+      ChannelOrder.find({ partyType: "DISTRIBUTOR", party: distId }).sort({ createdAt: -1 }).limit(6).lean(),
+      DeliveryOrder.find({ partyType: "DISTRIBUTOR", party: distId, status: "DISPATCHED" })
+        .select("doCode lines loading.registrationNo loading.driverName loading.driverPhone dispatch.at document.number ewayBill.validUpto")
+        .sort({ "dispatch.at": -1 })
+        .lean(),
+      LedgerEntry.find({ partyType: "DISTRIBUTOR", party: distId }).sort({ date: -1 }).limit(6).lean(),
+    ]);
+    return {
+      role: "DISTRIBUTOR",
+      period: cur.period,
+      distributor: dist,
+      credit,
+      orders,
+      awaitingApproval: orders.filter((o) => o.status === "PENDING_APPROVAL").length,
+      inTransit,
+      ledger: invoices,
+    };
+  }
+
   // --------------------------------------------------------------------- FEC
   if (user.role === "FEC") {
     const match = { soldBy: uid };
@@ -259,7 +295,7 @@ export async function getDashboardData(user: JWTPayload) {
       Vehicle.countDocuments({ status: "IN_STOCK" }),
       Vehicle.countDocuments({ status: "ALLOCATED_TO_DEALER" }),
       Dealer.countDocuments({ status: "ACTIVE" }),
-      User.countDocuments({ status: "ACTIVE" }),
+      User.countDocuments({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }),
       IncentiveLedger.aggregate([{ $match: { period: cur.period } }, { $group: { _id: null, t: { $sum: "$totalEarned" } } }]),
       Sale.aggregate([
         { $match: { status: "DELIVERED", saleDate: { $gte: periods[3].start, $lte: cur.end } } },
@@ -307,9 +343,31 @@ export async function getDashboardData(user: JWTPayload) {
   const yearUnits = trend.reduce((s, t) => s + t.units, 0);
 
   const actions: Array<{ kind: string; label: string; href: string; tone: string }> = [];
-  if (draftSchemes > 0)
+  // Signatures this person owes (Business Head / Managing Partner).
+  if (user.role === "BUSINESS_HEAD" || user.role === "MANAGING_PARTNER") {
+    const mine = (await listPending(user)).filter((i) => i.canSign);
+    if (mine.length) {
+      actions.push({ kind: "approval", label: `${mine.length} approval${mine.length > 1 ? "s" : ""} waiting for your signature`, href: "/approvals", tone: "amber" });
+    }
+  }
+  const [doWaiting, fleet] = await Promise.all([
+    DeliveryOrder.aggregate([{ $match: { status: { $in: ["SUBMITTED", "LOADED"] } } }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
+    FleetVehicle.find({ status: "ACTIVE" }).lean(),
+  ]);
+  const toLoad = doWaiting.find((x: any) => x._id === "SUBMITTED")?.n || 0;
+  const toDispatch = doWaiting.find((x: any) => x._id === "LOADED")?.n || 0;
+  if (toLoad) actions.push({ kind: "dispatch", label: `${toLoad} delivery order${toLoad > 1 ? "s" : ""} waiting to be loaded`, href: "/dispatch", tone: "brand" });
+  if (toDispatch) actions.push({ kind: "dispatch", label: `${toDispatch} loaded DO${toDispatch > 1 ? "s" : ""} waiting for dispatch`, href: "/dispatch", tone: "brand" });
+  const fleetState = fleet.map((f: any) => ({ f, c: fleetCompliance(f) }));
+  const locked = fleetState.filter((x) => x.c.locked);
+  const expiring = fleetState.filter((x) => !x.c.locked && x.c.expiringSoon.length);
+  if (locked.length) actions.push({ kind: "fleet", label: `${locked.length} truck${locked.length > 1 ? "s" : ""} locked: ${locked.map((x) => x.f.registrationNo).join(", ")}`, href: "/fleet", tone: "rose" });
+  if (expiring.length) actions.push({ kind: "fleet", label: `Papers expiring soon on ${expiring.map((x) => x.f.registrationNo).join(", ")}`, href: "/fleet", tone: "amber" });
+  if (draftSchemes > 0 && user.role === "ADMIN")
     actions.push({ kind: "scheme", label: `${draftSchemes} incentive scheme${draftSchemes > 1 ? "s" : ""} awaiting approval`, href: "/schemes", tone: "amber" });
   for (const r of openRuns) {
+    // BH/MP already see unsigned runs in their approvals count above.
+    if (r.status !== "APPROVED" && (user.role === "BUSINESS_HEAD" || user.role === "MANAGING_PARTNER")) continue;
     actions.push({
       kind: "payroll",
       label:

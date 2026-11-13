@@ -3,7 +3,16 @@ export type UserRole =
   | "ASM"
   | "BUSINESS_HEAD"
   | "MANAGING_PARTNER"
-  | "ADMIN";
+  | "ADMIN"
+  /** External channel partner — outside the employee hierarchy. */
+  | "DISTRIBUTOR";
+
+export const EMPLOYEE_ROLES = ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
+export const ALL_ROLES = [...EMPLOYEE_ROLES, "DISTRIBUTOR"] as const;
+
+/** Everything needs BOTH signatures, in this order. Admin cannot approve. */
+export const APPROVAL_CHAIN = ["BUSINESS_HEAD", "MANAGING_PARTNER"] as const;
+export type ApprovalLevel = (typeof APPROVAL_CHAIN)[number];
 
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   FEC: 1,
@@ -11,6 +20,7 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   BUSINESS_HEAD: 3,
   MANAGING_PARTNER: 4,
   ADMIN: 5,
+  DISTRIBUTOR: 0,
 };
 
 export type Permission =
@@ -42,7 +52,27 @@ export type Permission =
   | "payslip.download"
   | "settings.manage"
   | "reports.view"
-  | "audit.view";
+  | "audit.view"
+  // --- channel partners, orders & credit
+  | "distributor.view"
+  | "distributor.manage"
+  | "order.view"
+  | "order.create"
+  | "credit.request"
+  | "ledger.view"
+  | "ledger.manage"
+  // --- warehouse delivery orders, dispatch & receipts
+  | "dispatch.view"
+  | "dispatch.manage"
+  | "grn.record"
+  // --- fleet & documents
+  | "fleet.view"
+  | "fleet.manage"
+  // --- salary structures & approvals
+  | "salary.manage"
+  | "approvals.sign"
+  // --- distributor self-service portal
+  | "portal.access";
 
 export type VehicleCategory =
   | "2W"
@@ -55,7 +85,14 @@ export type VehicleStatus =
   | "IN_STOCK"
   | "ALLOCATED_TO_DEALER"
   | "SOLD"
-  | "RETURNED";
+  | "RETURNED"
+  /** Picked onto a warehouse Delivery Order, not yet dispatched. */
+  | "RESERVED"
+  | "IN_TRANSIT"
+  /** Received by a distributor against a GRN (sold to the distributor). */
+  | "WITH_DISTRIBUTOR"
+  /** Reported short on a GRN — under investigation. */
+  | "MISSING";
 
 export type PaymentStatus = "UNPAID" | "PARTIAL" | "PAID";
 

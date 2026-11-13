@@ -1,5 +1,6 @@
 "use client";
 import { useSession } from "@/components/layout/session";
+import { ApprovalPanel } from "@/components/workflow";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -192,12 +193,6 @@ export default function PayrollRunDetailPage({
             </a>
           )}
 
-          {/* Approve Button */}
-          {run.status === "DRAFT" && can("payroll.approve") && (
-            <Button size="sm" onClick={handleApprove} className="bg-brand-600 hover:bg-brand-500 text-white">
-              <CheckCircle className="w-4 h-4" /> Approve Run
-            </Button>
-          )}
 
           {/* Lock Button */}
           {run.status === "APPROVED" && can("payroll.lock") && (
@@ -207,6 +202,19 @@ export default function PayrollRunDetailPage({
           )}
         </div>
       </div>
+
+      {/* Two-signature approval: Business Head, then Managing Partner */}
+      {["DRAFT", "UNDER_REVIEW"].includes(run.status) && (
+        <ApprovalPanel
+          kind="payroll"
+          id={String(run._id)}
+          approvals={run.approvals}
+          active
+          onDone={fetchRun}
+          title="Payroll approval"
+          note={run.notes ? <>Note: {run.notes}</> : "Any adjustment after a signature clears the approvals so the final figures are signed."}
+        />
+      )}
 
       {/* Financial Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

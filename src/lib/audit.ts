@@ -4,8 +4,39 @@ import mongoose from "mongoose";
 
 export interface LogAuditParams {
   user?: JWTPayload | null;
-  action: "CREATE" | "UPDATE" | "DELETE" | "APPROVE" | "LOCK" | "CANCEL" | "LOGIN" | "PASSWORD_RESET";
-  resource: "SALE" | "PURCHASE" | "EMPLOYEE" | "DEALER" | "VEHICLE" | "SCHEME" | "PAYROLL" | "SETTINGS" | "AUTH";
+  action:
+    | "CREATE"
+    | "UPDATE"
+    | "DELETE"
+    | "APPROVE"
+    | "REJECT"
+    | "LOCK"
+    | "CANCEL"
+    | "LOGIN"
+    | "PASSWORD_RESET"
+    | "SUBMIT"
+    | "LOAD"
+    | "DISPATCH"
+    | "RECEIVE"
+    | "PAYMENT"
+    | "UPLOAD";
+  resource:
+    | "SALE"
+    | "PURCHASE"
+    | "EMPLOYEE"
+    | "DEALER"
+    | "DISTRIBUTOR"
+    | "VEHICLE"
+    | "SCHEME"
+    | "PAYROLL"
+    | "SETTINGS"
+    | "AUTH"
+    | "ORDER"
+    | "CREDIT"
+    | "SALARY"
+    | "DELIVERY_ORDER"
+    | "LEDGER"
+    | "FLEET";
   resourceId?: string;
   before?: any;
   after?: any;

@@ -26,7 +26,7 @@ export async function generateDraftPayrollRun(
 
   // Refresh incentive ledgers first, outside the payroll transaction, so the
   // run is generated from up-to-date figures (and the transaction stays short).
-  const activeForRecalc = await User.find({ status: "ACTIVE" }, { _id: 1 }).lean();
+  const activeForRecalc = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }, { _id: 1 }).lean();
   await recalculateIncentivesForPeriod(
     activeForRecalc.map((e: any) => e._id),
     periodStart,
@@ -45,7 +45,9 @@ export async function generateDraftPayrollRun(
     const settings = await Setting.findOne().session(session ?? null).lean();
 
     // Fetch active employees
-    const employees = await User.find({ status: "ACTIVE" }).session(session ?? null).lean();
+    // Employees only — distributor logins are external partners, not on payroll.
+    const employees = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }).session(session ?? null).lean();
+    const periodEnd = periodFor(year, month).end;
 
     // Create or find PayrollRun
     let payrollRun = existingRun;
@@ -66,6 +68,7 @@ export async function generateDraftPayrollRun(
       payrollRun = createdRuns[0];
     } else {
       payrollRun.status = "DRAFT";
+      payrollRun.approvals = [];
       payrollRun.approvedBy = undefined;
       payrollRun.approvedAt = undefined;
       payrollRun.notes = notes || payrollRun.notes;
@@ -78,12 +81,15 @@ export async function generateDraftPayrollRun(
 
     for (const emp of employees) {
       // Find salary structure
+      // The approved structure in force for this month (effective-dated, so
+      // re-running an old month uses the salary that applied then).
       const salaryStruct = await SalaryStructure.findOne({
         employee: emp._id,
-        isActive: true,
+        status: { $in: ["APPROVED", "SUPERSEDED", null] },
+        effectiveFrom: { $lte: periodEnd },
       })
         .session(session ?? null)
-        .sort({ effectiveFrom: -1 })
+        .sort({ effectiveFrom: -1, createdAt: -1 })
         .lean();
 
       if (!salaryStruct) continue;
@@ -271,9 +277,10 @@ export async function adjustPayrollEntry(
       totalNet: allEntries.reduce((s, e) => s + e.netPay, 0),
       totalEmployees: allEntries.length,
     };
-    // Changing a figure on an approved run invalidates the approval.
-    if (run.status === "APPROVED") {
+    // Changing any figure invalidates every signature collected so far.
+    if (run.status === "APPROVED" || run.status === "UNDER_REVIEW" || (run.approvals?.length ?? 0) > 0) {
       run.status = "DRAFT";
+      run.approvals = [];
       run.approvedBy = undefined;
       run.approvedAt = undefined;
     }
@@ -283,23 +290,13 @@ export async function adjustPayrollEntry(
   });
 }
 
-export async function approvePayrollRun(
-  runId: string,
-  user: JWTPayload
-): Promise<IPayrollRun> {
-  const run = await PayrollRun.findById(runId);
-  if (!run) throw new Error("Payroll run not found");
-  if (run.status === "LOCKED") throw new Error("Payroll run is already locked");
-  if (run.status === "APPROVED") throw new Error("Payroll run is already approved");
-  if (!run.totals || run.totals.totalEmployees === 0) {
-    throw new Error("Cannot approve an empty payroll run");
-  }
-
-  run.status = "APPROVED";
-  run.approvedBy = new mongoose.Types.ObjectId(user.userId);
-  run.approvedAt = new Date();
-  await run.save();
-  return run;
+/**
+ * Kept for older callers; approval now always goes through the two-signature
+ * workflow (Business Head, then Managing Partner).
+ */
+export async function approvePayrollRun(runId: string, user: JWTPayload) {
+  const { signApproval } = await import("./approvalService");
+  return signApproval("payroll", runId, user, "APPROVED");
 }
 
 export async function lockPayrollRun(

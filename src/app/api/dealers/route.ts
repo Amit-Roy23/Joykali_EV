@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { creditSummary } from "@/services/creditService";
+import { requestCreditChange } from "@/services/orderService";
 import { connectToDatabase } from "@/lib/db";
 import { Dealer } from "@/models/Dealer";
 import { Vehicle } from "@/models/Vehicle";
@@ -78,11 +80,14 @@ export async function GET(req: NextRequest) {
     const stockMap = new Map(stockCounts.map((s: any) => [String(s._id), s.count]));
     const soldMap = new Map(soldCounts.map((s: any) => [String(s._id), s.count]));
 
-    const enriched = dealers.map((d: any) => ({
-      ...d,
-      stockCount: stockMap.get(String(d._id)) || 0,
-      soldCount: soldMap.get(String(d._id)) || 0,
-    }));
+    const enriched = await Promise.all(
+      dealers.map(async (d: any) => ({
+        ...d,
+        stockCount: stockMap.get(String(d._id)) || 0,
+        soldCount: soldMap.get(String(d._id)) || 0,
+        credit: await creditSummary("DEALER", d._id).catch(() => null),
+      }))
+    );
 
     return jsonResponse(enriched);
   } catch (error: any) {
@@ -115,11 +120,28 @@ export async function POST(req: NextRequest) {
       city: data.city.trim(),
       state: data.state.trim(),
       gstin: data.gstin.toUpperCase().trim(),
+      stateCode: data.gstin.toUpperCase().trim().slice(0, 2) || "19",
+      pincode: String(body.pincode || "").trim(),
+      creditLimit: 0, // set only through an approved credit request
+      creditDays: Math.min(180, Math.max(0, Number(body.creditDays ?? 30))),
       assignedASM: data.assignedASM ? new mongoose.Types.ObjectId(data.assignedASM) : null,
       status: data.status || "ACTIVE",
       onboardingDate: new Date(),
       createdBy: new mongoose.Types.ObjectId(auth.user.userId),
     });
+
+    if (Number(body.requestedCreditLimit) > 0) {
+      await requestCreditChange(
+        {
+          partyType: "DEALER",
+          partyId: String(dealer._id),
+          toLimitRupees: Number(body.requestedCreditLimit),
+          creditDays: dealer.creditDays,
+          reason: "Opening credit limit at onboarding",
+        },
+        auth.user
+      );
+    }
 
     await logAudit({
       user: auth.user,

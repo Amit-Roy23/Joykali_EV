@@ -3,128 +3,106 @@ import { RolePermission } from "@/models/RolePermission";
 import { User } from "@/models/User";
 import mongoose from "mongoose";
 
+const FEC_BASE: Permission[] = [
+  "sales.create",
+  "sales.view.own",
+  "scheme.view",
+  "payslip.view.own",
+  "payslip.download",
+  "employee.view",
+];
+const ASM_BASE: Permission[] = [
+  ...FEC_BASE,
+  "sales.view.team",
+  "inventory.view",
+  "dealer.view",
+  "payslip.view.team",
+  "reports.view",
+  // dealer orders for their own dealers; record goods receipt (GRN) for a dealer
+  "order.view",
+  "order.create",
+  "dispatch.view",
+  "grn.record",
+  "ledger.view",
+];
+const BH_BASE: Permission[] = [
+  ...ASM_BASE,
+  "sales.view.all",
+  "purchase.view",
+  "inventory.manage",
+  "dealer.manage",
+  "employee.manage",
+  "scheme.create",
+  "scheme.manage",
+  "scheme.approve",
+  "payroll.run",
+  "payroll.adjust",
+  "payroll.approve",
+  "payroll.view",
+  "payslip.view.all",
+  "distributor.view",
+  "distributor.manage",
+  "credit.request",
+  "ledger.manage",
+  "dispatch.manage",
+  "fleet.view",
+  "fleet.manage",
+  "salary.manage",
+  "approvals.sign",
+];
+const MP_BASE: Permission[] = [...BH_BASE, "sales.cancel", "purchase.manage", "payroll.lock", "audit.view"];
+
+const uniq = (list: Permission[]) => [...new Set(list)];
+
 export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  FEC: [
-    "sales.create",
-    "sales.view.own",
-    "scheme.view",
-    "payslip.view.own",
-    "payslip.download",
-    "employee.view",
-  ],
-  ASM: [
-    "sales.create",
-    "sales.view.own",
-    "sales.view.team",
-    "inventory.view",
-    "dealer.view",
-    "employee.view",
-    "scheme.view",
-    "payslip.view.own",
-    "payslip.view.team",
-    "payslip.download",
-    "reports.view",
-  ],
-  BUSINESS_HEAD: [
-    "sales.create",
-    "sales.view.own",
-    "sales.view.team",
-    "sales.view.all",
-    "purchase.view",
-    "inventory.view",
-    "inventory.manage",
-    "dealer.view",
-    "dealer.manage",
-    "employee.view",
-    "employee.manage",
-    "scheme.create",
-    "scheme.view",
-    "scheme.manage",
-    "payroll.run",
-    "payroll.adjust",
-    "payroll.view",
-    "payslip.view.own",
-    "payslip.view.team",
-    "payslip.view.all",
-    "payslip.download",
-    "reports.view",
-  ],
-  MANAGING_PARTNER: [
-    "sales.create",
-    "sales.view.own",
-    "sales.view.team",
-    "sales.view.all",
-    "sales.cancel",
-    "purchase.view",
-    "purchase.manage",
-    "inventory.view",
-    "inventory.manage",
-    "dealer.view",
-    "dealer.manage",
-    "employee.view",
-    "employee.manage",
-    "scheme.create",
-    "scheme.approve",
-    "scheme.view",
-    "scheme.manage",
-    "payroll.run",
-    "payroll.adjust",
-    "payroll.approve",
-    "payroll.lock",
-    "payroll.view",
-    "payslip.view.own",
-    "payslip.view.team",
-    "payslip.view.all",
-    "payslip.download",
-    "reports.view",
-    "audit.view",
-  ],
-  ADMIN: [
-    "sales.create",
-    "sales.view.own",
-    "sales.view.team",
-    "sales.view.all",
-    "sales.cancel",
-    "purchase.view",
-    "purchase.manage",
-    "inventory.view",
-    "inventory.manage",
-    "dealer.view",
-    "dealer.manage",
-    "employee.view",
-    "employee.manage",
-    "scheme.create",
-    "scheme.approve",
-    "scheme.view",
-    "scheme.manage",
-    "payroll.run",
-    "payroll.adjust",
-    "payroll.approve",
-    "payroll.lock",
-    "payroll.view",
-    "payslip.view.own",
-    "payslip.view.team",
-    "payslip.view.all",
-    "payslip.download",
-    "settings.manage",
-    "reports.view",
-    "audit.view",
-  ],
+  FEC: uniq(FEC_BASE),
+  ASM: uniq(ASM_BASE),
+  BUSINESS_HEAD: uniq(BH_BASE),
+  MANAGING_PARTNER: uniq(MP_BASE),
+  // Admin governs the system but is deliberately NOT an approver: every approval
+  // needs the Business Head and then the Managing Partner.
+  ADMIN: uniq([...MP_BASE, "settings.manage"]).filter((p) => p !== "approvals.sign"),
+  // Distributor logins see only their own orders, deliveries and account.
+  DISTRIBUTOR: ["portal.access", "order.view", "order.create", "dispatch.view", "grn.record", "ledger.view"],
 };
 
 /**
- * Fetch permissions for a given role from database, falling back to defaults
+ * Permissions that existed before role documents recorded `knownPermissions`.
+ * A stored role only "knows" these, so any newer default permission is added
+ * automatically instead of silently missing after an upgrade.
+ */
+const LEGACY_PERMISSIONS: string[] = [
+  "sales.create", "sales.view.own", "sales.view.team", "sales.view.all", "sales.cancel",
+  "purchase.manage", "purchase.view", "inventory.manage", "inventory.view",
+  "dealer.manage", "dealer.view", "employee.manage", "employee.view",
+  "scheme.create", "scheme.approve", "scheme.view", "scheme.manage",
+  "payroll.run", "payroll.adjust", "payroll.approve", "payroll.lock", "payroll.view",
+  "payslip.view.own", "payslip.view.team", "payslip.view.all", "payslip.download",
+  "settings.manage", "reports.view", "audit.view",
+];
+
+/** Every permission the system knows about (used when saving the role matrix). */
+export const ALL_PERMISSIONS: Permission[] = uniq(Object.values(DEFAULT_ROLE_PERMISSIONS).flat());
+
+/**
+ * Permissions for a role: the stored matrix plus any default permission
+ * introduced after that matrix was saved.
  */
 export async function getPermissionsForRole(role: UserRole): Promise<Permission[]> {
+  const defaults = DEFAULT_ROLE_PERMISSIONS[role] || [];
   try {
-    const customRole = await RolePermission.findOne({ role }).lean();
-    if (customRole && customRole.permissions && customRole.permissions.length > 0) {
-      return customRole.permissions as Permission[];
+    const stored: any = await RolePermission.findOne({ role }).lean();
+    if (stored && Array.isArray(stored.permissions)) {
+      const known = new Set<string>(stored.knownPermissions?.length ? stored.knownPermissions : LEGACY_PERMISSIONS);
+      const added = defaults.filter((p) => !known.has(p));
+      let perms = uniq([...(stored.permissions as Permission[]), ...added]);
+      if (role === "ADMIN") perms = perms.filter((p) => p !== "approvals.sign");
+      return perms;
     }
-  } catch (err) {
+  } catch {
     // Database might not be initialized yet
   }
-  return DEFAULT_ROLE_PERMISSIONS[role] || [];
+  return defaults;
 }
 
 /**
@@ -134,7 +112,8 @@ export async function hasPermission(
   role: UserRole,
   permission: Permission
 ): Promise<boolean> {
-  if (role === "ADMIN") return true;
+  // Admin has every permission except signing approvals (BH + MP only).
+  if (role === "ADMIN") return permission !== "approvals.sign";
   const permissions = await getPermissionsForRole(role);
   return permissions.includes(permission);
 }
@@ -144,6 +123,9 @@ export async function hasPermission(
  */
 export function canManageRole(managerRole: UserRole, targetRole: UserRole): boolean {
   if (managerRole === "ADMIN") return true;
+  // Distributor logins are managed with their distributor (BH and above).
+  if (targetRole === "DISTRIBUTOR") return ROLE_HIERARCHY[managerRole] >= ROLE_HIERARCHY.BUSINESS_HEAD;
+  if (managerRole === "DISTRIBUTOR") return false;
   return ROLE_HIERARCHY[managerRole] > ROLE_HIERARCHY[targetRole];
 }
 
@@ -183,6 +165,10 @@ export async function getScopeFilter(
 
   if (user.role === "ADMIN" || user.role === "MANAGING_PARTNER") {
     return {};
+  }
+  // External distributor logins never see internal sales, staff, payroll or stock.
+  if (user.role === "DISTRIBUTOR") {
+    return { _id: null };
   }
 
   if (resource === "sales") {

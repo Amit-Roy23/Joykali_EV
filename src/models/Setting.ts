@@ -31,6 +31,24 @@ export interface ISetting extends Document {
     esiEnabled: boolean;
     ptEnabled: boolean;
     ptMode?: "WB_SLAB" | "FLAT";
+    /** Statutory PF wage ceiling (₹15,000) — PF is 12% of min(basic, ceiling) when capped. */
+    pfWageCeilingPaise?: number;
+    pfCapAtCeiling?: boolean;
+    employerEsiRate?: number;
+  };
+  /** How a gross salary is split automatically into components. */
+  salaryRules?: {
+    basicPct: number; // % of gross
+    hraPctOfBasic: number; // % of basic
+    conveyancePaise: number; // fixed monthly
+  };
+  logistics?: {
+    /** Consignments at or above this value need an e-way bill before dispatch. */
+    ewayBillThresholdPaise: number;
+    /** The person who loads a DO may not also dispatch it. */
+    requireSeparateDispatcher: boolean;
+    /** Warn this many days before a fleet document expires. */
+    docExpiryWarningDays: number;
   };
   updatedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -79,6 +97,19 @@ const SettingSchema = new Schema<ISetting>(
       ptEnabled: { type: Boolean, default: true },
       // WB_SLAB = West Bengal slab table on gross; FLAT = ptMonthlyPaise for everyone
       ptMode: { type: String, enum: ["WB_SLAB", "FLAT"], default: "WB_SLAB" },
+      pfWageCeilingPaise: { type: Number, default: 1500000 },
+      pfCapAtCeiling: { type: Boolean, default: true },
+      employerEsiRate: { type: Number, default: 3.25 },
+    },
+    salaryRules: {
+      basicPct: { type: Number, default: 50 },
+      hraPctOfBasic: { type: Number, default: 40 },
+      conveyancePaise: { type: Number, default: 160000 },
+    },
+    logistics: {
+      ewayBillThresholdPaise: { type: Number, default: 5000000 },
+      requireSeparateDispatcher: { type: Boolean, default: true },
+      docExpiryWarningDays: { type: Number, default: 15 },
     },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

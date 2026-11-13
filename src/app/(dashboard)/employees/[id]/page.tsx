@@ -1,5 +1,6 @@
 "use client";
 import { useSession } from "@/components/layout/session";
+import { SalaryPanel } from "@/components/salaryPanel";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -29,7 +30,8 @@ export default function EmployeeDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { can } = useSession();
+  const session = useSession();
+  const { can } = session;
   const { id } = use(params);
   const [data, setData] = useState<any>(null);
   const [allEmployees, setAllEmployees] = useState<any[]>([]);
@@ -186,52 +188,9 @@ export default function EmployeeDetailPage({
         </Card>
       </div>
 
-      {/* Salary Structure Card */}
-      {salary && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Configured Monthly Salary Structure</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-lg bg-slate-50 border border-slate-100 text-xs">
-              <div>
-                <span className="text-slate-400 block">Basic Pay</span>
-                <span className="font-bold text-slate-800 text-sm">{formatINR(salary.basic)}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">House Rent (HRA)</span>
-                <span className="font-bold text-slate-800 text-sm">{formatINR(salary.hra)}</span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">Conveyance Allowance</span>
-                <span className="font-bold text-slate-800 text-sm">
-                  {formatINR(salary.conveyance)}
-                </span>
-              </div>
-              <div>
-                <span className="text-slate-400 block">Other Allowances</span>
-                <span className="font-bold text-slate-800 text-sm">
-                  {formatINR(salary.otherAllowances)}
-                </span>
-              </div>
-            </div>
+      {/* Salary: automatic breakup, revisions with BH + MP approval */}
+      <SalaryPanel employeeId={String(user._id)} isSelf={String(user._id) === String(session.user?.userId)} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 text-xs text-slate-600">
-              <div>
-                <span className="font-semibold text-slate-700">PAN:</span> {salary.pan}
-              </div>
-              <div>
-                <span className="font-semibold text-slate-700">Bank:</span> {salary.bankDetails?.bankName}
-              </div>
-              <div>
-                <span className="font-semibold text-slate-700">A/C:</span> {salary.bankDetails?.accountNo} (IFSC: {salary.bankDetails?.ifsc})
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Reporting History Timeline (Maintains past attribution) */}
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Manager Assignment History</CardTitle>

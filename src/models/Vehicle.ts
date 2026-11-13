@@ -10,8 +10,11 @@ export interface IVehicle {
   color: string;
   model: mongoose.Types.ObjectId;
   status: VehicleStatus;
-  currentLocationType: "WAREHOUSE" | "DEALER";
+  currentLocationType: "WAREHOUSE" | "DEALER" | "IN_TRANSIT" | "DISTRIBUTOR";
   currentLocationDealer?: mongoose.Types.ObjectId | null;
+  currentLocationDistributor?: mongoose.Types.ObjectId | null;
+  /** The warehouse Delivery Order currently holding this vehicle (reserved / in transit). */
+  deliveryOrder?: mongoose.Types.ObjectId | null;
   purchase?: mongoose.Types.ObjectId | null;
   sale?: mongoose.Types.ObjectId | null;
   createdAt?: Date;
@@ -29,17 +32,19 @@ const VehicleSchema = new Schema<IVehicle>(
     status: {
       type: String,
       required: true,
-      enum: ["IN_STOCK", "ALLOCATED_TO_DEALER", "SOLD", "RETURNED"],
+      enum: ["IN_STOCK", "ALLOCATED_TO_DEALER", "SOLD", "RETURNED", "RESERVED", "IN_TRANSIT", "WITH_DISTRIBUTOR", "MISSING"],
       default: "IN_STOCK",
       index: true,
     },
     currentLocationType: {
       type: String,
-      enum: ["WAREHOUSE", "DEALER"],
+      enum: ["WAREHOUSE", "DEALER", "IN_TRANSIT", "DISTRIBUTOR"],
       default: "WAREHOUSE",
       index: true,
     },
     currentLocationDealer: { type: Schema.Types.ObjectId, ref: "Dealer", default: null, index: true },
+    currentLocationDistributor: { type: Schema.Types.ObjectId, ref: "Distributor", default: null, index: true },
+    deliveryOrder: { type: Schema.Types.ObjectId, ref: "DeliveryOrder", default: null, index: true },
     purchase: { type: Schema.Types.ObjectId, ref: "Purchase", default: null },
     sale: { type: Schema.Types.ObjectId, ref: "Sale", default: null },
   },

@@ -9,6 +9,9 @@ export interface IVehicleModel extends Document {
   rangeKm: number;
   purchasePrice: number; // in paise
   sellingPrice: number; // in paise (ex-showroom)
+  /** Ex-GST channel prices in paise. Missing values fall back to a % of the ex-showroom price. */
+  dealerPrice?: number;
+  distributorPrice?: number;
   gstRate: number; // percentage, e.g. 5
   hsnCode: string;
   isActive: boolean;
@@ -32,6 +35,8 @@ const VehicleModelSchema = new Schema<IVehicleModel>(
     rangeKm: { type: Number, required: true },
     purchasePrice: { type: Number, required: true, default: 0 },
     sellingPrice: { type: Number, required: true, default: 0 },
+    dealerPrice: { type: Number },
+    distributorPrice: { type: Number },
     gstRate: { type: Number, required: true, default: 5 }, // 5% standard EV GST in India
     hsnCode: { type: String, required: true, default: "870380" },
     isActive: { type: Boolean, default: true, index: true },

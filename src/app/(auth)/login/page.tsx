@@ -17,10 +17,11 @@ const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 const DEMO_PASSWORD = "Joykali@123";
 const DEMO_ACCOUNTS = [
   { role: "ADMIN", name: "Rajib Chakraborty", login: "admin@joykaliev.in", blurb: "Users, roles, settings, audit trail" },
-  { role: "MANAGING_PARTNER", name: "Joydeb Kali Sarkar", login: "mp@joykaliev.in", blurb: "Approves schemes & locks payroll" },
-  { role: "BUSINESS_HEAD", name: "Ananya Bhattacharya", login: "bh@joykaliev.in", blurb: "Runs payroll, dealers & stock" },
+  { role: "MANAGING_PARTNER", name: "Joydeb Kali Sarkar", login: "mp@joykaliev.in", blurb: "Final approver — orders, payroll, credit" },
+  { role: "BUSINESS_HEAD", name: "Ananya Bhattacharya", login: "bh@joykaliev.in", blurb: "First approver; warehouse & dispatch" },
   { role: "ASM", name: "Moumita Banerjee", login: "asm.kolkata@joykaliev.in", blurb: "Kolkata team & leaderboard" },
   { role: "FEC", name: "Arnab Chatterjee", login: "fec5@joykaliev.in", blurb: "Books sales, tracks incentives" },
+  { role: "DISTRIBUTOR", name: "Bardhaman Auto Distributors", login: "dist1@joykaliev.in", blurb: "Places orders, receives deliveries (GRN)" },
 ];
 
 export default function LoginPage() {

@@ -118,6 +118,18 @@ The engine (`src/services/incentiveEngine.ts`) supports 5 rule architectures:
 
 ---
 
+## Channel, dispatch & control features
+
+| Area | What it does |
+| --- | --- |
+| **Two-signature approvals** | Orders, incentive schemes, payroll runs, credit-limit changes and salary revisions take effect only after the **Business Head** and then the **Managing Partner** approve (Approvals inbox). Admin can see but never sign. Any payroll edit clears the signatures. |
+| **Distributor portal** | Distributors log in (role `DISTRIBUTOR`, code `JKDB-0001`), see only their own credit, statement, orders and deliveries, place orders, and record the **GRN** when a truck arrives. Short-delivered vehicles are credited back automatically (credit note). |
+| **Credit limits** | Dealers and distributors have an approved limit and credit days. Exposure = unpaid invoices + open orders + delivery orders in the pipeline + (dealers) consignment stock. Orders over the limit, or with overdue dues, are refused; re-checked at final approval and at dispatch. Payments are recorded on the party ledger. |
+| **Warehouse DO → dispatch** | Approved order → Delivery Order → submit → assign a compliant truck + driver → scan/pick chassis (atomically reserved) → loading checklist → tax invoice (distributor) or delivery challan (dealer consignment) → e-way bill → dispatch by a **different person** than the loader → receiver's GRN. Cancelling releases every reservation. |
+| **Invoice & e-way bill** | GST invoice/challan PDF with CGST+SGST or IGST by place of supply. E-way bill JSON in the NIC bulk-upload format; the 12-digit EWB number and validity (1 day per 200 km) are recorded and enforced before dispatch. |
+| **Fleet documents** | RC, insurance, PUC (not for EVs), fitness, permit, road tax with expiry dates and scans. A truck with any missing/expired paper, on manual hold or inactive is **locked** and cannot be loaded or dispatched; expiring papers are flagged on dashboards. |
+| **Automatic salary** | Enter a monthly gross or annual CTC; basic/HRA/conveyance/special allowance, PF (₹15k ceiling), ESI, WB professional tax, employer cost and take-home are calculated. Revisions are effective-dated and need BH + MP approval; a daily job drafts last month's payroll on the 1st. |
+
 ## Deploying
 
 **Vercel (frontend + backend in one project) with MongoDB Atlas:** follow [DEPLOY-VERCEL.md](./DEPLOY-VERCEL.md) —

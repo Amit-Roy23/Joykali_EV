@@ -105,3 +105,10 @@ export function checkRateLimit(
   return true;
 }
 
+
+/** Turn a thrown business-rule error (which carries .status) into an API error response. */
+export function failure(error: any, fallback = "Request failed"): NextResponse<ApiResponse> {
+  const status = typeof error?.status === "number" ? error.status : 500;
+  if (status >= 500) console.error(error);
+  return errorResponse(error?.message || fallback, status);
+}

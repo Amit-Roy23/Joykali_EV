@@ -18,6 +18,13 @@ import {
   Settings,
   ShieldCheck,
   History,
+  Building2,
+  ClipboardList,
+  ShoppingBag,
+  Truck,
+  BadgeCheck,
+  BookOpen,
+  Container,
 } from "lucide-react";
 
 export interface NavItem {
@@ -45,6 +52,18 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "Channel & Dispatch",
+    items: [
+      { title: "Approvals", href: "/approvals", icon: BadgeCheck, permission: "approvals.sign" },
+      { title: "Place an Order", href: "/orders/new", icon: ShoppingBag, permission: "order.create" },
+      { title: "Orders", href: "/orders", icon: ClipboardList, permission: "order.view" },
+      { title: "Delivery Orders", href: "/dispatch", icon: Truck, permission: "dispatch.view" },
+      { title: "My Account", href: "/account", icon: BookOpen, permission: "portal.access" },
+      { title: "Distributors", href: "/distributors", icon: Building2, permission: "distributor.view" },
+      { title: "Transport Fleet", href: "/fleet", icon: Container, permission: "fleet.view" },
+    ],
+  },
+  {
     label: "Stock",
     items: [
       { title: "Vehicle Inventory", href: "/inventory", icon: Warehouse, permission: "inventory.view" },
@@ -64,7 +83,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Earnings",
     items: [
-      { title: "My Incentives", href: "/incentives/my-incentives", icon: Trophy },
+      { title: "My Incentives", href: "/incentives/my-incentives", icon: Trophy, permission: "scheme.view" },
       { title: "Payslips", href: "/payslips", icon: FileText, permission: "payslip.view.own" },
       { title: "Incentive Schemes", href: "/schemes", icon: Sparkles, permission: "scheme.view" },
       { title: "Scheme Builder", href: "/schemes/builder", icon: Wand2, permission: "scheme.create" },

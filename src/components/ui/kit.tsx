@@ -212,6 +212,7 @@ export const ROLE_LABEL: Record<string, string> = {
   BUSINESS_HEAD: "Business Head",
   ASM: "Area Sales Manager",
   FEC: "Field Executive",
+  DISTRIBUTOR: "Distributor",
 };
 export const ROLE_SHORT: Record<string, string> = {
   ADMIN: "Admin",
@@ -219,6 +220,7 @@ export const ROLE_SHORT: Record<string, string> = {
   BUSINESS_HEAD: "BH",
   ASM: "ASM",
   FEC: "FEC",
+  DISTRIBUTOR: "DIST",
 };
 const roleTone: Record<string, string> = {
   ADMIN: "bg-ink-900 text-volt-300 ring-ink-700",
@@ -226,6 +228,7 @@ const roleTone: Record<string, string> = {
   BUSINESS_HEAD: "bg-brand-100 text-brand-800 ring-brand-200",
   ASM: "bg-sky-50 text-sky-800 ring-sky-200",
   FEC: "bg-volt-100 text-volt-800 ring-volt-200",
+  DISTRIBUTOR: "bg-amber-50 text-amber-800 ring-amber-200",
 };
 export function RoleBadge({ role, short, className }: { role?: string; short?: boolean; className?: string }) {
   if (!role) return null;

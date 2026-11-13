@@ -121,13 +121,10 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {selectedIds.length > 0 && can("inventory.manage") && (
-            <Button
-              size="sm"
-              onClick={() => setIsAllocateModalOpen(true)}
-            >
-              Allocate Selected ({selectedIds.length}) to Dealer
-            </Button>
+          {can("order.create") && (
+            <Link href="/orders/new">
+              <Button size="sm">Send stock to a dealer</Button>
+            </Link>
           )}
           {can("reports.view") && (
             <a href="/api/reports/stock/excel" download>
@@ -164,8 +161,12 @@ export default function InventoryPage() {
             >
               <option value="">All Statuses</option>
               <option value="IN_STOCK">In Stock (Warehouse)</option>
-              <option value="ALLOCATED_TO_DEALER">Allocated to Dealer</option>
+              <option value="ALLOCATED_TO_DEALER">At Dealer (consignment)</option>
+              <option value="RESERVED">Reserved on a DO</option>
+              <option value="IN_TRANSIT">In Transit</option>
+              <option value="WITH_DISTRIBUTOR">With Distributor</option>
               <option value="SOLD">Sold</option>
+              <option value="MISSING">Missing (short on GRN)</option>
             </select>
             <select
               value={locationType}
@@ -185,13 +186,6 @@ export default function InventoryPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
-                  <input
-                    type="checkbox"
-                    onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="rounded border-slate-300"
-                  />
-                </TableHead>
                 <TableHead>Chassis Number</TableHead>
                 <TableHead>Model & Variant</TableHead>
                 <TableHead>Color</TableHead>
@@ -204,29 +198,19 @@ export default function InventoryPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-slate-400">
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-400">
                     Loading inventory...
                   </TableCell>
                 </TableRow>
               ) : vehicles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                     No vehicles found. Inward new vehicles via Purchases.
                   </TableCell>
                 </TableRow>
               ) : (
                 vehicles.map((v) => (
                   <TableRow key={v._id}>
-                    <TableCell>
-                      {v.status === "IN_STOCK" && (
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(v._id)}
-                          onChange={() => handleToggleSelect(v._id)}
-                          className="rounded border-slate-300"
-                        />
-                      )}
-                    </TableCell>
                     <TableCell className="font-mono font-bold text-xs text-slate-900">
                       {v.chassisNumber}
                     </TableCell>
