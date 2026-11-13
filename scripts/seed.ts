@@ -42,11 +42,27 @@ import { bulkAllocateVehiclesToDealer } from "../src/services/inventoryService";
 import { createSale, cancelSale } from "../src/services/salesService";
 import {
   adjustPayrollEntry,
-  approvePayrollRun,
   generateDraftPayrollRun,
   lockPayrollRun,
 } from "../src/services/payrollService";
 import type { JWTPayload, UserRole } from "../src/types";
+import { signApproval } from "../src/services/approvalService";
+import { placeOrder, recordPayment, requestCreditChange } from "../src/services/orderService";
+import {
+  autoPick,
+  completeLoading,
+  createDeliveryOrder,
+  dispatchDO,
+  generateDocument,
+  recordEwayBill,
+  recordGRN,
+  startLoading,
+  submitDO,
+} from "../src/services/dispatchService";
+import { proposeRevision } from "../src/services/salaryService";
+import { createPurchase as createPurchaseAgain } from "../src/services/purchaseService";
+import { Distributor, FleetVehicle, CreditLimitChange, LedgerEntry as LedgerEntryModel, DeliveryOrder as DeliveryOrderModel } from "../src/models";
+import { generateDistributorCode } from "../src/lib/codeGenerator";
 
 export const DEMO_PASSWORD = "Joykali@123";
 
@@ -245,6 +261,10 @@ async function main() {
         state: "West Bengal",
         gstin: d.gst,
         assignedASM: d.asm._id,
+        stateCode: "19",
+        pincode: String(700100 + i * 37),
+        creditLimit: rupeesToPaise(3000000), // ₹30 L — approved below
+        creditDays: 30,
         status: "ACTIVE",
         onboardingDate: new Date(Date.UTC(first.year - 1, 4 + i, 10)),
         createdBy: bh._id,
@@ -322,6 +342,8 @@ async function main() {
       rangeKm: m.range,
       purchasePrice: rupeesToPaise(m.cost),
       sellingPrice: rupeesToPaise(m.price),
+      dealerPrice: rupeesToPaise(Math.round(m.price * 0.91)),
+      distributorPrice: rupeesToPaise(Math.round(m.price * 0.87)),
       gstRate: 5,
       hsnCode: "870380",
       isActive: true,
@@ -385,8 +407,8 @@ async function main() {
     approvedBy: mp._id,
     approvedAt: months[0].start,
   });
-  // Awaiting Managing Partner approval — the live-demo moment.
-  await IncentiveScheme.create({
+  // Business Head has signed; awaiting the Managing Partner — the live-demo moment.
+  const draftScheme = await IncentiveScheme.create({
     name: "Commercial EV Push — E-Rickshaw & Cargo",
     description: "Per-unit kicker on commercial vehicles. Approve it and watch this month's payouts update instantly.",
     status: "DRAFT",
@@ -577,10 +599,175 @@ async function main() {
         await adjustPayrollEntry(String(star._id), { adjustment: { amount: 2500, reason: "Best showroom conduct award" } }, bhPayload);
       }
     }
-    await approvePayrollRun(String(run._id), mpPayload);
+    await signApproval("payroll", String(run._id), bhPayload, "APPROVED");
+    await signApproval("payroll", String(run._id), mpPayload, "APPROVED");
     // The most recent closed month stays APPROVED so the demo can show "Lock".
     if (mi < months.length - 2) await lockPayrollRun(String(run._id), mpPayload);
   }
+
+  // ------------------------------------------------- channel operations
+  console.log("• Credit limits, distributors, fleet, orders & delivery orders");
+  const asmSouthPayload = asPayload(asmSouth);
+  const asmKolkataPayload = asPayload(asmKolkata);
+  const sig = (u: any, at: Date) => ({ level: u.role, decision: "APPROVED", by: u._id, byName: u.name, byCode: u.employeeCode, at });
+
+  // Dealer limits were set at onboarding; record the approvals that granted them.
+  for (const d of dealers) {
+    await CreditLimitChange.create({
+      partyType: "DEALER", party: d._id, partyName: d.name, partyCode: d.dealerCode,
+      fromLimit: 0, toLimit: d.creditLimit, creditDays: 30, reason: "Opening credit limit at onboarding",
+      status: "APPROVED", approvals: [sig(bh, d.onboardingDate), sig(mp, d.onboardingDate)],
+      requestedBy: bh._id, appliedAt: d.onboardingDate,
+    });
+  }
+
+  // Distributors (one inter-state → IGST on its invoices).
+  const distSpecs = [
+    { name: "Bardhaman Auto Distributors", owner: "Sujit Kumar Ghosh", city: "Bardhaman", pincode: "713101", gstin: "19AAGFB4521M1Z8", state: "West Bengal", limit: 6000000, login: "dist1@joykaliev.in", asm: asmSouth },
+    { name: "Malda EV Traders", owner: "Anowar Hossain", city: "Malda", pincode: "732101", gstin: "19ABCFM7788N1Z2", state: "West Bengal", limit: 2500000, login: null, asm: asmNorth },
+    { name: "Bihar Green Wheels", owner: "Rakesh Kumar Singh", city: "Patna", pincode: "800001", gstin: "10AAJFB3344P1Z6", state: "Bihar", limit: 4000000, login: "dist3@joykaliev.in", asm: asmNorth },
+  ];
+  const distributors: any[] = [];
+  const distUsers: Record<string, any> = {};
+  for (const [i, ds] of distSpecs.entries()) {
+    const onboard = new Date(first.start.getTime() + i * 9 * 86400000);
+    const code = await generateDistributorCode();
+    const dist = await Distributor.create({
+      distributorCode: code, name: ds.name, ownerName: ds.owner, phone: `97${between(30000000, 39999999)}`,
+      email: `accounts${i + 1}@${ds.city.toLowerCase()}dist.in`, address: `${between(10, 180)}, ${pick(["G.T. Road", "Station Road", "Bypass More", "Industrial Area"])}`,
+      city: ds.city, state: ds.state, stateCode: ds.gstin.slice(0, 2), pincode: ds.pincode, gstin: ds.gstin,
+      creditLimit: rupeesToPaise(ds.limit), creditDays: 30, assignedASM: ds.asm._id, status: "ACTIVE", onboardingDate: onboard, createdBy: bh._id,
+    });
+    await CreditLimitChange.create({
+      partyType: "DISTRIBUTOR", party: dist._id, partyName: dist.name, partyCode: code, fromLimit: 0, toLimit: dist.creditLimit, creditDays: 30,
+      reason: "Opening credit limit at onboarding", status: "APPROVED", approvals: [sig(bh, onboard), sig(mp, onboard)], requestedBy: bh._id, appliedAt: onboard,
+    });
+    if (ds.login) {
+      distUsers[code] = await User.create({
+        employeeCode: code, name: ds.owner, email: ds.login, phone: dist.phone, role: "DISTRIBUTOR", distributor: dist._id,
+        designation: `Distributor — ${ds.name}`, joiningDate: onboard, status: "ACTIVE", passwordHash, mustChangePassword: false,
+      });
+    }
+    distributors.push(dist);
+  }
+  const [bardhaman, malda, bihar] = distributors;
+  const bardhamanUser = asPayload(distUsers[bardhaman.distributorCode]);
+  const biharUser = asPayload(distUsers[bihar.distributorCode]);
+
+  // Malda carries an older unpaid invoice (within its 30 credit days).
+  await LedgerEntryModel.create({
+    partyType: "DISTRIBUTOR", party: malda._id, date: new Date(Date.now() - 18 * 86400000), type: "OPENING",
+    reference: "OPENING/2026-27", debit: rupeesToPaise(320000), credit: 0, narration: "Opening balance migrated from Tally", createdBy: admin._id,
+  });
+
+  // Transport fleet with documents. One truck has an expired PUC → locked.
+  const day = 86400000;
+  const inDays = (n: number) => new Date(Date.now() + n * day);
+  const docs = (fuel: string, overrides: Record<string, Date | null> = {}) =>
+    ["RC", "INSURANCE", "FITNESS", "PERMIT", "ROAD_TAX", ...(fuel === "ELECTRIC" ? [] : ["PUC"])].map((type) => ({
+      type,
+      number: `${type}-${between(100000, 999999)}`,
+      issuedOn: inDays(-200),
+      validUpto: type in overrides ? overrides[type] : type === "RC" ? inDays(3650) : inDays(between(60, 330)),
+      issuer: type === "INSURANCE" ? pick(["ICICI Lombard", "Tata AIG", "New India Assurance"]) : "RTO Kolkata",
+      updatedBy: bh._id,
+    }));
+  const fleetSpecs = [
+    { reg: "WB25K4521", type: "TRUCK", mm: "Tata LPT 1109 (car carrier)", fuel: "DIESEL", cap: 10, own: "OWNED", over: {} },
+    { reg: "WB19J7710", type: "MINI_TRUCK", mm: "Ashok Leyland Dost+", fuel: "DIESEL", cap: 6, own: "OWNED", over: { INSURANCE: inDays(9) } },
+    { reg: "WB11C3302", type: "TRUCK", mm: "Eicher Pro 2049", fuel: "DIESEL", cap: 12, own: "HIRED", over: { PUC: inDays(-4) } },
+    { reg: "WB02AB9001", type: "EV_LOADER", mm: "Joykali CargoLoader (in-house)", fuel: "ELECTRIC", cap: 3, own: "OWNED", over: {} },
+  ];
+  const fleet: Record<string, any> = {};
+  for (const f of fleetSpecs) {
+    fleet[f.reg] = await FleetVehicle.create({
+      registrationNo: f.reg, vehicleType: f.type, makeModel: f.mm, fuel: f.fuel, capacityUnits: f.cap, ownership: f.own,
+      transporterName: f.own === "HIRED" ? "Sealdah Roadlines" : undefined, transporterGstin: f.own === "HIRED" ? "19AAKFS1122Q1Z4" : undefined,
+      documents: docs(f.fuel, f.over as any), status: "ACTIVE",
+    });
+  }
+
+  // Fresh stock for channel orders.
+  const bump: Array<[string, number]> = [["FALCON", 14], ["STORM", 12], ["CITYRIDE", 6], ["CARGO", 4]];
+  for (const supplier of [supplierMain, supplierCargo]) {
+    const lineItems = bump
+      .map(([k, q]) => ({ spec: modelSpecs.find((m) => m.key === k)!, q }))
+      .filter(({ spec }) => spec.supplier === supplier)
+      .map(({ spec, q }) => ({
+        model: String(models[spec.key]._id), quantity: q, unitCost: spec.cost, gstRate: 5,
+        vehicles: Array.from({ length: q }, () => {
+          chassisSeq += 1;
+          const code = `${spec.key.slice(0, 3)}${current.year % 100}${String(current.month).padStart(2, "0")}${chassisSeq}`;
+          return { chassisNumber: `MD9JK${code}`, motorNumber: `MTR${code}`, batteryNumber: `BAT${code}`, chargerNumber: `CHG${code}`, color: pick([...COLORS]) };
+        }),
+      }));
+    await createPurchaseAgain(
+      { supplier: String(supplier._id), invoiceNumber: `${supplier === supplierMain ? "VDM" : "ECW"}/${current.year}/CH/${between(100, 999)}`, invoiceDate: ymd(current.year, current.month, Math.max(1, todayIst - 3)), lineItems, notes: "Channel stock" },
+      bhPayload
+    );
+  }
+  const M = (k: string) => String(models[k]._id);
+  const approveBoth = async (kind: "order", id: string) => {
+    await signApproval(kind, id, bhPayload, "APPROVED");
+    await signApproval(kind, id, mpPayload, "APPROVED");
+  };
+
+  // (a) Bardhaman: ordered on the portal → approved → shipped → received in full → part-paid.
+  const oA = await placeOrder({ partyType: "DISTRIBUTOR", partyId: String(bardhaman._id), lines: [{ modelId: M("FALCON"), quantity: 6 }, { modelId: M("STORM"), quantity: 4 }], notes: "Puja season replenishment" }, bardhamanUser);
+  await approveBoth("order", String(oA._id));
+  const doA = await createDeliveryOrder(String(oA._id), [{ modelId: M("FALCON"), quantity: 6 }, { modelId: M("STORM"), quantity: 4 }], bhPayload);
+  await submitDO(String(doA._id), bhPayload);
+  await startLoading(String(doA._id), { fleetVehicleId: String(fleet.WB25K4521._id), driverName: "Ramesh Yadav", driverPhone: "9831245670", driverLicence: "WB1020190045821" }, bhPayload);
+  await autoPick(String(doA._id), bhPayload);
+  await completeLoading(String(doA._id), { physicalInspection: true, chassisVerified: true, batteryChargerKeys: true, securedForTransit: true }, bhPayload);
+  await generateDocument(String(doA._id), bhPayload);
+  await recordEwayBill(String(doA._id), { distanceKm: 110, ewbNo: `3810${between(10000000, 99999999)}` }, bhPayload);
+  await dispatchDO(String(doA._id), mpPayload); // loader ≠ dispatcher
+  const doAfull: any = await DeliveryOrderModel.findById(doA._id).lean();
+  await recordGRN(String(doA._id), { items: doAfull.vehicles.map((v: any) => ({ vehicleId: String(v.vehicle), condition: "RECEIVED" })), remarks: "All 10 received in good condition" }, bardhamanUser);
+  await recordPayment({ partyType: "DISTRIBUTOR", partyId: String(bardhaman._id), amountRupees: 500000, mode: "BANK", reference: `UTR${between(100000000, 999999999)}`, narration: "Part payment" }, bhPayload);
+
+  // (b) Bihar (inter-state, IGST): approved → shipped → IN TRANSIT, awaiting the distributor's GRN.
+  const oB = await placeOrder({ partyType: "DISTRIBUTOR", partyId: String(bihar._id), lines: [{ modelId: M("CITYRIDE"), quantity: 3 }, { modelId: M("CARGO"), quantity: 2 }] }, biharUser);
+  await approveBoth("order", String(oB._id));
+  const doB = await createDeliveryOrder(String(oB._id), [{ modelId: M("CITYRIDE"), quantity: 3 }, { modelId: M("CARGO"), quantity: 2 }], bhPayload);
+  await submitDO(String(doB._id), bhPayload);
+  await startLoading(String(doB._id), { fleetVehicleId: String(fleet.WB19J7710._id), driverName: "Manoj Paswan", driverPhone: "9123456781", driverLicence: "BR0120180067112" }, bhPayload);
+  await autoPick(String(doB._id), bhPayload);
+  await completeLoading(String(doB._id), { physicalInspection: true, chassisVerified: true, batteryChargerKeys: true, securedForTransit: true }, bhPayload);
+  await generateDocument(String(doB._id), bhPayload);
+  await recordEwayBill(String(doB._id), { distanceKm: 560, ewbNo: `3810${between(10000000, 99999999)}` }, bhPayload);
+  await dispatchDO(String(doB._id), mpPayload);
+
+  // (c) Howrah dealer stock order by the ASM → approved → DO submitted, waiting to be loaded.
+  const howrah = dealers[2];
+  const oC = await placeOrder({ partyType: "DEALER", partyId: String(howrah._id), lines: [{ modelId: M("STORM"), quantity: 4 }], notes: "Weekend demand" }, asmKolkataPayload);
+  await approveBoth("order", String(oC._id));
+  const doC = await createDeliveryOrder(String(oC._id), [{ modelId: M("STORM"), quantity: 4 }], bhPayload);
+  await submitDO(String(doC._id), bhPayload);
+
+  // (d) Malda: placed by the ASM, waiting for the Business Head.
+  await placeOrder({ partyType: "DISTRIBUTOR", partyId: String(malda._id), lines: [{ modelId: M("FALCON"), quantity: 3 }, { modelId: M("ZIPPY"), quantity: 2 }] }, asPayload(asmNorth));
+  // (e) Bardhaman repeat order: Business Head signed, waiting for the Managing Partner.
+  const oE = await placeOrder({ partyType: "DISTRIBUTOR", partyId: String(bardhaman._id), lines: [{ modelId: M("FALCON"), quantity: 4 }] }, bardhamanUser);
+  await signApproval("order", String(oE._id), bhPayload, "APPROVED");
+  // (f) Durgapur dealer order by ASM South, waiting for the Business Head.
+  await placeOrder({ partyType: "DEALER", partyId: String(dealers[4]._id), lines: [{ modelId: M("CITYRIDE"), quantity: 2 }] }, asmSouthPayload);
+
+  // Credit limit increase waiting for the Business Head.
+  await requestCreditChange({ partyType: "DISTRIBUTOR", partyId: String(malda._id), toLimitRupees: 3500000, creditDays: 30, reason: "Opening a second showroom in English Bazar" }, bhPayload);
+
+  // Salary revision for the top FEC from next month: BH proposed and signed, waiting for the MP.
+  const star = fecs[4].user;
+  const rev = await proposeRevision(
+    String(star._id),
+    { mode: "GROSS", amountRupees: 21000, flags: { pf: true, esi: true, professionalTax: true }, effectiveMonth: nextMonth.period, reason: "Top performer — 6-month review" },
+    asPayload(mp)
+  );
+  await signApproval("salary", String(rev._id), bhPayload, "APPROVED");
+
+  // The commercial EV scheme: Business Head has signed, waiting for the Managing Partner.
+  await signApproval("scheme", String(draftScheme._id), bhPayload, "APPROVED");
 
   // A light audit trail so the Audit screen isn't empty.
   for (const u of [admin, mp, bh, asmNorth, fecs[0].user]) {
@@ -591,10 +778,12 @@ async function main() {
   const vehicles = await Vehicle.countDocuments();
   console.log(`\nSeed complete: ${saleIds.length} sales, ${vehicles} vehicles, ${runs} payroll runs.`);
   console.log(`\nDemo accounts (password: ${DEMO_PASSWORD})`);
-  for (const u of await User.find({ role: { $ne: "FEC" } }).sort({ role: 1 }).lean()) {
+  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR"] } }).sort({ role: 1 }).lean()) {
     console.log(`  ${u.role.padEnd(17)} ${u.employeeCode.padEnd(13)} ${u.email}`);
   }
   console.log(`  FEC               JKE-FEC-0001  fec1@joykaliev.in (… fec12)`);
+  console.log(`  DISTRIBUTOR       JKDB-0001     dist1@joykaliev.in  (Bardhaman)`);
+  console.log(`  DISTRIBUTOR       JKDB-0003     dist3@joykaliev.in  (Patna, Bihar — inter-state)`);
   await mongoose.disconnect();
 }
 

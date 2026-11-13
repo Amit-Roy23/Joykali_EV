@@ -11,6 +11,11 @@ export interface IDealer extends Document {
   state: string;
   gstin: string;
   assignedASM?: mongoose.Types.ObjectId | null;
+  /** Approved credit limit in paise — covers consignment stock + open orders. Changes need BH + MP. */
+  creditLimit: number;
+  creditDays: number;
+  stateCode: string;
+  pincode: string;
   status: "ACTIVE" | "INACTIVE";
   onboardingDate: Date;
   createdBy?: mongoose.Types.ObjectId;
@@ -31,6 +36,10 @@ const DealerSchema = new Schema<IDealer>(
     state: { type: String, required: true, trim: true },
     gstin: { type: String, required: true, uppercase: true, trim: true },
     assignedASM: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
+    creditLimit: { type: Number, required: true, default: 0 },
+    creditDays: { type: Number, required: true, default: 30 },
+    stateCode: { type: String, required: true, default: "19" },
+    pincode: { type: String, default: "" },
     status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE", index: true },
     onboardingDate: { type: Date, required: true, default: Date.now },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },

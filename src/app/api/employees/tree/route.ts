@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     if (auth.error) return auth.error;
 
     // Fetch all active employees
-    const employees = await User.find({ status: "ACTIVE" })
+    const employees = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } })
       .select("name employeeCode role designation reportsTo email phone")
       .lean();
 

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { periodOf } from "@/lib/period";
 import { connectToDatabase, withTransaction } from "@/lib/db";
 import { User } from "@/models/User";
 import { SalaryStructure } from "@/models/SalaryStructure";
@@ -31,7 +32,8 @@ export async function GET(req: NextRequest) {
     // Scoping filter
     const scopeFilter = await getScopeFilter(auth.user, "employees");
 
-    const query: any = { ...scopeFilter };
+    // Distributor logins are managed under Distributors, not in the employee list.
+    const query: any = { $and: [scopeFilter, { role: { $ne: "DISTRIBUTOR" } }] };
 
     if (search) {
       query.$or = [
@@ -41,7 +43,7 @@ export async function GET(req: NextRequest) {
         { phone: { $regex: search, $options: "i" } },
       ];
     }
-    if (role) query.role = role;
+    if (role && role !== "DISTRIBUTOR") query.$and.push({ role });
     if (status) query.status = status;
 
     const total = await User.countDocuments(query);
@@ -132,8 +134,18 @@ export async function POST(req: NextRequest) {
             fixedDeductions: data.salary.fixedDeductions,
             bankDetails: data.salary.bankDetails,
             pan: data.salary.pan.toUpperCase().trim(),
-            effectiveFrom: new Date(data.joiningDate),
-            isActive: true,
+            // Effective from the 1st of the joining month; not paid until BH + MP approve it.
+            effectiveFrom: periodOf(new Date(data.joiningDate)).start,
+            isActive: false,
+            status: "PENDING_APPROVAL",
+            approvals: [],
+            grossMonthly:
+              rupeesToPaise(data.salary.basic) +
+              rupeesToPaise(data.salary.hra) +
+              rupeesToPaise(data.salary.conveyance) +
+              rupeesToPaise(data.salary.otherAllowances),
+            reason: "Joining salary",
+            proposedBy: new mongoose.Types.ObjectId(auth.user.userId),
           },
         ],
         { session }

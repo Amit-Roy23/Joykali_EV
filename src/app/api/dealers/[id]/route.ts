@@ -1,4 +1,7 @@
 import { NextRequest } from "next/server";
+import { creditSummary } from "@/services/creditService";
+import { ChannelOrder } from "@/models/ChannelOrder";
+import { CreditLimitChange } from "@/models/CreditLimitChange";
 import { getScopeFilter } from "@/lib/rbac";
 import { connectToDatabase } from "@/lib/db";
 import { Dealer } from "@/models/Dealer";
@@ -47,10 +50,19 @@ export async function GET(
       .sort({ saleDate: -1 })
       .lean();
 
+    const [credit, orders, creditChanges] = await Promise.all([
+      creditSummary("DEALER", dealer._id as any).catch(() => null),
+      ChannelOrder.find({ partyType: "DEALER", party: dealer._id }).sort({ createdAt: -1 }).limit(15).lean(),
+      CreditLimitChange.find({ partyType: "DEALER", party: dealer._id }).sort({ createdAt: -1 }).limit(10).lean(),
+    ]);
+
     return jsonResponse({
       dealer,
       allocatedVehicles,
       salesHistory,
+      credit,
+      orders,
+      creditChanges,
     });
   } catch (error: any) {
     return errorResponse(error.message || "Failed to fetch dealer details", 500);
@@ -64,6 +76,7 @@ export async function PUT(
   try {
     await connectToDatabase();
     const auth = await authenticateAndAuthorize(req, "dealer.manage");
+    // (credit limits change only through an approved credit request)
     if (auth.error) return auth.error;
 
     const { id } = await params;
@@ -81,7 +94,14 @@ export async function PUT(
     if (body.address) dealer.address = body.address.trim();
     if (body.city) dealer.city = body.city.trim();
     if (body.state) dealer.state = body.state.trim();
-    if (body.gstin) dealer.gstin = body.gstin.toUpperCase().trim();
+    if (body.gstin) {
+      dealer.gstin = body.gstin.toUpperCase().trim();
+      dealer.stateCode = dealer.gstin.slice(0, 2); // GST state code = first two GSTIN digits
+    }
+    if (body.pincode !== undefined) dealer.pincode = String(body.pincode).trim();
+    if (body.creditDays !== undefined || body.creditLimit !== undefined) {
+      return errorResponse("Credit terms change only through an approved credit request", 400);
+    }
     if (body.status) dealer.status = body.status;
     if (body.assignedASM !== undefined) {
       dealer.assignedASM = body.assignedASM ? new mongoose.Types.ObjectId(body.assignedASM) : null;

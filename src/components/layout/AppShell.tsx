@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Menu, Plus, Receipt, ShieldOff, Trophy, Warehouse } from "lucide-react";
+import { ClipboardList, LayoutDashboard, Menu, Plus, Receipt, ShieldOff, Trophy, Truck, Warehouse } from "lucide-react";
 import { cn } from "@/components/ui/button";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -77,7 +77,14 @@ function MobileTabBar({ user, permissions, onMenu }: { user: any; permissions: s
   const pathname = usePathname();
   const can = (p?: string) => canSee({ permission: p }, user?.role, permissions);
 
-  const tabs = [
+  const isDistributor = user?.role === "DISTRIBUTOR";
+  const tabs = isDistributor
+    ? [
+        { href: "/", label: "Home", icon: LayoutDashboard, show: true },
+        { href: "/orders", label: "Orders", icon: ClipboardList, show: true },
+        { href: "/dispatch", label: "Deliveries", icon: Truck, show: true },
+      ]
+    : [
     { href: "/", label: "Home", icon: LayoutDashboard, show: true },
     { href: "/sales", label: "Sales", icon: Receipt, show: can("sales.view.own") },
     can("sales.create")
@@ -86,7 +93,8 @@ function MobileTabBar({ user, permissions, onMenu }: { user: any; permissions: s
   ].filter((t) => t.show);
 
   const isOn = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
-  const sellFab = can("sales.create");
+  const sellFab = can("sales.create") || isDistributor;
+  const fabHref = isDistributor ? "/orders/new" : "/sales/new";
 
   const Tab = ({ href, label, icon: Icon }: { href: string; label: string; icon: any }) => (
     <Link
@@ -113,8 +121,8 @@ function MobileTabBar({ user, permissions, onMenu }: { user: any; permissions: s
         {sellFab && (
           <div className="flex flex-1 justify-center">
             <Link
-              href="/sales/new"
-              aria-label="Record a sale"
+              href={fabHref}
+              aria-label={isDistributor ? "Place an order" : "Record a sale"}
               className="-mt-5 grid h-14 w-14 place-items-center rounded-2xl bg-ink-900 text-volt-300 shadow-lg shadow-ink-900/30 ring-4 ring-white transition active:scale-95"
             >
               <Plus className="h-7 w-7" />

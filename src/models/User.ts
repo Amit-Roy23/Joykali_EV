@@ -9,6 +9,8 @@ export interface IUser extends Document {
   role: UserRole;
   reportsTo?: mongoose.Types.ObjectId | IUser | null;
   dealer?: mongoose.Types.ObjectId | null;
+  /** For DISTRIBUTOR logins: the distributor company this user acts for. */
+  distributor?: mongoose.Types.ObjectId | null;
   designation: string;
   joiningDate: Date;
   status: "ACTIVE" | "INACTIVE";
@@ -30,11 +32,12 @@ const UserSchema = new Schema<IUser>(
     role: {
       type: String,
       required: true,
-      enum: ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"],
+      enum: ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "DISTRIBUTOR"],
       index: true,
     },
     reportsTo: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     dealer: { type: Schema.Types.ObjectId, ref: "Dealer", default: null },
+    distributor: { type: Schema.Types.ObjectId, ref: "Distributor", default: null, index: true },
     designation: { type: String, required: true, trim: true },
     joiningDate: { type: Date, required: true, default: Date.now },
     status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE", index: true },

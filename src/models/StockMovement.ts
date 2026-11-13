@@ -2,7 +2,17 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IStockMovement extends Document {
   vehicle: mongoose.Types.ObjectId;
-  movementType: "INWARD" | "DEALER_ALLOCATION" | "TRANSFER" | "SALE" | "RETURN";
+  movementType:
+    | "INWARD"
+    | "DEALER_ALLOCATION"
+    | "TRANSFER"
+    | "SALE"
+    | "RETURN"
+    | "DO_RESERVE"
+    | "DO_RELEASE"
+    | "DISPATCH"
+    | "DELIVERY"
+    | "SHORTAGE";
   fromLocation: string;
   toLocation: string;
   performedBy: mongoose.Types.ObjectId;
@@ -17,7 +27,7 @@ const StockMovementSchema = new Schema<IStockMovement>(
     movementType: {
       type: String,
       required: true,
-      enum: ["INWARD", "DEALER_ALLOCATION", "TRANSFER", "SALE", "RETURN"],
+      enum: ["INWARD", "DEALER_ALLOCATION", "TRANSFER", "SALE", "RETURN", "DO_RESERVE", "DO_RELEASE", "DISPATCH", "DELIVERY", "SHORTAGE"],
       index: true,
     },
     fromLocation: { type: String, required: true },

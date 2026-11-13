@@ -107,6 +107,9 @@ export async function PUT(
     const { id } = await params;
     const body = await req.json();
     if (!isValidId(id)) return errorResponse("Employee not found", 404);
+    if (body.salary) {
+      return errorResponse("Salary changes are proposed as a revision and need Business Head + Managing Partner approval", 400);
+    }
 
     const existingUser = await User.findById(id);
     if (!existingUser) return errorResponse("Employee not found", 404);
@@ -160,32 +163,8 @@ export async function PUT(
 
       await existingUser.save({ session });
 
-      // 3. Update or version salary structure if provided
-      if (body.salary) {
-        await SalaryStructure.updateMany(
-          { employee: existingUser._id },
-          { $set: { isActive: false } },
-          { session }
-        );
-
-        await SalaryStructure.create(
-          [
-            {
-              employee: existingUser._id,
-              basic: rupeesToPaise(body.salary.basic),
-              hra: rupeesToPaise(body.salary.hra || 0),
-              conveyance: rupeesToPaise(body.salary.conveyance || 0),
-              otherAllowances: rupeesToPaise(body.salary.otherAllowances || 0),
-              fixedDeductions: body.salary.fixedDeductions,
-              bankDetails: body.salary.bankDetails,
-              pan: body.salary.pan?.toUpperCase().trim(),
-              effectiveFrom: new Date(),
-              isActive: true,
-            },
-          ],
-          { session }
-        );
-      }
+      // Salary changes are never applied directly: they go through
+      // /api/employees/[id]/salary as a revision that BH + MP must approve.
     });
 
     await logAudit({

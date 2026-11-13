@@ -1,39 +1,21 @@
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
-import { approvePayrollRun } from "@/services/payrollService";
-import {
-  authenticateAndAuthorize,
-  jsonResponse,
-  errorResponse,
-} from "@/lib/apiHelper";
-import { logAudit } from "@/lib/audit";
+import { authenticateAndAuthorize, errorResponse, jsonResponse } from "@/lib/apiHelper";
+import { signApproval } from "@/services/approvalService";
+import { ApprovalError } from "@/lib/approval";
 
-// Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
 export const maxDuration = 60;
 
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+/** Sign a payroll run: Business Head first (→ UNDER_REVIEW), then Managing Partner (→ APPROVED). */
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectToDatabase();
-    const auth = await authenticateAndAuthorize(req, "payroll.approve");
+    const auth = await authenticateAndAuthorize(req);
     if (auth.error) return auth.error;
-
     const { id } = await params;
-    const run = await approvePayrollRun(id, auth.user);
-
-    await logAudit({
-      user: auth.user,
-      action: "APPROVE",
-      resource: "PAYROLL",
-      resourceId: id,
-      after: { status: "APPROVED", approvedBy: auth.user.employeeCode },
-    });
-
-    return jsonResponse(run);
+    const body = await req.json().catch(() => ({}));
+    return jsonResponse(await signApproval("payroll", id, auth.user, body.decision === "REJECTED" ? "REJECTED" : "APPROVED", body.note));
   } catch (error: any) {
-    return errorResponse(error.message || "Failed to approve payroll run", 500);
+    return errorResponse(error.message || "Failed to approve payroll", error instanceof ApprovalError ? error.status : 500);
   }
 }
-

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChargeBar, PageSkeleton, StatCard, TrendPill } from "@/components/ui/kit";
+import { StatusBadge } from "@/components/ui/badge";
 import { cn } from "@/components/ui/button";
 import { formatINR } from "@/lib/money";
 import {
@@ -89,6 +90,7 @@ export default function DashboardPage() {
     </div>
   );
 
+  if (data.role === "DISTRIBUTOR") return <DistributorDashboard data={data} header={header} />;
   if (data.role === "FEC") return <FecDashboard data={data} header={header} />;
   if (data.role === "ASM") return <AsmDashboard data={data} header={header} />;
   return <ExecutiveDashboard data={data} header={header} />;
@@ -475,6 +477,127 @@ function FecDashboard({ data, header }: { data: any; header: React.ReactNode }) 
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/* Distributor (external partner portal)                               */
+/* ================================================================== */
+function DistributorDashboard({ data, header }: { data: any; header: React.ReactNode }) {
+  if (!data.distributor) {
+    return (
+      <div className="animate-fade-up">
+        {header}
+        <Card className="p-6 text-sm text-slate-600">Your login is not linked to a distributor account. Please contact Joykali.</Card>
+      </div>
+    );
+  }
+  const c = data.credit;
+  const used = Math.max(0, c.exposure);
+  const pct = c.limit > 0 ? Math.min(100, (used / c.limit) * 100) : 0;
+  return (
+    <div className="animate-fade-up">
+      {header}
+      <div className="surface-ink relative overflow-hidden rounded-3xl p-5 text-white shadow-lift sm:p-7">
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+              {data.distributor.name} · {data.distributor.distributorCode}
+            </p>
+            <p className="mt-2 text-sm text-slate-300">Available credit</p>
+            <p className={cn("font-display text-5xl font-bold tracking-tight tabular", c.available < 0 ? "text-rose-300" : "text-volt-300")}>
+              {formatRupeesShort(c.available / 100)}
+            </p>
+            <p className="mt-1 text-sm text-slate-300">
+              of {formatRupeesShort(c.limit / 100)} limit · {c.creditDays} credit days · outstanding {formatRupees(Math.max(0, c.ledgerBalance) / 100)}
+            </p>
+          </div>
+          <Link
+            href="/orders/new"
+            className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-volt-300 px-5 py-3 text-sm font-bold text-ink-900 shadow-glow transition hover:bg-volt-200 md:self-auto"
+          >
+            <Plus className="h-4 w-4" /> Place an order
+          </Link>
+        </div>
+        <div className="mt-6 h-2.5 overflow-hidden rounded-full bg-white/10">
+          <div className={cn("h-full rounded-full", c.onHold ? "bg-rose-400" : "bg-gradient-to-r from-volt-400 to-volt-300")} style={{ width: `${pct}%` }} />
+        </div>
+        {c.onHold && <p className="mt-3 rounded-xl bg-rose-500/15 px-3 py-2 text-sm text-rose-200 ring-1 ring-rose-400/30">Credit hold — {c.holdReason}</p>}
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <StatCard label="In approval" value={data.awaitingApproval} sub="orders with Joykali" icon={CalendarClock} tone="amber" />
+        <StatCard label="On the way" value={data.inTransit.length} sub="deliveries to receive" icon={PackageCheck} tone="brand" />
+        <StatCard label="Dues" value={formatRupeesShort(Math.max(0, c.ledgerBalance) / 100)} sub={c.overdue > 0 ? `${formatRupeesShort(c.overdue / 100)} overdue` : "nothing overdue"} icon={BadgeIndianRupee} tone={c.overdue > 0 ? "rose" : "emerald"} />
+        <StatCard label="Open orders" value={formatRupeesShort(c.openOrders / 100)} sub="value not yet shipped" icon={Bike} tone="sky" />
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Deliveries on the way</CardTitle>
+            <CardDescription>Record the goods receipt when the truck arrives</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.inTransit.length === 0 ? (
+              <p className="text-sm text-slate-500">Nothing in transit right now.</p>
+            ) : (
+              <ul className="space-y-2">
+                {data.inTransit.map((d: any) => (
+                  <li key={d._id}>
+                    <Link href={`/dispatch/${d._id}`} className="block rounded-xl border border-amber-200 bg-amber-50/50 p-3 transition hover:border-amber-300">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-mono text-sm font-semibold">{d.doCode}</p>
+                        <span className="text-xs font-semibold text-amber-800">Record GRN →</span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-600">
+                        {d.lines.reduce((s: number, l: any) => s + l.quantity, 0)} vehicles · {d.loading?.registrationNo} · driver {d.loading?.driverName} ({d.loading?.driverPhone})
+                      </p>
+                      <p className="text-[11px] text-slate-500">Invoice {d.document?.number}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle>Recent orders</CardTitle>
+              <CardDescription>Approved by Joykali&apos;s Business Head and Managing Partner</CardDescription>
+            </div>
+            <Link href="/orders" className="text-xs font-semibold text-brand-700 hover:underline">
+              All orders
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {data.orders.length === 0 ? (
+              <p className="text-sm text-slate-500">No orders yet.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {data.orders.map((o: any) => (
+                  <li key={o._id}>
+                    <Link href={`/orders/${o._id}`} className="flex items-center justify-between gap-3 py-2.5">
+                      <div>
+                        <p className="font-mono text-sm font-semibold">{o.orderCode}</p>
+                        <p className="text-xs text-slate-500">
+                          {o.lines.reduce((s: number, l: any) => s + l.quantity, 0)} vehicles · {formatRupees(o.totalValue / 100)}
+                        </p>
+                      </div>
+                      <StatusBadge status={o.status} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      <Link href="/account" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:underline">
+        Full account statement <ArrowRight className="h-4 w-4" />
+      </Link>
     </div>
   );
 }

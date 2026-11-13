@@ -33,11 +33,26 @@ const ALL_PERMISSIONS = [
   { key: "payslip.view.team", label: "View Team Payslips", group: "Payroll" },
   { key: "payslip.view.all", label: "View All Staff Payslips", group: "Payroll" },
   { key: "reports.view", label: "View & Export Reports Hub", group: "Analytics" },
+  { key: "distributor.view", label: "View Distributors", group: "Channel" },
+  { key: "distributor.manage", label: "Onboard / Manage Distributors", group: "Channel" },
+  { key: "order.view", label: "View Orders", group: "Channel" },
+  { key: "order.create", label: "Place Orders (dealer / distributor)", group: "Channel" },
+  { key: "credit.request", label: "Request Credit Limit Changes", group: "Channel" },
+  { key: "ledger.view", label: "View Party Ledgers", group: "Channel" },
+  { key: "ledger.manage", label: "Record Payments Received", group: "Channel" },
+  { key: "dispatch.view", label: "View Delivery Orders", group: "Warehouse" },
+  { key: "dispatch.manage", label: "Create / Load / Dispatch DOs", group: "Warehouse" },
+  { key: "grn.record", label: "Record Goods Receipt (GRN)", group: "Warehouse" },
+  { key: "fleet.view", label: "View Transport Fleet", group: "Warehouse" },
+  { key: "fleet.manage", label: "Manage Fleet & Documents", group: "Warehouse" },
+  { key: "salary.manage", label: "Propose Salary Revisions", group: "Payroll" },
+  { key: "approvals.sign", label: "Sign Approvals (BH / MP only)", group: "Approvals" },
+  { key: "portal.access", label: "Distributor Portal", group: "Portal" },
   { key: "settings.manage", label: "Manage Company Settings", group: "Settings" },
   { key: "audit.view", label: "View Audit Log History", group: "Settings" },
 ];
 
-const ROLES = ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"];
+const ROLES = ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "DISTRIBUTOR"];
 
 export default function RolesPermissionsPage() {
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});
@@ -170,7 +185,7 @@ export default function RolesPermissionsPage() {
         <CardContent className="p-0">
           <div className="divide-y divide-slate-100">
             {ALL_PERMISSIONS.map((perm) => {
-              const isChecked = selectedRole === "ADMIN" || currentRolePerms.includes(perm.key);
+              const isChecked = selectedRole === "ADMIN" ? perm.key !== "approvals.sign" : currentRolePerms.includes(perm.key);
 
               return (
                 <label

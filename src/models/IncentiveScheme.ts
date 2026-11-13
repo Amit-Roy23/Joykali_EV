@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { ApprovalSignature, ApprovalSignatureSchema } from "@/lib/approval";
 import {
   IncentiveRuleType,
   SchemeStatus,
@@ -48,6 +49,8 @@ export interface IIncentiveScheme extends Document {
   applicableDealers?: mongoose.Types.ObjectId[];
   rules: IIncentiveRule[];
   approvedBy?: mongoose.Types.ObjectId | null;
+  /** Business Head then Managing Partner signatures. */
+  approvals?: ApprovalSignature[];
   approvedAt?: Date | null;
   version: number;
   createdAt: Date;
@@ -119,6 +122,7 @@ const IncentiveSchemeSchema = new Schema<IIncentiveScheme>(
     applicableDealers: [{ type: Schema.Types.ObjectId, ref: "Dealer" }],
     rules: [IncentiveRuleSchema],
     approvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    approvals: [ApprovalSignatureSchema],
     approvedAt: { type: Date, default: null },
     version: { type: Number, default: 1 },
   },

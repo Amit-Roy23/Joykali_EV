@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { ApprovalSignature, ApprovalSignatureSchema } from "@/lib/approval";
 import { PayrollRunStatus } from "@/types";
 
 export interface IPayrollRunTotals {
@@ -17,6 +18,8 @@ export interface IPayrollRun extends Document {
   createdBy: mongoose.Types.ObjectId;
   reviewedBy?: mongoose.Types.ObjectId | null;
   approvedBy?: mongoose.Types.ObjectId | null;
+  /** Business Head then Managing Partner signatures. */
+  approvals?: ApprovalSignature[];
   approvedAt?: Date | null;
   lockedBy?: mongoose.Types.ObjectId | null;
   lockedAt?: Date | null;
@@ -50,6 +53,7 @@ const PayrollRunSchema = new Schema<IPayrollRun>(
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     reviewedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     approvedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    approvals: [ApprovalSignatureSchema],
     approvedAt: { type: Date, default: null },
     lockedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     lockedAt: { type: Date, default: null },

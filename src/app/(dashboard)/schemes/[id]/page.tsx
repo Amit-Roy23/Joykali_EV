@@ -1,5 +1,7 @@
 "use client";
 
+import { ApprovalPanel } from "@/components/workflow";
+import { StatusBadge } from "@/components/ui/badge";
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Award, CheckCircle, Sliders } from "lucide-react";
@@ -17,7 +19,7 @@ export default function SchemeDetailPage({
   const [scheme, setScheme] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const load = React.useCallback(() => {
     fetch(`/api/schemes/${id}`)
       .then((res) => res.json())
       .then((res) => {
@@ -25,6 +27,7 @@ export default function SchemeDetailPage({
         setLoading(false);
       });
   }, [id]);
+  useEffect(load, [load]);
 
   if (loading) return <div className="p-8 text-center text-slate-500">Loading scheme...</div>;
   if (!scheme) return <div className="p-6 text-red-600">Scheme not found.</div>;
@@ -40,9 +43,7 @@ export default function SchemeDetailPage({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold text-slate-900">{scheme.name}</h1>
-            <Badge variant={scheme.status === "ACTIVE" ? "success" : "warning"}>
-              {scheme.status}
-            </Badge>
+            <StatusBadge status={scheme.status} />
           </div>
           <p className="text-xs text-slate-500">
             Valid: {new Date(scheme.validFrom).toLocaleDateString("en-IN")} —{" "}
@@ -50,6 +51,18 @@ export default function SchemeDetailPage({
           </p>
         </div>
       </div>
+
+      {scheme.status === "DRAFT" && (
+        <ApprovalPanel
+          kind="scheme"
+          id={String(scheme._id)}
+          approvals={scheme.approvals}
+          active
+          onDone={load}
+          title="Scheme approval"
+          note="On final approval the scheme activates and every month it covers is recalculated — open payroll drafts update automatically."
+        />
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
         <Card>
