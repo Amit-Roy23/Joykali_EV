@@ -128,6 +128,10 @@ The engine (`src/services/incentiveEngine.ts`) supports 5 rule architectures:
 | **Warehouse DO → dispatch** | Approved order → Delivery Order → submit → assign a compliant truck + driver → scan/pick chassis (atomically reserved) → loading checklist → tax invoice (distributor) or delivery challan (dealer consignment) → e-way bill → dispatch by a **different person** than the loader → receiver's GRN. Cancelling releases every reservation. |
 | **Invoice & e-way bill** | GST invoice/challan PDF with CGST+SGST or IGST by place of supply. E-way bill JSON in the NIC bulk-upload format; the 12-digit EWB number and validity (1 day per 200 km) are recorded and enforced before dispatch. |
 | **Fleet documents** | RC, insurance, PUC (not for EVs), fitness, permit, road tax with expiry dates and scans. A truck with any missing/expired paper, on manual hold or inactive is **locked** and cannot be loaded or dispatched; expiring papers are flagged on dashboards. |
+| **Channel network (phase 4)** | Four partner tiers with their own logins: **super distributor** (`JKSD-…`) → **distributor** (`JKDB-…`) → **dealer** (`JKD-…`) → **sub dealer** (`JKSB-…`). Each buys from the level above: the company supplies super distributors, independent distributors and company dealers (orders need BH + MP); everyone else orders from its own supplier, who accepts against the credit **it** gave. Sales down the chain are invoiced from the seller's own stock by chassis number, travel until the buyer confirms receipt (shortages are credited back automatically), and post to the seller's own books. Partners also bill retail customers. |
+| **Appointments & KYC** | Partners appoint the next level down (a dealer on consignment cannot). New partners stay **pending** until the company verifies GST, PAN and the signed agreement — someone other than the uploader must verify. Security deposits (received / refunded / set off against dues) are tracked per partner. |
+| **Territories, targets, chain tree** | Zone → district → area master; super distributors hold districts, one distributor per area. Monthly partner targets with live achievement, ranking and per-unit commission paid as a credit note (company commission needs BH + MP). Business network tree with stock and dues at every level. Account statements download as Excel. |
+| **Showrooms** | Company outlets get a showroom login, receive stock from the warehouse on a branch transfer (the sender cannot confirm receipt), bill customers at the counter from their own floor stock only, and see a day closing of bills and collections by payment mode. |
 | **Automatic salary** | Enter a monthly gross or annual CTC; basic/HRA/conveyance/special allowance, PF (₹15k ceiling), ESI, WB professional tax, employer cost and take-home are calculated. Revisions are effective-dated and need BH + MP approval; a daily job drafts last month's payroll on the 1st. |
 
 ## Deploying
@@ -191,6 +195,11 @@ Password for every account: **`Joykali@123`** (login with email or employee code
 | ASM — North / South | `asm.north@…`, `asm.south@…` | `JKE-ASM-0001/3` | |
 | FEC (top seller) | `fec5@joykaliev.in` | `JKE-FEC-0005` | Record a sale on a phone, watch incentive update |
 | FEC 1–12 | `fec1@joykaliev.in` … `fec12@…` | `JKE-FEC-0001…` | |
+| Showroom (Salt Lake) | `showroom@joykaliev.in` | `JKE-OUT-0001` | Counter bill, receive a transfer, day closing |
+| Super distributor | `sd1@joykaliev.in` | `JKSD-0001` | Network view, its Bolpur distributor |
+| Distributor | `dist1@joykaliev.in` | `JKDB-0001` | Accept Memari's order, supply it, set targets |
+| Dealer | `dealer1@joykaliev.in` | `JKD-0007` | Buy stock, receive the shipment on the road, sell |
+| Sub dealer | `subdealer1@joykaliev.in` | `JKSB-0001` | Buys from Memari, retail bill |
 
 ### Suggested 5-minute client demo
 1. **FEC on a phone** — sign in as Arnab (FEC), tap **+**, pick an E-Rickshaw, fill the customer, confirm. The

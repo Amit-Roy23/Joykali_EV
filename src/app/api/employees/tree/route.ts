@@ -1,3 +1,4 @@
+import { EMPLOYEE_ROLES } from "@/types";
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { User } from "@/models/User";
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
     if (auth.error) return auth.error;
 
     // Fetch all active employees
-    const employees = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } })
+    const employees = await User.find({ status: "ACTIVE", role: { $in: [...EMPLOYEE_ROLES] } })
       .select("name employeeCode role designation reportsTo email phone")
       .lean();
 

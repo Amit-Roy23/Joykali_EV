@@ -11,6 +11,8 @@ export interface IUser extends Document {
   dealer?: mongoose.Types.ObjectId | null;
   /** For DISTRIBUTOR logins: the distributor company this user acts for. */
   distributor?: mongoose.Types.ObjectId | null;
+  /** For OUTLET logins (and FECs posted at a showroom): the company outlet. */
+  outlet?: mongoose.Types.ObjectId | null;
   designation: string;
   joiningDate: Date;
   status: "ACTIVE" | "INACTIVE";
@@ -32,12 +34,13 @@ const UserSchema = new Schema<IUser>(
     role: {
       type: String,
       required: true,
-      enum: ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "DISTRIBUTOR"],
+      enum: ["FEC", "OUTLET", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"],
       index: true,
     },
     reportsTo: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     dealer: { type: Schema.Types.ObjectId, ref: "Dealer", default: null },
     distributor: { type: Schema.Types.ObjectId, ref: "Distributor", default: null, index: true },
+    outlet: { type: Schema.Types.ObjectId, ref: "Outlet", default: null, index: true },
     designation: { type: String, required: true, trim: true },
     joiningDate: { type: Date, required: true, default: Date.now },
     status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE", index: true },

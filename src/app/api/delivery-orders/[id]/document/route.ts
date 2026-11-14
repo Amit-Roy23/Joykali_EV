@@ -18,10 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!isValidId(id)) return errorResponse("Not found", 404);
     const d: any = await DeliveryOrder.findById(id).lean();
     if (!d) return errorResponse("Not found", 404);
-    if (auth.user.role === "DISTRIBUTOR") {
-      const own = await distributorOf(auth.user);
-      if (d.partyType !== "DISTRIBUTOR" || String(own) !== String(d.party)) return errorResponse("Not found", 404);
-    } else if (!(await canAccessParty(auth.user, d.partyType, d.party))) return errorResponse("Not found", 404);
+    if (!(await canAccessParty(auth.user, d.partyType, d.party))) return errorResponse("Not found", 404);
     if (!d.document?.number) return errorResponse("The invoice/challan has not been generated yet", 409);
     const s: any = await Setting.findOne().lean();
     const pdf = await generateChannelDocPDF({

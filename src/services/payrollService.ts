@@ -9,7 +9,7 @@ import { calculatePayrollEntry, statutorySettingsFrom } from "./payrollEngine";
 import { recalculateIncentivesForPeriod } from "./incentiveService";
 import { periodFor } from "@/lib/period";
 import { withTransaction } from "@/lib/db";
-import { JWTPayload } from "@/types";
+import { JWTPayload, EMPLOYEE_ROLES } from "@/types";
 import { rupeesToPaise } from "@/lib/money";
 import mongoose from "mongoose";
 
@@ -26,7 +26,7 @@ export async function generateDraftPayrollRun(
 
   // Refresh incentive ledgers first, outside the payroll transaction, so the
   // run is generated from up-to-date figures (and the transaction stays short).
-  const activeForRecalc = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }, { _id: 1 }).lean();
+  const activeForRecalc = await User.find({ status: "ACTIVE", role: { $in: [...EMPLOYEE_ROLES] } }, { _id: 1 }).lean();
   await recalculateIncentivesForPeriod(
     activeForRecalc.map((e: any) => e._id),
     periodStart,
@@ -46,7 +46,7 @@ export async function generateDraftPayrollRun(
 
     // Fetch active employees
     // Employees only — distributor logins are external partners, not on payroll.
-    const employees = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }).session(session ?? null).lean();
+    const employees = await User.find({ status: "ACTIVE", role: { $in: [...EMPLOYEE_ROLES] } }).session(session ?? null).lean();
     const periodEnd = periodFor(year, month).end;
 
     // Create or find PayrollRun

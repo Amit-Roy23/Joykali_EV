@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { JWTPayload } from "@/types";
+import { JWTPayload, isPartnerRole } from "@/types";
 import { ChannelOrder } from "@/models/ChannelOrder";
 import { DeliveryOrder, IDeliveryOrder } from "@/models/DeliveryOrder";
 import { FleetVehicle } from "@/models/FleetVehicle";
@@ -735,13 +735,8 @@ export async function recordGRN(
 ) {
   const d = await loadDO(id);
   expect(d, "DISPATCHED");
-  if (user.role === "DISTRIBUTOR") {
-    const own = await distributorOf(user);
-    if (
-      d.partyType !== "DISTRIBUTOR" ||
-      !own ||
-      String(own) !== String(d.party)
-    )
+  if (isPartnerRole(user.role)) {
+    if (!(await canAccessParty(user, d.partyType, d.party)))
       throw new DispatchError("Delivery order not found", 404);
   } else if (!(await canAccessParty(user, d.partyType, d.party))) {
     throw new DispatchError(

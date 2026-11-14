@@ -44,7 +44,7 @@ export function Badge({
 }
 
 /** Consistent status colouring across sales, payroll, schemes and stock. */
-export function StatusBadge({ status, className }: { status?: string | null; className?: string }) {
+export function StatusBadge({ status, className, label: labelOverride }: { status?: string | null; className?: string; label?: string }) {
   const s = (status || "").toUpperCase();
   const map: Record<string, BadgeVariant> = {
     DELIVERED: "success",
@@ -84,6 +84,12 @@ export function StatusBadge({ status, className }: { status?: string | null; cla
     SUPERSEDED: "secondary",
     ON_HOLD: "warning",
     LOCKED_FLEET: "destructive",
+    PLACED: "warning",
+    ACCEPTED: "info",
+    PARTIALLY_FULFILLED: "info",
+    RECEIVED: "success",
+    AT_OUTLET: "info",
+    WITH_DEALER: "volt",
   };
   const LABELS: Record<string, string> = {
     ALLOCATED_TO_DEALER: "AT DEALER",
@@ -94,8 +100,12 @@ export function StatusBadge({ status, className }: { status?: string | null; cla
     WITH_DISTRIBUTOR: "WITH DISTRIBUTOR",
     UNDER_REVIEW: "BH APPROVED",
     LOCKED_FLEET: "LOCKED",
+    PARTIALLY_FULFILLED: "PART SUPPLIED",
+    PLACED: "NEW",
+    AT_OUTLET: "AT SHOWROOM",
+    WITH_DEALER: "WITH DEALER",
   };
-  const label = LABELS[s] || s.replace(/_/g, " ");
+  const label = labelOverride || LABELS[s] || s.replace(/_/g, " ");
   return (
     <Badge variant={map[s] || "secondary"} dot className={className}>
       {label || "—"}

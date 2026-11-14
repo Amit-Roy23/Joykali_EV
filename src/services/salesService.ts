@@ -58,8 +58,21 @@ export async function createSale(
   // Attribution guard: an FEC can only book sales under their own name, an
   // ASM under themselves or their own downline. Previously any salesperson
   // could credit (or steal) incentive-bearing sales for anyone.
+  let sellerOutlet: string | null = null;
+  if (user.role === "FEC" || user.role === "OUTLET") {
+    const me = await User.findById(user.userId).select("outlet").lean();
+    sellerOutlet = (me as any)?.outlet ? String((me as any).outlet) : null;
+  }
   if (user.role === "FEC") {
     input.soldBy = user.userId;
+  } else if (user.role === "OUTLET") {
+    // A showroom login bills under its own name or an FEC posted at the same showroom.
+    if (String(input.soldBy) !== String(user.userId)) {
+      const fec = await User.findById(input.soldBy).select("outlet role").lean();
+      if (!fec || !sellerOutlet || String((fec as any).outlet) !== sellerOutlet) {
+        throw new Error("You can only bill under your own name or an FEC posted at this showroom");
+      }
+    }
   } else if (user.role === "ASM" && String(input.soldBy) !== String(user.userId)) {
     const team = await getTeamUserIds(user.userId);
     if (!team.some((id) => String(id) === String(input.soldBy))) {
@@ -74,8 +87,16 @@ export async function createSale(
     if (!vehicle) {
       throw new Error("Vehicle not found");
     }
-    if (vehicle.status !== "IN_STOCK" && vehicle.status !== "ALLOCATED_TO_DEALER") {
+    if (!["IN_STOCK", "ALLOCATED_TO_DEALER", "AT_OUTLET"].includes(vehicle.status)) {
       throw new Error(`Vehicle is not available for sale. Current status: ${vehicle.status}`);
+    }
+    // Showroom stock is billed only at that showroom; a showroom login bills only its own stock.
+    if (vehicle.status === "AT_OUTLET") {
+      if ((user.role === "OUTLET" || user.role === "FEC") && String(vehicle.currentLocationOutlet) !== sellerOutlet) {
+        throw new Error("This vehicle is in another showroom's stock");
+      }
+    } else if (user.role === "OUTLET") {
+      throw new Error("A showroom can only bill vehicles in its own stock");
     }
 
     // 2. Fetch salesperson and derive ASM at sale time
@@ -87,8 +108,8 @@ export async function createSale(
     const saleDateObj = new Date(input.saleDate);
     const saleCode = await generateSaleCode(saleDateObj, session);
 
-    if (salesperson.status !== "ACTIVE" || !["FEC", "ASM"].includes(salesperson.role)) {
-      throw new Error("Sales can only be attributed to an active FEC or ASM");
+    if (salesperson.status !== "ACTIVE" || !["FEC", "ASM", "OUTLET"].includes(salesperson.role)) {
+      throw new Error("Sales can only be attributed to an active FEC, ASM or showroom login");
     }
 
     // Convert all amounts to integer paise
@@ -139,6 +160,7 @@ export async function createSale(
           dealer:
             vehicle.currentLocationDealer ||
             (input.dealerId ? new mongoose.Types.ObjectId(input.dealerId) : null),
+          outlet: vehicle.status === "AT_OUTLET" ? vehicle.currentLocationOutlet : null,
           soldBy: salesperson._id,
           asmAtSale: salesperson.reportsTo || null,
           priceBreakdown: {
@@ -164,7 +186,9 @@ export async function createSale(
     const previousLocation =
       vehicle.currentLocationType === "DEALER"
         ? `Dealer: ${vehicle.currentLocationDealer}`
-        : "Main Warehouse";
+        : vehicle.currentLocationType === "OUTLET"
+          ? `Outlet: ${vehicle.currentLocationOutlet}`
+          : "Main Warehouse";
 
     vehicle.status = "SOLD";
     vehicle.sale = sale._id;
@@ -227,7 +251,11 @@ export async function cancelSale(
     // Revert Vehicle status
     const vehicle = await Vehicle.findById(sale.vehicle).session(session ?? null);
     if (vehicle) {
-      vehicle.status = vehicle.currentLocationDealer ? "ALLOCATED_TO_DEALER" : "IN_STOCK";
+      vehicle.status = vehicle.currentLocationDealer
+        ? "ALLOCATED_TO_DEALER"
+        : vehicle.currentLocationOutlet && vehicle.currentLocationType === "OUTLET"
+          ? "AT_OUTLET"
+          : "IN_STOCK";
       vehicle.sale = null;
       await vehicle.save({ session });
 
@@ -238,7 +266,11 @@ export async function cancelSale(
             vehicle: vehicle._id,
             movementType: "RETURN",
             fromLocation: `Customer: ${sale.customer.name}`,
-            toLocation: vehicle.currentLocationDealer ? `Dealer: ${vehicle.currentLocationDealer}` : "Main Warehouse",
+            toLocation: vehicle.currentLocationDealer
+              ? `Dealer: ${vehicle.currentLocationDealer}`
+              : vehicle.status === "AT_OUTLET"
+                ? `Outlet: ${vehicle.currentLocationOutlet}`
+                : "Main Warehouse",
             performedBy: new mongoose.Types.ObjectId(user.userId),
             reference: sale.saleCode,
             notes: `Sale cancellation: ${reason}`,

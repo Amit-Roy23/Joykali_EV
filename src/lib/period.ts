@@ -66,3 +66,15 @@ export function parseBusinessDate(value: string | Date, edge: "start" | "end"): 
   }
   return new Date(value);
 }
+
+/** "YYYY-MM" of the current IST month. */
+export function getCurrentPeriod(now: Date = new Date()): string {
+  return periodOf(now).period;
+}
+
+/** IST bounds of a "YYYY-MM" period. */
+export function getPeriodBounds(period: string): { start: Date; end: Date } {
+  const [y, m] = period.split("-").map(Number);
+  const p = periodFor(y, m);
+  return { start: p.start, end: p.end };
+}

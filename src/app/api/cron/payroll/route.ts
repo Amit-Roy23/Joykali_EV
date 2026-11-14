@@ -1,3 +1,4 @@
+import { EMPLOYEE_ROLES } from "@/types";
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { PayrollRun } from "@/models/PayrollRun";
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
     await connectToDatabase();
     const report: Record<string, unknown> = {};
 
-    const employees = await User.find({ role: { $ne: "DISTRIBUTOR" } }).select("_id").lean();
+    const employees = await User.find({ role: { $in: [...EMPLOYEE_ROLES] } }).select("_id").lean();
     for (const e of employees) await activateSalaryStructures(e._id as any);
     report.salaryStructuresChecked = employees.length;
 

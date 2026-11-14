@@ -212,7 +212,11 @@ export const ROLE_LABEL: Record<string, string> = {
   BUSINESS_HEAD: "Business Head",
   ASM: "Area Sales Manager",
   FEC: "Field Executive",
+  OUTLET: "Showroom",
+  SUPER_DISTRIBUTOR: "Super Distributor",
   DISTRIBUTOR: "Distributor",
+  DEALER: "Dealer",
+  SUB_DEALER: "Sub Dealer",
 };
 export const ROLE_SHORT: Record<string, string> = {
   ADMIN: "Admin",
@@ -220,7 +224,11 @@ export const ROLE_SHORT: Record<string, string> = {
   BUSINESS_HEAD: "BH",
   ASM: "ASM",
   FEC: "FEC",
+  OUTLET: "SHOWROOM",
+  SUPER_DISTRIBUTOR: "SUPER",
   DISTRIBUTOR: "DIST",
+  DEALER: "DEALER",
+  SUB_DEALER: "SUB",
 };
 const roleTone: Record<string, string> = {
   ADMIN: "bg-ink-900 text-volt-300 ring-ink-700",
@@ -228,7 +236,11 @@ const roleTone: Record<string, string> = {
   BUSINESS_HEAD: "bg-brand-100 text-brand-800 ring-brand-200",
   ASM: "bg-sky-50 text-sky-800 ring-sky-200",
   FEC: "bg-volt-100 text-volt-800 ring-volt-200",
+  OUTLET: "bg-teal-50 text-teal-800 ring-teal-200",
+  SUPER_DISTRIBUTOR: "bg-orange-50 text-orange-800 ring-orange-200",
   DISTRIBUTOR: "bg-amber-50 text-amber-800 ring-amber-200",
+  DEALER: "bg-lime-50 text-lime-800 ring-lime-200",
+  SUB_DEALER: "bg-yellow-50 text-yellow-800 ring-yellow-200",
 };
 export function RoleBadge({ role, short, className }: { role?: string; short?: boolean; className?: string }) {
   if (!role) return null;

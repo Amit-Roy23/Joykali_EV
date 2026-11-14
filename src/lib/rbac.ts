@@ -1,4 +1,4 @@
-import { Permission, UserRole, ROLE_HIERARCHY, JWTPayload } from "@/types";
+import { Permission, UserRole, ROLE_HIERARCHY, JWTPayload, isPartnerRole } from "@/types";
 import { RolePermission } from "@/models/RolePermission";
 import { User } from "@/models/User";
 import mongoose from "mongoose";
@@ -24,6 +24,8 @@ const ASM_BASE: Permission[] = [
   "dispatch.view",
   "grn.record",
   "ledger.view",
+  "network.view",
+  "outlet.view",
 ];
 const BH_BASE: Permission[] = [
   ...ASM_BASE,
@@ -49,8 +51,14 @@ const BH_BASE: Permission[] = [
   "fleet.manage",
   "salary.manage",
   "approvals.sign",
+  "network.manage",
+  "kyc.verify",
+  "target.manage",
+  "outlet.manage",
 ];
 const MP_BASE: Permission[] = [...BH_BASE, "sales.cancel", "purchase.manage", "payroll.lock", "audit.view"];
+
+const PARTNER_BASE: Permission[] = ["portal.access", "order.view", "order.create", "dispatch.view", "grn.record", "ledger.view"];
 
 const uniq = (list: Permission[]) => [...new Set(list)];
 
@@ -62,8 +70,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // Admin governs the system but is deliberately NOT an approver: every approval
   // needs the Business Head and then the Managing Partner.
   ADMIN: uniq([...MP_BASE, "settings.manage"]).filter((p) => p !== "approvals.sign"),
-  // Distributor logins see only their own orders, deliveries and account.
-  DISTRIBUTOR: ["portal.access", "order.view", "order.create", "dispatch.view", "grn.record", "ledger.view"],
+  // Showroom counter login: sells from its own outlet's stock and receives transfers.
+  OUTLET: uniq([...FEC_BASE, "outlet.view"]),
+  // Channel partner logins see only their own business and their own downline.
+  SUPER_DISTRIBUTOR: [...PARTNER_BASE, "partner.sell", "partner.appoint"],
+  DISTRIBUTOR: [...PARTNER_BASE, "partner.sell", "partner.appoint"],
+  DEALER: [...PARTNER_BASE, "partner.sell", "partner.appoint"],
+  SUB_DEALER: [...PARTNER_BASE, "partner.sell"],
 };
 
 /**
@@ -124,8 +137,9 @@ export async function hasPermission(
 export function canManageRole(managerRole: UserRole, targetRole: UserRole): boolean {
   if (managerRole === "ADMIN") return true;
   // Distributor logins are managed with their distributor (BH and above).
-  if (targetRole === "DISTRIBUTOR") return ROLE_HIERARCHY[managerRole] >= ROLE_HIERARCHY.BUSINESS_HEAD;
-  if (managerRole === "DISTRIBUTOR") return false;
+  // Partner logins are managed with their partner record (BH and above).
+  if (isPartnerRole(targetRole)) return ROLE_HIERARCHY[managerRole] >= ROLE_HIERARCHY.BUSINESS_HEAD;
+  if (isPartnerRole(managerRole)) return false;
   return ROLE_HIERARCHY[managerRole] > ROLE_HIERARCHY[targetRole];
 }
 
@@ -167,7 +181,16 @@ export async function getScopeFilter(
     return {};
   }
   // External distributor logins never see internal sales, staff, payroll or stock.
-  if (user.role === "DISTRIBUTOR") {
+  if (isPartnerRole(user.role)) {
+    return { _id: null };
+  }
+  if (user.role === "OUTLET") {
+    const me = await User.findById(userObjectId).select("outlet").lean();
+    const outlet = (me as any)?.outlet || null;
+    if (resource === "sales") return outlet ? { outlet } : { soldBy: userObjectId };
+    if (resource === "inventory") return outlet ? { status: "AT_OUTLET", currentLocationOutlet: outlet } : { _id: null };
+    if (resource === "payslips") return { employee: userObjectId };
+    if (resource === "employees") return { _id: userObjectId };
     return { _id: null };
   }
 

@@ -1,3 +1,4 @@
+import { isPartnerRole } from "@/types";
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { Distributor } from "@/models/Distributor";
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const { id } = await params;
     if (!isValidId(id)) return errorResponse("Distributor not found", 404);
     const allowed =
-      (auth.user.role === "DISTRIBUTOR" || (await hasPermission(auth.user.role, "distributor.view"))) &&
+      (isPartnerRole(auth.user.role) || (await hasPermission(auth.user.role, "distributor.view"))) &&
       (await canAccessParty(auth.user, "DISTRIBUTOR", id));
     if (!allowed) return errorResponse("Distributor not found", 404);
     const distributor = await Distributor.findById(id).populate("assignedASM", "name employeeCode").lean();
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         .sort({ createdAt: -1 })
         .limit(20)
         .lean(),
-      auth.user.role === "DISTRIBUTOR" ? [] : User.find({ distributor: id }).select("name email employeeCode status lastLoginAt").lean(),
+      isPartnerRole(auth.user.role) ? [] : User.find({ distributor: id }).select("name email employeeCode status lastLoginAt").lean(),
       CreditLimitChange.find({ partyType: "DISTRIBUTOR", party: id }).sort({ createdAt: -1 }).limit(10).lean(),
     ]);
     return jsonResponse({ distributor, credit, orders, deliveries, logins, creditChanges });

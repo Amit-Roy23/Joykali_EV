@@ -47,12 +47,20 @@ const ALL_PERMISSIONS = [
   { key: "fleet.manage", label: "Manage Fleet & Documents", group: "Warehouse" },
   { key: "salary.manage", label: "Propose Salary Revisions", group: "Payroll" },
   { key: "approvals.sign", label: "Sign Approvals (BH / MP only)", group: "Approvals" },
-  { key: "portal.access", label: "Distributor Portal", group: "Portal" },
+  { key: "portal.access", label: "Partner Portal", group: "Portal" },
+  { key: "partner.sell", label: "Sell to Network / Customers", group: "Portal" },
+  { key: "partner.appoint", label: "Appoint Own Network", group: "Portal" },
+  { key: "network.view", label: "View Business Network", group: "Network" },
+  { key: "network.manage", label: "Manage Territories & Network", group: "Network" },
+  { key: "kyc.verify", label: "Verify Partner KYC", group: "Network" },
+  { key: "target.manage", label: "Set Partner Targets", group: "Network" },
+  { key: "outlet.view", label: "View Outlets", group: "Network" },
+  { key: "outlet.manage", label: "Manage Outlets & Transfers", group: "Network" },
   { key: "settings.manage", label: "Manage Company Settings", group: "Settings" },
   { key: "audit.view", label: "View Audit Log History", group: "Settings" },
 ];
 
-const ROLES = ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "DISTRIBUTOR"];
+const ROLES = ["FEC", "OUTLET", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"];
 
 export default function RolesPermissionsPage() {
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});

@@ -47,6 +47,10 @@ const ROLE_PREFIX_MAP: Record<UserRole, string> = {
   MANAGING_PARTNER: "MP",
   ADMIN: "ADM",
   DISTRIBUTOR: "DST",
+  SUPER_DISTRIBUTOR: "SDS",
+  DEALER: "DLR",
+  SUB_DEALER: "SDL",
+  OUTLET: "OUT",
 };
 
 /**
@@ -118,6 +122,24 @@ export function generatePayslipCode(
 }
 
 
+/** Super distributor code: JKSD-0001. */
+export async function generateSuperDistributorCode(session?: any): Promise<string> {
+  const seq = await getNextSequence("SUPER_DISTRIBUTOR", session);
+  return `JKSD-${String(seq).padStart(4, "0")}`;
+}
+
+/** Sub dealer code: JKSB-0001. */
+export async function generateSubDealerCode(session?: any): Promise<string> {
+  const seq = await getNextSequence("SUB_DEALER", session);
+  return `JKSB-${String(seq).padStart(4, "0")}`;
+}
+
+/** Outlet code: JKOT-01. */
+export async function generateOutletCode(session?: any): Promise<string> {
+  const seq = await getNextSequence("OUTLET", session);
+  return `JKOT-${String(seq).padStart(2, "0")}`;
+}
+
 /** Distributor code: JKDB-0001 (also the distributor's login ID). */
 export async function generateDistributorCode(session?: any): Promise<string> {
   const seq = await getNextSequence("DISTRIBUTOR", session);
@@ -136,6 +158,10 @@ export const FY_SERIES = {
   GRN: "JKG",
   CREDIT_NOTE: "JKCN",
   RECEIPT: "JKR",
+  NETWORK_ORDER: "JKNO",
+  PARTNER_SALE: "JKPS",
+  STOCK_TRANSFER: "JKST",
+  PARTNER_RECEIPT: "JKPR",
 } as const;
 
 export async function generateFyCode(

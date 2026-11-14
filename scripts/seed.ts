@@ -36,6 +36,7 @@ import {
   ReportingHistory,
   PayrollEntry,
   PayrollRun,
+  Outlet,
 } from "../src/models";
 import { createPurchase } from "../src/services/purchaseService";
 import { bulkAllocateVehiclesToDealer } from "../src/services/inventoryService";
@@ -63,6 +64,23 @@ import { proposeRevision } from "../src/services/salaryService";
 import { createPurchase as createPurchaseAgain } from "../src/services/purchaseService";
 import { Distributor, FleetVehicle, CreditLimitChange, LedgerEntry as LedgerEntryModel, DeliveryOrder as DeliveryOrderModel } from "../src/models";
 import { generateDistributorCode } from "../src/lib/codeGenerator";
+import {
+  createPartner,
+  createPartnerSale,
+  receivePartnerSale,
+  placeNetworkOrder,
+  recordNetworkPayment,
+} from "../src/services/networkService";
+import {
+  createTerritory,
+  createOutlet,
+  createStockTransfer,
+  receiveStockTransfer,
+  setTarget,
+  recordDeposit,
+  uploadPartyDocument,
+  verifyPartyDocument,
+} from "../src/services/partnerAdminService";
 
 export const DEMO_PASSWORD = "Joykali@123";
 
@@ -707,7 +725,7 @@ async function main() {
     );
   }
   const M = (k: string) => String(models[k]._id);
-  const approveBoth = async (kind: "order", id: string) => {
+  const approveBoth = async (kind: "order" | "credit", id: string) => {
     await signApproval(kind, id, bhPayload, "APPROVED");
     await signApproval(kind, id, mpPayload, "APPROVED");
   };
@@ -769,6 +787,189 @@ async function main() {
   // The commercial EV scheme: Business Head has signed, waiting for the Managing Partner.
   await signApproval("scheme", String(draftScheme._id), bhPayload, "APPROVED");
 
+
+  // ---------------------------------------------------------------------------
+  // Phase 4: territories, the full channel network, partner portals, a showroom.
+  // Built through the real services so every business rule runs during seeding.
+  // ---------------------------------------------------------------------------
+  const terr = async (kind: "ZONE" | "DISTRICT" | "AREA", name: string, code: string, parent?: any, state?: string) =>
+    createTerritory(bhPayload, { kind, name, code, parentId: parent ? String(parent._id) : undefined, state });
+  const zSB = await terr("ZONE", "South Bengal", "ZN-SB");
+  const zNB = await terr("ZONE", "North Bengal", "ZN-NB");
+  const zBR = await terr("ZONE", "Bihar", "ZN-BR", undefined, "Bihar");
+  const dKOL = await terr("DISTRICT", "Kolkata", "DT-KOL", zSB);
+  const dBDN = await terr("DISTRICT", "Purba Bardhaman", "DT-BDN", zSB);
+  const dBIR = await terr("DISTRICT", "Birbhum", "DT-BIR", zSB);
+  const dMLD = await terr("DISTRICT", "Malda", "DT-MLD", zNB);
+  const dPAT = await terr("DISTRICT", "Patna", "DT-PAT", zBR);
+  const aBDN = await terr("AREA", "Bardhaman Sadar", "AR-BDN", dBDN);
+  const aMEM = await terr("AREA", "Memari", "AR-MEM", dBDN);
+  const aKLN = await terr("AREA", "Kalna", "AR-KLN", dBDN);
+  const aGUS = await terr("AREA", "Guskara", "AR-GUS", dBDN);
+  const aBOL = await terr("AREA", "Bolpur", "AR-BOL", dBIR);
+  await terr("AREA", "Suri", "AR-SURI", dBIR);
+  const aSLK = await terr("AREA", "Salt Lake", "AR-SLK", dKOL);
+  const aEBZ = await terr("AREA", "English Bazar", "AR-EBZ", dMLD);
+  const aPAT = await terr("AREA", "Patna Sadar", "AR-PAT", dPAT);
+  await Distributor.updateOne({ _id: bardhaman._id }, { $set: { territories: [aBDN._id] } });
+  await Distributor.updateOne({ _id: malda._id }, { $set: { territories: [aEBZ._id] } });
+  await Distributor.updateOne({ _id: bihar._id }, { $set: { territories: [aPAT._id] } });
+
+  // KYC for the company-supplied distributors: uploaded by the MP, verified by the BH.
+  const kyc = async (by: JWTPayload, type: "DEALER" | "DISTRIBUTOR", party: any, items: Array<[string, string]>, verifier: JWTPayload | null) => {
+    for (const [docType, number] of items) {
+      const doc = await uploadPartyDocument(by, type, String(party._id), { docType, number });
+      if (verifier) await verifyPartyDocument(verifier, String(doc._id), "VERIFIED");
+    }
+  };
+  for (const d of [bardhaman, malda, bihar]) {
+    await kyc(mpPayload, "DISTRIBUTOR", d, [["GST", d.gstin], ["PAN", d.gstin.slice(2, 12)], ["AGREEMENT", `AGR/${d.distributorCode}`]], bhPayload);
+  }
+  const demoLogin = async (email: string) => {
+    const u = await User.findOneAndUpdate({ email }, { $set: { mustChangePassword: false } }, { new: true });
+    return asPayload(u);
+  };
+
+  // (1) Super distributor for Birbhum, supplied by the company.
+  const sdRes = await createPartner(
+    {
+      tier: "SUPER_DISTRIBUTOR", name: "Rarh Bengal EV Super Distributors", ownerName: "Debashis Mondal", phone: "9734512890",
+      email: "sd1@joykaliev.in", address: "12, Lalbandh Road", city: "Suri", pincode: "731101", gstin: "19AAKFR6612L1Z3",
+      territories: [String(dBIR._id)], creditDays: 45, creditLimitRupees: 4000000, assignedASM: String(asmSouth._id),
+      login: { password: DEMO_PASSWORD },
+    },
+    bhPayload
+  );
+  const sd = sdRes.partner;
+  const sdUser = await demoLogin("sd1@joykaliev.in");
+  const sdCredit = await CreditLimitChange.findOne({ party: sd._id, status: "PENDING" });
+  await approveBoth("credit", String(sdCredit!._id));
+  await kyc(mpPayload, "DISTRIBUTOR", sd, [["GST", sd.gstin], ["PAN", sd.gstin.slice(2, 12)], ["AGREEMENT", `AGR/${sd.distributorCode}`]], bhPayload);
+  // The super distributor appoints a distributor for Bolpur; it activates once the company verifies its KYC.
+  const bolRes = await createPartner(
+    {
+      tier: "DISTRIBUTOR", name: "Bolpur EV Hub", ownerName: "Suman Ghosh", phone: "9732201456", email: "bolpur.evhub@gmail.com",
+      address: "Station Road", city: "Bolpur", pincode: "731204", gstin: "19ABJFB2201K1Z9", territories: [String(aBOL._id)], creditDays: 30, creditLimitRupees: 1500000,
+    },
+    sdUser
+  );
+  const bolpur = bolRes.partner;
+  await kyc(sdUser, "DISTRIBUTOR", bolpur, [["GST", bolpur.gstin], ["PAN", bolpur.gstin.slice(2, 12)], ["AGREEMENT", "AGR/RARH/BOL-01"]], bhPayload);
+  // Company → super distributor: order, both approvals, warehouse dispatch, receipt.
+  const oSD = await placeOrder({ partyType: "DISTRIBUTOR", partyId: String(sd._id), lines: [{ modelId: M("FALCON"), quantity: 3 }, { modelId: M("ZIPPY"), quantity: 3 }], notes: "Opening stock for Birbhum" }, sdUser);
+  await approveBoth("order", String(oSD._id));
+  const doSD = await createDeliveryOrder(String(oSD._id), [{ modelId: M("FALCON"), quantity: 3 }, { modelId: M("ZIPPY"), quantity: 3 }], bhPayload);
+  await submitDO(String(doSD._id), bhPayload);
+  await startLoading(String(doSD._id), { fleetVehicleId: String(fleet.WB25K4521._id), driverName: "Ramesh Yadav", driverPhone: "9831245670", driverLicence: "WB1020190045821" }, bhPayload);
+  await autoPick(String(doSD._id), bhPayload);
+  await completeLoading(String(doSD._id), { physicalInspection: true, chassisVerified: true, batteryChargerKeys: true, securedForTransit: true }, bhPayload);
+  await generateDocument(String(doSD._id), bhPayload);
+  await recordEwayBill(String(doSD._id), { distanceKm: 210, ewbNo: `3810${between(10000000, 99999999)}` }, bhPayload);
+  await dispatchDO(String(doSD._id), mpPayload);
+  const doSDfull: any = await DeliveryOrderModel.findById(doSD._id).lean();
+  await recordGRN(String(doSD._id), { items: doSDfull.vehicles.map((v: any) => ({ vehicleId: String(v.vehicle), condition: "RECEIVED" })), remarks: "Received at Suri godown" }, sdUser);
+  // Super distributor → Bolpur distributor (secondary sale), received by the Business Head on Bolpur's behalf (Bolpur has no login).
+  const sdStock = await Vehicle.find({ status: "WITH_DISTRIBUTOR", currentLocationDistributor: sd._id }).populate("model").lean();
+  const toBol = sdStock.filter((v: any) => v.model.name.includes("Falcon")).slice(0, 2);
+  const sBol = await createPartnerSale(sdUser, { buyerKind: "DISTRIBUTOR", buyerId: String(bolpur._id), vehicles: toBol.map((v: any) => ({ vehicleId: String(v._id) })) });
+  await receivePartnerSale(bhPayload, String(sBol._id), { remarks: "Confirmed by phone with Bolpur EV Hub" });
+
+  // (2) Bardhaman distributor's own network: a dealer, a sub dealer, and one still waiting for KYC.
+  const memRes = await createPartner(
+    {
+      tier: "DEALER", name: "Memari Motors", ownerName: "Prosenjit Saha", phone: "9800456123", email: "dealer1@joykaliev.in",
+      address: "G.T. Road, near Memari Station", city: "Memari", pincode: "713146", gstin: "19ABMFM4410C1Z5",
+      territories: [String(aMEM._id)], creditDays: 21, creditLimitRupees: 1500000, login: { password: DEMO_PASSWORD },
+    },
+    bardhamanUser
+  );
+  const memari = memRes.partner;
+  const memariUser = await demoLogin("dealer1@joykaliev.in");
+  await kyc(bardhamanUser, "DEALER", memari, [["GST", memari.gstin], ["PAN", memari.gstin.slice(2, 12)], ["AGREEMENT", "AGR/BDN/MEM-01"], ["CANCELLED_CHEQUE", "SBIN0007788"]], bhPayload);
+  const kalRes = await createPartner(
+    {
+      tier: "SUB_DEALER", name: "Kalna E-Ride Point", ownerName: "Rina Pal", phone: "9851230987", email: "subdealer1@joykaliev.in",
+      address: "Kalna Gate", city: "Kalna", pincode: "713409", gstin: "19ACKPP9087D1Z1", territories: [String(aKLN._id)],
+      creditDays: 15, creditLimitRupees: 300000, login: { password: DEMO_PASSWORD },
+    },
+    memariUser
+  );
+  const kalna = kalRes.partner;
+  const kalnaUser = await demoLogin("subdealer1@joykaliev.in");
+  await kyc(memariUser, "DEALER", kalna, [["GST", kalna.gstin], ["PAN", kalna.gstin.slice(2, 12)], ["AGREEMENT", "AGR/MEM/KLN-01"]], bhPayload);
+  const gusRes = await createPartner(
+    {
+      tier: "DEALER", name: "Guskara Auto Point", ownerName: "Sk. Rafiqul Islam", phone: "9775312045", email: "guskara.autopoint@gmail.com",
+      address: "Guskara Bazar", city: "Guskara", pincode: "713128", gstin: "19ADGPI5521E1Z7", territories: [String(aGUS._id)], creditDays: 21, creditLimitRupees: 600000,
+    },
+    bardhamanUser
+  );
+  // Guskara's papers are uploaded but not yet checked by the company → stays "KYC pending".
+  await kyc(bardhamanUser, "DEALER", gusRes.partner, [["GST", gusRes.partner.gstin], ["PAN", gusRes.partner.gstin.slice(2, 12)], ["AGREEMENT", "AGR/BDN/GUS-01"]], null);
+
+  // Security deposits: Bardhaman with the company, Memari with Bardhaman.
+  await recordDeposit(bhPayload, "DISTRIBUTOR", String(bardhaman._id), { type: "RECEIVED", amountRupees: 200000, mode: "BANK", reference: `UTR${between(100000000, 999999999)}`, narration: "Security deposit as per agreement" });
+  await recordDeposit(bardhamanUser, "DEALER", String(memari._id), { type: "RECEIVED", amountRupees: 50000, mode: "CHEQUE", reference: `CHQ ${between(100000, 999999)}` });
+
+  // Bardhaman → Memari: 3 received, 2 still on the road; Memari → Kalna 1; retail bills at each level.
+  const bdnStock = await Vehicle.find({ status: "WITH_DISTRIBUTOR", currentLocationDistributor: bardhaman._id }).sort({ chassisNumber: 1 }).lean();
+  const s1 = await createPartnerSale(bardhamanUser, { buyerKind: "DEALER", buyerId: String(memari._id), vehicles: bdnStock.slice(0, 3).map((v: any) => ({ vehicleId: String(v._id) })), saleDate: new Date(Date.now() - 6 * day).toISOString() });
+  await receivePartnerSale(memariUser, String(s1._id), { remarks: "All three received" });
+  await createPartnerSale(bardhamanUser, { buyerKind: "DEALER", buyerId: String(memari._id), vehicles: bdnStock.slice(3, 5).map((v: any) => ({ vehicleId: String(v._id) })) });
+  await createPartnerSale(bardhamanUser, {
+    buyerKind: "CUSTOMER", vehicles: [{ vehicleId: String(bdnStock[5]._id) }],
+    customer: { name: "Tapas Kumar Roy", phone: "9732145678", address: "Kalitala, Bardhaman" }, paymentMode: "UPI", amountReceivedRupees: 60000,
+  });
+  await recordNetworkPayment(bardhamanUser, { buyerType: "DEALER", buyerId: String(memari._id), amountRupees: 150000, mode: "BANK", reference: `UTR${between(100000000, 999999999)}` });
+  const memStock = await Vehicle.find({ status: "WITH_DEALER", currentLocationDealer: memari._id }).lean();
+  const s2 = await createPartnerSale(memariUser, { buyerKind: "DEALER", buyerId: String(kalna._id), vehicles: [{ vehicleId: String(memStock[0]._id) }], saleDate: new Date(Date.now() - 3 * day).toISOString() });
+  await receivePartnerSale(kalnaUser, String(s2._id), { remarks: "Received" });
+  await createPartnerSale(memariUser, {
+    buyerKind: "CUSTOMER", vehicles: [{ vehicleId: String(memStock[1]._id) }],
+    customer: { name: "Mitali Ghosh", phone: "9933012456", address: "Memari Bazar, Purba Bardhaman" }, paymentMode: "FINANCE", amountReceivedRupees: 25000,
+  });
+  // Memari orders more from Bardhaman → waiting for Bardhaman to accept (demo).
+  await placeNetworkOrder(memariUser, { lines: [{ modelId: M("STORM"), quantity: 2 }], notes: "Two Storms for a fleet customer" });
+
+  // Targets for this month: company-set for its partners, Bardhaman-set for Memari.
+  await setTarget(bhPayload, { partyType: "DISTRIBUTOR", partyId: String(bardhaman._id), period: current.period, targetUnits: 12, commissionPerUnitRupees: 1500 });
+  await setTarget(bhPayload, { partyType: "DISTRIBUTOR", partyId: String(sd._id), period: current.period, targetUnits: 6, commissionPerUnitRupees: 2000 });
+  await setTarget(bhPayload, { partyType: "DISTRIBUTOR", partyId: String(malda._id), period: current.period, targetUnits: 8, commissionPerUnitRupees: 1200 });
+  await setTarget(bhPayload, { partyType: "DISTRIBUTOR", partyId: String(bihar._id), period: current.period, targetUnits: 10, commissionPerUnitRupees: 1200 });
+  await setTarget(bardhamanUser, { partyType: "DEALER", partyId: String(memari._id), period: current.period, targetUnits: 6, commissionPerUnitRupees: 500 });
+
+  // (3) Company showroom in Salt Lake with its own login, stock transfers and counter bills.
+  const outlet = await createOutlet(bhPayload, { name: "Joykali Showroom — Salt Lake", address: "DD-14, Sector 1, Salt Lake", city: "Kolkata", pincode: "700064", phone: "03340012345", territoryId: String(aSLK._id) });
+  const outletUser = await makeUser("OUTLET", "Sayantani Dutta", "showroom@joykaliev.in", "Showroom Manager — Salt Lake", asmKolkata, { basic: 14000, hra: 5600, conveyance: 1600, other: 2800, esi: false }, { outlet: outlet._id });
+  await Outlet.updateOne({ _id: outlet._id }, { $set: { manager: outletUser._id } });
+  const outletPayload = asPayload(outletUser);
+  const free = await Vehicle.find({ status: "IN_STOCK", currentLocationType: "WAREHOUSE" }).populate("model").sort({ createdAt: -1 }).lean();
+  const pickModels = (names: string[], n: number) => {
+    const out: any[] = [];
+    for (const nm of names) out.push(...free.filter((v: any) => v.model.name.includes(nm) && !out.includes(v)).slice(0, n));
+    return out;
+  };
+  const showroomLot = pickModels(["Falcon", "Storm", "Zippy"], 2);
+  const t1 = await createStockTransfer(bhPayload, { outletId: String(outlet._id), direction: "TO_OUTLET", vehicleIds: showroomLot.map((v) => String(v._id)), remarks: "Showroom opening stock" });
+  await receiveStockTransfer(outletPayload, String(t1._id));
+  const secondLot = pickModels(["CityRide"], 1).filter((v) => !showroomLot.includes(v));
+  if (secondLot.length) await createStockTransfer(bhPayload, { outletId: String(outlet._id), direction: "TO_OUTLET", vehicleIds: secondLot.map((v) => String(v._id)), remarks: "E-rickshaw display unit" });
+  for (const [i, v] of showroomLot.slice(0, 2).entries()) {
+    const m: any = v.model;
+    await createSale(
+      {
+        saleDate: new Date(),
+        customer: { name: i ? "Arijit Sen" : "Payel Majumdar", phone: i ? "9830098765" : "9903312478", address: i ? "BF-112, Salt Lake" : "Lake Town, Kolkata" },
+        vehicleId: String(v._id),
+        soldBy: String(outletUser._id),
+        priceBreakdown: { exShowroom: m.sellingPrice / 100, discount: i ? 2000 : 0, gst: 0, registration: 1500, insurance: 4200 },
+        paymentMode: i ? "UPI" : "CASH",
+        initialPayment: { amount: i ? 40000 : 102000 },
+      } as any,
+      outletPayload
+    );
+  }
+
   // A light audit trail so the Audit screen isn't empty.
   for (const u of [admin, mp, bh, asmNorth, fecs[0].user]) {
     await logAudit({ user: asPayload(u), action: "LOGIN", resource: "AUTH", resourceId: String(u._id), ipAddress: "103.42.18.7" });
@@ -778,12 +979,16 @@ async function main() {
   const vehicles = await Vehicle.countDocuments();
   console.log(`\nSeed complete: ${saleIds.length} sales, ${vehicles} vehicles, ${runs} payroll runs.`);
   console.log(`\nDemo accounts (password: ${DEMO_PASSWORD})`);
-  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR"] } }).sort({ role: 1 }).lean()) {
+  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR", "SUPER_DISTRIBUTOR", "DEALER", "SUB_DEALER", "OUTLET"] } }).sort({ role: 1 }).lean()) {
     console.log(`  ${u.role.padEnd(17)} ${u.employeeCode.padEnd(13)} ${u.email}`);
   }
   console.log(`  FEC               JKE-FEC-0001  fec1@joykaliev.in (… fec12)`);
   console.log(`  DISTRIBUTOR       JKDB-0001     dist1@joykaliev.in  (Bardhaman)`);
   console.log(`  DISTRIBUTOR       JKDB-0003     dist3@joykaliev.in  (Patna, Bihar — inter-state)`);
+  console.log(`  SUPER_DISTRIBUTOR JKSD-0001     sd1@joykaliev.in    (Rarh Bengal, Birbhum)`);
+  console.log(`  DEALER            (Memari)      dealer1@joykaliev.in  (buys from Bardhaman)`);
+  console.log(`  SUB_DEALER        JKSB-0001     subdealer1@joykaliev.in (buys from Memari)`);
+  console.log(`  OUTLET            showroom@joykaliev.in (Salt Lake showroom counter)`);
   await mongoose.disconnect();
 }
 

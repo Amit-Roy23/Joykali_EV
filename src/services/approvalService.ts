@@ -11,11 +11,14 @@ import { SalaryStructure } from "@/models/SalaryStructure";
 import { Dealer } from "@/models/Dealer";
 import { Distributor } from "@/models/Distributor";
 import { User } from "@/models/User";
+import { PartnerTarget } from "@/models/PartnerTarget";
+import { LedgerEntry } from "@/models/LedgerEntry";
+import { generateFyCode } from "@/lib/codeGenerator";
 import { assertCredit } from "./creditService";
 import { recalculateForScheme } from "./incentiveService";
 
-export type ApprovalKind = "order" | "scheme" | "payroll" | "credit" | "salary";
-export const APPROVAL_KINDS: ApprovalKind[] = ["order", "scheme", "payroll", "credit", "salary"];
+export type ApprovalKind = "order" | "scheme" | "payroll" | "credit" | "salary" | "commission";
+export const APPROVAL_KINDS: ApprovalKind[] = ["order", "scheme", "payroll", "credit", "salary", "commission"];
 
 export const KIND_LABEL: Record<ApprovalKind, string> = {
   order: "Vehicle order",
@@ -23,6 +26,7 @@ export const KIND_LABEL: Record<ApprovalKind, string> = {
   payroll: "Payroll run",
   credit: "Credit limit change",
   salary: "Salary revision",
+  commission: "Partner commission",
 };
 
 const rupees = (p: number) => `₹${Math.round(p / 100).toLocaleString("en-IN")}`;
@@ -144,6 +148,33 @@ export async function signApproval(
     if (result.status === "APPROVED") await activateSalaryStructures(structure.employee);
     const emp = await User.findById(structure.employee).select("name employeeCode").lean();
     summary = `${emp?.name} (${emp?.employeeCode}) · gross ${rupees(structure.grossMonthly || 0)}/month`;
+  } else if (kind === "commission") {
+    const t = await PartnerTarget.findById(id);
+    if (!t || !t.settlement) throw new ApprovalError("Commission claim not found", 404);
+    if (t.settlement.status !== "PENDING_APPROVAL") throw new ApprovalError(`Claim is already ${t.settlement.status.toLowerCase()}`);
+    result = sign(t.settlement.approvals, user, decision, note);
+    t.settlement.approvals = result.signatures;
+    if (result.status === "APPROVED") {
+      const cn = await generateFyCode("CREDIT_NOTE");
+      await LedgerEntry.create({
+        partyType: t.partyType,
+        party: t.party,
+        type: "CREDIT_NOTE",
+        reference: cn,
+        debit: 0,
+        credit: t.settlement.amount,
+        narration: `Target commission ${t.period}: ${t.settlement.units} units`,
+        createdBy: new mongoose.Types.ObjectId(user.userId),
+      });
+      t.settlement.status = "SETTLED";
+      t.settlement.creditNote = cn;
+      t.settlement.settledAt = new Date();
+    } else if (result.status === "REJECTED") {
+      t.settlement.status = "REJECTED";
+    }
+    t.markModified("settlement");
+    await t.save();
+    summary = `${t.period} commission ${rupees(t.settlement.amount)}`;
   } else {
     throw new ApprovalError("Unknown approval type", 400);
   }
@@ -151,7 +182,7 @@ export async function signApproval(
   await logAudit({
     user,
     action: decision === "APPROVED" ? "APPROVE" : "REJECT",
-    resource: ({ order: "ORDER", scheme: "SCHEME", payroll: "PAYROLL", credit: "CREDIT", salary: "SALARY" } as const)[kind],
+    resource: ({ order: "ORDER", scheme: "SCHEME", payroll: "PAYROLL", credit: "CREDIT", salary: "SALARY", commission: "TARGET" } as const)[kind],
     resourceId: id,
     after: { level: user.role, decision, note, outcome: result.status, summary },
   });
@@ -286,6 +317,24 @@ export async function listPending(user: JWTPayload): Promise<PendingItem[]> {
       canSign: mine(s.approvals),
       signatures: s.approvals || [],
       href: `/employees/${emp?._id}`,
+    });
+  }
+  const claims = await PartnerTarget.find({ "settlement.status": "PENDING_APPROVAL" }).sort({ updatedAt: 1 }).lean();
+  for (const t of claims as any[]) {
+    const Coll: any = t.partyType === "DEALER" ? Dealer : Distributor;
+    const p: any = await Coll.findById(t.party).select("name dealerCode distributorCode").lean();
+    items.push({
+      kind: "commission",
+      kindLabel: KIND_LABEL.commission,
+      id: String(t._id),
+      title: `${p?.name || "Partner"} (${p?.dealerCode || p?.distributorCode || ""})`,
+      subtitle: `${t.period}: ${t.settlement.units} units against a target of ${t.targetUnits} · credit note`,
+      amount: t.settlement.amount,
+      submittedAt: t.updatedAt,
+      waitingFor: waitingLabel(t.settlement.approvals),
+      canSign: mine(t.settlement.approvals),
+      signatures: t.settlement.approvals || [],
+      href: `/targets?period=${t.period}`,
     });
   }
   return items.sort((a, b) => Number(b.canSign) - Number(a.canSign) || +new Date(a.submittedAt) - +new Date(b.submittedAt));

@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { useSession } from "@/components/layout/session";
 import { api, dt, Notice, rupees } from "@/components/workflow";
 import { CreditPanel, LedgerCard } from "@/components/party";
+import { DepositPanel, KycPanel, TierBadge } from "@/components/network";
 
 /** Shared by /distributors/[id] (staff) and /account (the distributor's own portal view). */
 export function DistributorDetail({ id, portal = false }: { id: string; portal?: boolean }) {
@@ -38,7 +39,7 @@ export function DistributorDetail({ id, portal = false }: { id: string; portal?:
     <div className="animate-fade-up">
       <PageHeader
         backHref={portal ? undefined : "/distributors"}
-        eyebrow={portal ? "My account" : `Distributor · ${d.distributorCode}`}
+        eyebrow={portal ? "My account" : <span className="inline-flex items-center gap-2"><TierBadge tier={d.tier || "DISTRIBUTOR"} /> {d.distributorCode}</span>}
         title={d.name}
         description={`${d.address}, ${d.city} - ${d.pincode} · GSTIN ${d.gstin}`}
         actions={
@@ -114,6 +115,12 @@ export function DistributorDetail({ id, portal = false }: { id: string; portal?:
         </div>
         <aside className="space-y-4">
           <CreditPanel partyType="distributor" partyId={d._id} />
+          {!portal && (
+            <>
+              <KycPanel partyType="DISTRIBUTOR" partyId={d._id} canUpload={can("distributor.manage") || can("kyc.verify")} />
+              <DepositPanel partyType="DISTRIBUTOR" partyId={d._id} canRecord={can("ledger.manage") && !d.parent} />
+            </>
+          )}
           <Card className="p-4 sm:p-5">
             <p className="mb-1 font-display text-[15px] font-semibold">Details</p>
             <DataRow label="Owner" value={d.ownerName} />

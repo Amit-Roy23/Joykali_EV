@@ -1,14 +1,14 @@
 import mongoose from "mongoose";
-import { JWTPayload } from "@/types";
+import { JWTPayload, isPartnerRole } from "@/types";
 import { ChannelOrder, IChannelOrder } from "@/models/ChannelOrder";
 import { DeliveryOrder } from "@/models/DeliveryOrder";
 import { VehicleModel } from "@/models/VehicleModel";
 import { CreditLimitChange } from "@/models/CreditLimitChange";
 import { LedgerEntry } from "@/models/LedgerEntry";
 import { generateFyCode } from "@/lib/codeGenerator";
-import { canAccessParty, distributorOf, PartyType } from "@/lib/partyAccess";
+import { canAccessParty, myParty, PartyType } from "@/lib/partyAccess";
 import { logAudit } from "@/lib/audit";
-import { assertCredit, channelPrice, creditSummary, getParty, lineValue } from "./creditService";
+import { assertCredit, channelPrice, creditSummary, getParty, lineValue, supplierRef, tierOf } from "./creditService";
 import { rupeesToPaise } from "@/lib/money";
 
 export class OrderError extends Error {
@@ -25,11 +25,11 @@ export async function placeOrder(
   user: JWTPayload
 ): Promise<IChannelOrder> {
   let { partyType, partyId } = input;
-  if (user.role === "DISTRIBUTOR") {
-    const own = await distributorOf(user);
-    if (!own) throw new OrderError("Your login is not linked to an active distributor", 403);
-    partyType = "DISTRIBUTOR";
-    partyId = String(own);
+  if (isPartnerRole(user.role)) {
+    const own = await myParty(user);
+    if (!own) throw new OrderError("Your login is not linked to an active partner account", 403);
+    partyType = own.type;
+    partyId = String(own.id);
   }
   if (partyType !== "DEALER" && partyType !== "DISTRIBUTOR") throw new OrderError("Choose a dealer or distributor");
   if (!(await canAccessParty(user, partyType, partyId))) {
@@ -38,6 +38,11 @@ export async function placeOrder(
   const party = await getParty(partyType, partyId);
   if (!party) throw new OrderError(`${partyType === "DEALER" ? "Dealer" : "Distributor"} not found`, 404);
   if (party.status !== "ACTIVE") throw new OrderError(`${party.name} is not active`);
+  const sup = supplierRef(partyType, party);
+  if (sup) {
+    const s = await getParty(sup.type, sup.id);
+    throw new OrderError(`${party.name} buys from ${s?.name || "its distributor"}. Place the order with them under My network → Buy stock.`);
+  }
 
   // Merge duplicate lines, validate quantities.
   const qtyByModel = new Map<string, number>();
@@ -56,7 +61,7 @@ export async function placeOrder(
     model: m._id,
     modelName: `${m.name} ${m.variant ? `(${m.variant})` : ""}`.trim(),
     quantity: qtyByModel.get(String(m._id))!,
-    unitPrice: channelPrice(m, partyType),
+    unitPrice: channelPrice(m, partyType, tierOf(partyType, party)),
     gstRate: m.gstRate ?? 5,
     hsnCode: m.hsnCode || "870380",
     dispatchedQty: 0,
@@ -115,7 +120,7 @@ export async function cancelOrder(orderId: string, reason: string, user: JWTPayl
     throw new OrderError(`Order is already ${order.status.toLowerCase()}`);
   }
   // Distributors may withdraw their own order only before it is approved.
-  if (user.role === "DISTRIBUTOR" && order.status !== "PENDING_APPROVAL") {
+  if (isPartnerRole(user.role) && order.status !== "PENDING_APPROVAL") {
     throw new OrderError("This order is already approved — contact Joykali to change it", 403);
   }
   const onDOs = order.lines.reduce((s, l) => s + (l.dispatchedQty || 0), 0);
@@ -158,6 +163,9 @@ export async function requestCreditChange(
 ) {
   const party = await getParty(input.partyType, input.partyId);
   if (!party) throw new OrderError("Party not found", 404);
+  if (supplierRef(input.partyType, party)) {
+    throw new OrderError(`${party.name} buys from a distributor/dealer, who sets its credit limit in their network.`);
+  }
   const toLimit = rupeesToPaise(Number(input.toLimitRupees));
   if (!Number.isFinite(toLimit) || toLimit < 0) throw new OrderError("Enter a valid credit limit");
   if (!input.reason?.trim()) throw new OrderError("A reason is required");
@@ -198,6 +206,9 @@ export async function recordPayment(
 ) {
   const party = await getParty(input.partyType, input.partyId);
   if (!party) throw new OrderError("Party not found", 404);
+  if (supplierRef(input.partyType, party)) {
+    throw new OrderError(`${party.name} pays its own supplier, not the company. Their supplier records the payment.`);
+  }
   const amount = rupeesToPaise(Number(input.amountRupees));
   if (!Number.isFinite(amount) || amount <= 0) throw new OrderError("Enter a valid amount");
   if (!["CASH", "UPI", "BANK", "CHEQUE"].includes(input.mode)) throw new OrderError("Choose a payment mode");
@@ -223,7 +234,7 @@ export async function recordPayment(
 
 /** Ledger with running balance (oldest first). */
 export async function partyLedger(partyType: PartyType, partyId: string) {
-  const entries = await LedgerEntry.find({ partyType, party: partyId }).sort({ date: 1, createdAt: 1 }).lean();
+  const entries = await LedgerEntry.find({ partyType, party: partyId, book: null }).sort({ date: 1, createdAt: 1 }).lean();
   let balance = 0;
   return entries.map((e) => {
     balance += (e.debit || 0) - (e.credit || 0);

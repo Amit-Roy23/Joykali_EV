@@ -1,3 +1,4 @@
+import { EMPLOYEE_ROLES } from "@/types";
 import { NextRequest } from "next/server";
 import { periodOf } from "@/lib/period";
 import { connectToDatabase, withTransaction } from "@/lib/db";
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
     const scopeFilter = await getScopeFilter(auth.user, "employees");
 
     // Distributor logins are managed under Distributors, not in the employee list.
-    const query: any = { $and: [scopeFilter, { role: { $ne: "DISTRIBUTOR" } }] };
+    const query: any = { $and: [scopeFilter, { role: { $in: [...EMPLOYEE_ROLES] } }] };
 
     if (search) {
       query.$or = [

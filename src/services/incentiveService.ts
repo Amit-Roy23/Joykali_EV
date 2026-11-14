@@ -9,7 +9,7 @@ import { Setting } from "@/models/Setting";
 import { computeIncentives } from "./incentiveEngine";
 import { calculatePayrollEntry, statutorySettingsFrom } from "./payrollEngine";
 import { periodOf, periodsBetween } from "@/lib/period";
-import { UserRole } from "@/types";
+import { UserRole, EMPLOYEE_ROLES } from "@/types";
 
 export interface RecalcOptions {
   /**
@@ -135,7 +135,7 @@ export async function recalculateForScheme(scheme: {
   const now = new Date();
   const to = scheme.validTo < now ? scheme.validTo : now;
   if (scheme.validFrom > to) return [];
-  const employees = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }, { _id: 1 }).lean();
+  const employees = await User.find({ status: "ACTIVE", role: { $in: [...EMPLOYEE_ROLES] } }, { _id: 1 }).lean();
   const ids = employees.map((e: any) => e._id);
   const periods = periodsBetween(scheme.validFrom, to);
   for (const p of periods) {

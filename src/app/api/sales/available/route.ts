@@ -25,25 +25,31 @@ export async function GET(req: NextRequest) {
     let dealerFilter: Record<string, any> = { status: "ACTIVE" };
     let sellerFilter: Record<string, any> = { status: "ACTIVE", role: { $in: ["FEC", "ASM"] } };
 
-    if (role === "FEC") {
-      const me = await User.findById(uid).lean();
-      dealerFilter = me?.dealer ? { _id: me.dealer } : { _id: null };
-      sellerFilter = { _id: uid };
+    let outletId: any = null;
+    if (role === "FEC" || role === "OUTLET") {
+      const me: any = await User.findById(uid).lean();
+      outletId = me?.outlet || null;
+      dealerFilter = role === "FEC" && me?.dealer ? { _id: me.dealer } : { _id: null };
+      sellerFilter = role === "OUTLET" && outletId ? { status: "ACTIVE", $or: [{ _id: uid }, { outlet: outletId, role: "FEC" }] } : { _id: uid };
     } else if (role === "ASM") {
       dealerFilter = { status: "ACTIVE", assignedASM: uid };
       sellerFilter = { _id: { $in: [uid, ...(await getTeamUserIds(uid))] }, status: "ACTIVE" };
     }
 
     const dealers = await Dealer.find(dealerFilter).select("name city dealerCode").sort({ name: 1 }).lean();
-    const vehicles = await Vehicle.find({
-      $or: [
-        { status: "IN_STOCK" },
-        { status: "ALLOCATED_TO_DEALER", currentLocationDealer: { $in: dealers.map((d: any) => d._id) } },
-      ],
-    })
+    const sources: Record<string, any>[] =
+      role === "OUTLET"
+        ? [{ status: "AT_OUTLET", currentLocationOutlet: outletId || null }]
+        : [
+            { status: "IN_STOCK" },
+            { status: "ALLOCATED_TO_DEALER", currentLocationDealer: { $in: dealers.map((d: any) => d._id) } },
+            ...(outletId ? [{ status: "AT_OUTLET", currentLocationOutlet: outletId }] : []),
+          ];
+    const vehicles = await Vehicle.find({ $or: sources })
       .populate("model", "name variant category sellingPrice gstRate rangeKm batteryType")
       .populate("currentLocationDealer", "name city")
-      .select("chassisNumber color status model currentLocationDealer currentLocationType")
+      .populate("currentLocationOutlet", "name city")
+      .select("chassisNumber color status model currentLocationDealer currentLocationOutlet currentLocationType")
       .sort({ createdAt: 1 })
       .lean();
     const sellers = await User.find(sellerFilter).select("name employeeCode role").sort({ role: 1, name: 1 }).lean();

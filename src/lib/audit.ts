@@ -19,7 +19,8 @@ export interface LogAuditParams {
     | "DISPATCH"
     | "RECEIVE"
     | "PAYMENT"
-    | "UPLOAD";
+    | "UPLOAD"
+    | "VERIFY";
   resource:
     | "SALE"
     | "PURCHASE"
@@ -36,7 +37,14 @@ export interface LogAuditParams {
     | "SALARY"
     | "DELIVERY_ORDER"
     | "LEDGER"
-    | "FLEET";
+    | "FLEET"
+    | "NETWORK"
+    | "OUTLET"
+    | "TERRITORY"
+    | "KYC"
+    | "DEPOSIT"
+    | "TARGET"
+    | "PARTNER_SALE";
   resourceId?: string;
   before?: any;
   after?: any;

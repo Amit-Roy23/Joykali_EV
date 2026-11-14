@@ -1,3 +1,4 @@
+import { isPartnerRole } from "@/types";
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { ChannelOrder } from "@/models/ChannelOrder";
@@ -36,7 +37,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!isValidId(id)) return errorResponse("Order not found", 404);
     const b = await req.json();
     if (b.action !== "cancel") return errorResponse("Unknown action", 400);
-    if (auth.user.role !== "DISTRIBUTOR" && !["BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "ASM"].includes(auth.user.role)) {
+    if (!isPartnerRole(auth.user.role) && !["BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "ASM"].includes(auth.user.role)) {
       return errorResponse("Forbidden", 403);
     }
     return jsonResponse(await cancelOrder(id, b.reason, auth.user));

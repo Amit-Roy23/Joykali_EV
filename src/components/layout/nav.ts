@@ -25,13 +25,25 @@ import {
   BadgeCheck,
   BookOpen,
   Container,
+  GitFork,
+  Map,
+  Target,
+  Boxes,
+  HandCoins,
+  ShoppingCart,
+  PackageCheck,
+  ReceiptText,
 } from "lucide-react";
+import { isPartnerRole } from "@/types";
 
 export interface NavItem {
   title: string;
   href: string;
   icon: any;
-  permission?: string;
+  /** One permission, or any of several. */
+  permission?: string | string[];
+  /** Menu audience: partner-only pages are hidden from staff (and vice versa). */
+  audience?: "staff" | "partner";
 }
 
 export interface NavGroup {
@@ -52,15 +64,31 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: "My Business",
+    items: [
+      { title: "Buy Stock", href: "/partner/buy", icon: ShoppingCart, permission: "order.create", audience: "partner" },
+      { title: "My Orders", href: "/partner/orders", icon: ClipboardList, permission: "order.view", audience: "partner" },
+      { title: "Stock & Deliveries", href: "/partner/stock", icon: PackageCheck, permission: "portal.access", audience: "partner" },
+      { title: "Sell", href: "/partner/sell", icon: HandCoins, permission: "partner.sell", audience: "partner" },
+      { title: "My Sales", href: "/partner/sales", icon: ReceiptText, permission: "partner.sell", audience: "partner" },
+      { title: "My Network", href: "/partner/network", icon: GitFork, permission: "partner.appoint", audience: "partner" },
+      { title: "Targets", href: "/targets", icon: Target, permission: ["portal.access", "network.view"], audience: "partner" },
+      { title: "My Account", href: "/account", icon: BookOpen, permission: "portal.access", audience: "partner" },
+    ],
+  },
+  {
     label: "Channel & Dispatch",
     items: [
       { title: "Approvals", href: "/approvals", icon: BadgeCheck, permission: "approvals.sign" },
-      { title: "Place an Order", href: "/orders/new", icon: ShoppingBag, permission: "order.create" },
-      { title: "Orders", href: "/orders", icon: ClipboardList, permission: "order.view" },
-      { title: "Delivery Orders", href: "/dispatch", icon: Truck, permission: "dispatch.view" },
-      { title: "My Account", href: "/account", icon: BookOpen, permission: "portal.access" },
-      { title: "Distributors", href: "/distributors", icon: Building2, permission: "distributor.view" },
-      { title: "Transport Fleet", href: "/fleet", icon: Container, permission: "fleet.view" },
+      { title: "Place an Order", href: "/orders/new", icon: ShoppingBag, permission: "order.create", audience: "staff" },
+      { title: "Orders", href: "/orders", icon: ClipboardList, permission: "order.view", audience: "staff" },
+      { title: "Delivery Orders", href: "/dispatch", icon: Truck, permission: "dispatch.view", audience: "staff" },
+      { title: "Business Network", href: "/network", icon: GitFork, permission: "network.view", audience: "staff" },
+      { title: "Distributors", href: "/distributors", icon: Building2, permission: "distributor.view", audience: "staff" },
+      { title: "Partner Targets", href: "/targets", icon: Target, permission: ["portal.access", "network.view"], audience: "staff" },
+      { title: "Territories", href: "/territories", icon: Map, permission: "network.view", audience: "staff" },
+      { title: "Outlets & Showrooms", href: "/outlets", icon: Boxes, permission: "outlet.view", audience: "staff" },
+      { title: "Transport Fleet", href: "/fleet", icon: Container, permission: "fleet.view", audience: "staff" },
     ],
   },
   {
@@ -102,18 +130,29 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 
 /** Pages that are not in the menu but still need a permission. */
-const EXTRA_ROUTES: Array<{ prefix: string; permission?: string; title: string }> = [
+const EXTRA_ROUTES: Array<{ prefix: string; permission?: string | string[]; title: string }> = [
+  { prefix: "/orders", permission: "order.view", title: "Orders" },
+  { prefix: "/dispatch", permission: "dispatch.view", title: "Delivery Orders" },
   { prefix: "/purchases/new", permission: "purchase.manage", title: "New Purchase" },
   { prefix: "/change-password", title: "Change Password" },
 ];
 
-export function canSee(item: { permission?: string }, role: string, permissions: string[]) {
+export function canSee(item: { permission?: string | string[]; audience?: "staff" | "partner" }, role: string, permissions: string[]) {
+  if (item.audience === "partner" && !isPartnerRole(role)) return false;
+  if (item.audience === "staff" && isPartnerRole(role)) return false;
   if (role === "ADMIN") return true;
-  return !item.permission || permissions.includes(item.permission);
+  if (!item.permission) return true;
+  const need = Array.isArray(item.permission) ? item.permission : [item.permission];
+  return need.some((p) => permissions.includes(p));
+}
+
+/** Route guard: permission only (audience just shapes the menu, deep links still work). */
+export function canOpen(item: { permission?: string | string[] }, role: string, permissions: string[]) {
+  return canSee({ permission: item.permission }, role, permissions);
 }
 
 /** Longest-prefix match of the current path against all known routes. */
-export function routeFor(pathname: string): { title: string; permission?: string } | null {
+export function routeFor(pathname: string): { title: string; permission?: string | string[] } | null {
   const candidates = [
     ...NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ prefix: i.href, permission: i.permission, title: i.title }))),
     ...EXTRA_ROUTES,

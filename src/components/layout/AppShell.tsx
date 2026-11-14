@@ -7,7 +7,8 @@ import { ClipboardList, LayoutDashboard, Menu, Plus, Receipt, ShieldOff, Trophy,
 import { cn } from "@/components/ui/button";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
-import { canSee, routeFor } from "./nav";
+import { canOpen, canSee, routeFor } from "./nav";
+import { isPartnerRole } from "@/types";
 import { SessionProvider } from "./session";
 
 export function AppShell({
@@ -31,7 +32,7 @@ export function AppShell({
   }, [drawer]);
 
   const route = routeFor(pathname);
-  const allowed = !route || canSee(route, user?.role, permissions);
+  const allowed = !route || canOpen(route, user?.role, permissions);
 
   return (
     <SessionProvider user={user} permissions={permissions}>
@@ -77,12 +78,12 @@ function MobileTabBar({ user, permissions, onMenu }: { user: any; permissions: s
   const pathname = usePathname();
   const can = (p?: string) => canSee({ permission: p }, user?.role, permissions);
 
-  const isDistributor = user?.role === "DISTRIBUTOR";
+  const isDistributor = isPartnerRole(user?.role);
   const tabs = isDistributor
     ? [
         { href: "/", label: "Home", icon: LayoutDashboard, show: true },
-        { href: "/orders", label: "Orders", icon: ClipboardList, show: true },
-        { href: "/dispatch", label: "Deliveries", icon: Truck, show: true },
+        { href: "/partner/orders", label: "Orders", icon: ClipboardList, show: true },
+        { href: "/partner/stock", label: "Stock", icon: Truck, show: true },
       ]
     : [
     { href: "/", label: "Home", icon: LayoutDashboard, show: true },
@@ -94,7 +95,7 @@ function MobileTabBar({ user, permissions, onMenu }: { user: any; permissions: s
 
   const isOn = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const sellFab = can("sales.create") || isDistributor;
-  const fabHref = isDistributor ? "/orders/new" : "/sales/new";
+  const fabHref = isDistributor ? "/partner/buy" : "/sales/new";
 
   const Tab = ({ href, label, icon: Icon }: { href: string; label: string; icon: any }) => (
     <Link

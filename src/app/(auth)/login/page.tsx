@@ -21,7 +21,11 @@ const DEMO_ACCOUNTS = [
   { role: "BUSINESS_HEAD", name: "Ananya Bhattacharya", login: "bh@joykaliev.in", blurb: "First approver; warehouse & dispatch" },
   { role: "ASM", name: "Moumita Banerjee", login: "asm.kolkata@joykaliev.in", blurb: "Kolkata team & leaderboard" },
   { role: "FEC", name: "Arnab Chatterjee", login: "fec5@joykaliev.in", blurb: "Books sales, tracks incentives" },
-  { role: "DISTRIBUTOR", name: "Bardhaman Auto Distributors", login: "dist1@joykaliev.in", blurb: "Places orders, receives deliveries (GRN)" },
+  { role: "OUTLET", name: "Salt Lake Showroom", login: "showroom@joykaliev.in", blurb: "Counter billing, showroom stock, day closing" },
+  { role: "SUPER_DISTRIBUTOR", name: "Rarh Bengal EV Super Distributors", login: "sd1@joykaliev.in", blurb: "Supplies distributors in its districts" },
+  { role: "DISTRIBUTOR", name: "Bardhaman Auto Distributors", login: "dist1@joykaliev.in", blurb: "Buys from Joykali, runs its dealer network" },
+  { role: "DEALER", name: "Memari Motors", login: "dealer1@joykaliev.in", blurb: "Buys from Bardhaman, sells to customers" },
+  { role: "SUB_DEALER", name: "Kalna E-Ride Point", login: "subdealer1@joykaliev.in", blurb: "Buys from Memari, retail sales" },
 ];
 
 export default function LoginPage() {
