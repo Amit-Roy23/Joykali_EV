@@ -7,8 +7,44 @@ import { ClipboardList, LayoutDashboard, Menu, Plus, Receipt, ShieldOff, Trophy,
 import { cn } from "@/components/ui/button";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
-import { canSee, routeFor } from "./nav";
+import { canOpen, canSee, routeFor } from "./nav";
+import { isPartnerRole } from "@/types";
+import { Fingerprint } from "lucide-react";
 import { SessionProvider } from "./session";
+
+/** Sign out after this many minutes without any activity (shared or unattended devices). */
+const IDLE_MINUTES = Number(process.env.NEXT_PUBLIC_IDLE_LOGOUT_MINUTES || 30);
+
+function useIdleLogout(minutes: number) {
+  useEffect(() => {
+    if (!minutes || minutes <= 0) return;
+    let last = Date.now();
+    const bump = () => {
+      last = Date.now();
+      try {
+        localStorage.setItem("jk-last-activity", String(last));
+      } catch {}
+    };
+    const events = ["pointerdown", "keydown", "scroll", "touchstart"];
+    events.forEach((e) => window.addEventListener(e, bump, { passive: true }));
+    const timer = window.setInterval(async () => {
+      // activity in another tab of the same browser counts too
+      let shared = last;
+      try {
+        shared = Math.max(last, Number(localStorage.getItem("jk-last-activity") || 0));
+      } catch {}
+      if (Date.now() - shared > minutes * 60000) {
+        window.clearInterval(timer);
+        await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+        window.location.href = "/login?idle=1";
+      }
+    }, 30000);
+    return () => {
+      events.forEach((e) => window.removeEventListener(e, bump));
+      window.clearInterval(timer);
+    };
+  }, [minutes]);
+}
 
 export function AppShell({
   user,
@@ -30,8 +66,10 @@ export function AppShell({
     };
   }, [drawer]);
 
+  useIdleLogout(IDLE_MINUTES);
+
   const route = routeFor(pathname);
-  const allowed = !route || canSee(route, user?.role, permissions);
+  const allowed = !route || canOpen(route, user?.role, permissions);
 
   return (
     <SessionProvider user={user} permissions={permissions}>
@@ -77,24 +115,26 @@ function MobileTabBar({ user, permissions, onMenu }: { user: any; permissions: s
   const pathname = usePathname();
   const can = (p?: string) => canSee({ permission: p }, user?.role, permissions);
 
-  const isDistributor = user?.role === "DISTRIBUTOR";
+  const isDistributor = isPartnerRole(user?.role);
   const tabs = isDistributor
     ? [
         { href: "/", label: "Home", icon: LayoutDashboard, show: true },
-        { href: "/orders", label: "Orders", icon: ClipboardList, show: true },
-        { href: "/dispatch", label: "Deliveries", icon: Truck, show: true },
+        { href: "/partner/orders", label: "Orders", icon: ClipboardList, show: true },
+        { href: "/partner/stock", label: "Stock", icon: Truck, show: true },
       ]
     : [
     { href: "/", label: "Home", icon: LayoutDashboard, show: true },
-    { href: "/sales", label: "Sales", icon: Receipt, show: can("sales.view.own") },
-    can("sales.create")
-      ? { href: "/incentives/my-incentives", label: "Earnings", icon: Trophy, show: true }
+    can("sales.view.own")
+      ? { href: "/sales", label: "Sales", icon: Receipt, show: true }
       : { href: "/inventory", label: "Stock", icon: Warehouse, show: can("inventory.view") },
+    // the staff app: punch in/out, leave, claims
+    { href: "/me", label: "My HR", icon: Fingerprint, show: can("hr.self") },
+    { href: "/incentives/my-incentives", label: "Earnings", icon: Trophy, show: can("sales.create") && !can("hr.self") },
   ].filter((t) => t.show);
 
   const isOn = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const sellFab = can("sales.create") || isDistributor;
-  const fabHref = isDistributor ? "/orders/new" : "/sales/new";
+  const fabHref = isDistributor ? "/partner/buy" : "/sales/new";
 
   const Tab = ({ href, label, icon: Icon }: { href: string; label: string; icon: any }) => (
     <Link

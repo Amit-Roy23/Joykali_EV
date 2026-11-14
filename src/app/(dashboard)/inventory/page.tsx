@@ -164,7 +164,9 @@ export default function InventoryPage() {
               <option value="ALLOCATED_TO_DEALER">At Dealer (consignment)</option>
               <option value="RESERVED">Reserved on a DO</option>
               <option value="IN_TRANSIT">In Transit</option>
-              <option value="WITH_DISTRIBUTOR">With Distributor</option>
+              <option value="WITH_DISTRIBUTOR">With Distributor (sold to)</option>
+              <option value="WITH_DEALER">With Dealer (bought from distributor)</option>
+              <option value="AT_OUTLET">At a company showroom</option>
               <option value="SOLD">Sold</option>
               <option value="MISSING">Missing (short on GRN)</option>
             </select>
@@ -175,7 +177,10 @@ export default function InventoryPage() {
             >
               <option value="">All Locations</option>
               <option value="WAREHOUSE">Main Warehouse</option>
-              <option value="DEALER">Dealer Outlets</option>
+              <option value="DEALER">Dealers</option>
+              <option value="DISTRIBUTOR">Distributors</option>
+              <option value="OUTLET">Company showrooms</option>
+              <option value="IN_TRANSIT">In transit</option>
             </select>
             <Button size="sm" variant="secondary" onClick={fetchVehicles}>
               Filter

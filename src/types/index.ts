@@ -4,11 +4,31 @@ export type UserRole =
   | "BUSINESS_HEAD"
   | "MANAGING_PARTNER"
   | "ADMIN"
-  /** External channel partner — outside the employee hierarchy. */
-  | "DISTRIBUTOR";
+  /** Company showroom / outlet login (an employee tied to one outlet). */
+  | "OUTLET"
+  /** HR manager: attendance, leave, documents, joining & exit. Not a finance approver. */
+  | "HR_MANAGER"
+  /** External channel partners — outside the employee hierarchy. */
+  | "SUPER_DISTRIBUTOR"
+  | "DISTRIBUTOR"
+  | "DEALER"
+  | "SUB_DEALER";
 
-export const EMPLOYEE_ROLES = ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
-export const ALL_ROLES = [...EMPLOYEE_ROLES, "DISTRIBUTOR"] as const;
+export const EMPLOYEE_ROLES = ["FEC", "OUTLET", "ASM", "HR_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
+export const PARTNER_ROLES = ["SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"] as const;
+export const ALL_ROLES = [...EMPLOYEE_ROLES, ...PARTNER_ROLES] as const;
+export type PartnerRole = (typeof PARTNER_ROLES)[number];
+
+/** Channel partner logins (super distributor, distributor, dealer, sub dealer). */
+export function isPartnerRole(role?: string | null): role is PartnerRole {
+  return !!role && (PARTNER_ROLES as readonly string[]).includes(role);
+}
+/** Which party collection a partner login belongs to. */
+export function partyTypeOfRole(role?: string | null): "DEALER" | "DISTRIBUTOR" | null {
+  if (role === "SUPER_DISTRIBUTOR" || role === "DISTRIBUTOR") return "DISTRIBUTOR";
+  if (role === "DEALER" || role === "SUB_DEALER") return "DEALER";
+  return null;
+}
 
 /** Everything needs BOTH signatures, in this order. Admin cannot approve. */
 export const APPROVAL_CHAIN = ["BUSINESS_HEAD", "MANAGING_PARTNER"] as const;
@@ -20,7 +40,12 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   BUSINESS_HEAD: 3,
   MANAGING_PARTNER: 4,
   ADMIN: 5,
+  OUTLET: 1,
+  HR_MANAGER: 2.5,
+  SUPER_DISTRIBUTOR: 0,
   DISTRIBUTOR: 0,
+  DEALER: 0,
+  SUB_DEALER: 0,
 };
 
 export type Permission =
@@ -72,7 +97,22 @@ export type Permission =
   | "salary.manage"
   | "approvals.sign"
   // --- distributor self-service portal
-  | "portal.access";
+  | "portal.access"
+  // --- channel network (phase 4)
+  | "network.view"
+  | "network.manage"
+  | "kyc.verify"
+  | "target.manage"
+  | "outlet.view"
+  | "outlet.manage"
+  | "partner.sell"
+  | "partner.appoint"
+  // --- HR, attendance & staff self-service (phase 5)
+  | "hr.self"
+  | "hr.manage"
+  | "attendance.team"
+  | "attendance.manage"
+  | "leave.approve";
 
 export type VehicleCategory =
   | "2W"
@@ -92,7 +132,11 @@ export type VehicleStatus =
   /** Received by a distributor against a GRN (sold to the distributor). */
   | "WITH_DISTRIBUTOR"
   /** Reported short on a GRN — under investigation. */
-  | "MISSING";
+  | "MISSING"
+  /** Company stock sitting at a company outlet / showroom. */
+  | "AT_OUTLET"
+  /** Owned by a dealer / sub dealer who bought it from a distributor or dealer. */
+  | "WITH_DEALER";
 
 export type PaymentStatus = "UNPAID" | "PARTIAL" | "PAID";
 

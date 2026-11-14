@@ -39,6 +39,8 @@ export interface ISale extends Document {
   customer: ICustomer;
   vehicle: mongoose.Types.ObjectId;
   dealer?: mongoose.Types.ObjectId | null;
+  /** Company outlet / showroom where the vehicle was billed (counter sale). */
+  outlet?: mongoose.Types.ObjectId | null;
   soldBy: mongoose.Types.ObjectId; // FEC/Employee
   asmAtSale?: mongoose.Types.ObjectId | null; // ASM derived at sale time
   priceBreakdown: IPriceBreakdown;
@@ -105,6 +107,7 @@ const SaleSchema = new Schema<ISale>(
     customer: { type: CustomerSchema, required: true },
     vehicle: { type: Schema.Types.ObjectId, ref: "Vehicle", required: true, index: true },
     dealer: { type: Schema.Types.ObjectId, ref: "Dealer", default: null, index: true },
+    outlet: { type: Schema.Types.ObjectId, ref: "Outlet", default: null, index: true },
     soldBy: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     asmAtSale: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     priceBreakdown: { type: PriceBreakdownSchema, required: true },

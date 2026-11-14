@@ -8,6 +8,12 @@ export type PartyType = "DEALER" | "DISTRIBUTOR";
  * Balance = Σdebit − Σcredit.
  */
 export interface ILedgerEntry extends Document {
+  /**
+   * Whose books the entry sits in. null = the company's books. For network (secondary)
+   * trade it is the supplying partner, e.g. a distributor's account for its dealer.
+   */
+  bookType?: PartyType | null;
+  book?: mongoose.Types.ObjectId | null;
   partyType: PartyType;
   party: mongoose.Types.ObjectId;
   date: Date;
@@ -17,6 +23,7 @@ export interface ILedgerEntry extends Document {
   credit: number; // paise
   narration?: string;
   deliveryOrder?: mongoose.Types.ObjectId | null;
+  partnerSale?: mongoose.Types.ObjectId | null;
   paymentMode?: "CASH" | "UPI" | "BANK" | "CHEQUE";
   createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -24,6 +31,8 @@ export interface ILedgerEntry extends Document {
 
 const LedgerEntrySchema = new Schema<ILedgerEntry>(
   {
+    bookType: { type: String, enum: ["DEALER", "DISTRIBUTOR", null], default: null },
+    book: { type: Schema.Types.ObjectId, default: null, index: true },
     partyType: { type: String, enum: ["DEALER", "DISTRIBUTOR"], required: true },
     party: { type: Schema.Types.ObjectId, required: true, index: true },
     date: { type: Date, required: true, default: Date.now, index: true },
@@ -33,6 +42,7 @@ const LedgerEntrySchema = new Schema<ILedgerEntry>(
     credit: { type: Number, required: true, default: 0, min: 0 },
     narration: { type: String },
     deliveryOrder: { type: Schema.Types.ObjectId, ref: "DeliveryOrder", default: null },
+    partnerSale: { type: Schema.Types.ObjectId, ref: "PartnerSale", default: null },
     paymentMode: { type: String, enum: ["CASH", "UPI", "BANK", "CHEQUE"] },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

@@ -9,8 +9,9 @@ import { calculatePayrollEntry, statutorySettingsFrom } from "./payrollEngine";
 import { recalculateIncentivesForPeriod } from "./incentiveService";
 import { periodFor } from "@/lib/period";
 import { withTransaction } from "@/lib/db";
-import { JWTPayload } from "@/types";
+import { JWTPayload, EMPLOYEE_ROLES } from "@/types";
 import { rupeesToPaise } from "@/lib/money";
+import { hrPayrollInputs, settleHrOnPayrollLock } from "./hrMoneyService";
 import mongoose from "mongoose";
 
 export async function generateDraftPayrollRun(
@@ -26,7 +27,7 @@ export async function generateDraftPayrollRun(
 
   // Refresh incentive ledgers first, outside the payroll transaction, so the
   // run is generated from up-to-date figures (and the transaction stays short).
-  const activeForRecalc = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }, { _id: 1 }).lean();
+  const activeForRecalc = await User.find({ status: "ACTIVE", role: { $in: [...EMPLOYEE_ROLES] } }, { _id: 1 }).lean();
   await recalculateIncentivesForPeriod(
     activeForRecalc.map((e: any) => e._id),
     periodStart,
@@ -46,7 +47,7 @@ export async function generateDraftPayrollRun(
 
     // Fetch active employees
     // Employees only — distributor logins are external partners, not on payroll.
-    const employees = await User.find({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }).session(session ?? null).lean();
+    const employees = await User.find({ status: "ACTIVE", role: { $in: [...EMPLOYEE_ROLES] } }).session(session ?? null).lean();
     const periodEnd = periodFor(year, month).end;
 
     // Create or find PayrollRun
@@ -116,10 +117,20 @@ export async function generateDraftPayrollRun(
       }).session(session ?? null);
 
       const workingDays = existingEntry?.workingDays || daysInMonth;
-      const lopDays = existingEntry?.lopDays || 0;
-      const adjustments = existingEntry?.adjustments || [];
+      // HR feeds: attendance loss of pay, approved overtime, approved claims, loan / advance EMIs.
+      const hr = await hrPayrollInputs(emp, period, { basic: salaryStruct.basic, otherAllowances: salaryStruct.otherAllowances }, emp.role);
+      const manualLop = existingEntry?.hrAuto?.lopFromAttendance ? 0 : existingEntry?.lopDays || 0;
+      const lopDays = hr.lopDays != null ? hr.lopDays : manualLop;
+      const manualAdjustments = (existingEntry?.adjustments || []).filter((a: any) => !a.auto);
+      const systemUser = new mongoose.Types.ObjectId(user.userId);
+      const autoAdjustments = [
+        ...(hr.otPay > 0 ? [{ amount: hr.otPay, reason: `Overtime ${(hr.otMinutes / 60).toFixed(1)} h (approved)`, addedBy: systemUser, addedAt: new Date(), auto: true }] : []),
+        ...hr.claims.map((c) => ({ amount: c.amount, reason: `Reimbursement ${c.code}`, addedBy: systemUser, addedAt: new Date(), auto: true })),
+      ];
+      const adjustments = [...manualAdjustments, ...autoAdjustments];
       const tds = existingEntry?.deductions?.tds || 0;
-      const advanceRecovery = existingEntry?.deductions?.advanceRecovery || 0;
+      const loanRecovery = hr.loans.reduce((s, l) => s + l.amount, 0);
+      const advanceRecovery = hr.loans.length ? loanRecovery : existingEntry?.hrAuto?.loans?.length ? 0 : existingEntry?.deductions?.advanceRecovery || 0;
 
       const calc = calculatePayrollEntry({
         salary: {
@@ -157,6 +168,14 @@ export async function generateDraftPayrollRun(
           earnings: calc.earnings,
           deductions: calc.deductions,
           adjustments,
+          hrAuto: {
+            lopFromAttendance: hr.lopDays != null,
+            attendance: hr.attendance,
+            otMinutes: hr.otMinutes,
+            otPay: hr.otPay,
+            claims: hr.claims,
+            loans: hr.loans,
+          },
           grossPay: calc.grossPay,
           totalDeductions: calc.totalDeductions,
           netPay: calc.netPay,
@@ -317,6 +336,10 @@ export async function lockPayrollRun(
     run.lockedBy = new mongoose.Types.ObjectId(user.userId);
     run.lockedAt = new Date();
     await run.save({ session });
+
+    // Book loan / advance recoveries and mark reimbursed claims as paid.
+    const entries = await PayrollEntry.find({ payrollRun: run._id }).select("employee hrAuto").session(session ?? null).lean();
+    await settleHrOnPayrollLock(`${run.year}-${String(run.month).padStart(2, "0")}`, run._id, entries as any, session);
 
     // Lock all associated IncentiveLedger documents for that period
     const period = `${run.year}-${String(run.month).padStart(2, "0")}`;

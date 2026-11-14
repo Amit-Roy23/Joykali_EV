@@ -12,7 +12,11 @@ export interface IStockMovement extends Document {
     | "DO_RELEASE"
     | "DISPATCH"
     | "DELIVERY"
-    | "SHORTAGE";
+    | "SHORTAGE"
+    | "OUTLET_TRANSFER"
+    | "NETWORK_SALE"
+    | "NETWORK_RECEIPT"
+    | "PARTNER_RETAIL";
   fromLocation: string;
   toLocation: string;
   performedBy: mongoose.Types.ObjectId;
@@ -27,7 +31,7 @@ const StockMovementSchema = new Schema<IStockMovement>(
     movementType: {
       type: String,
       required: true,
-      enum: ["INWARD", "DEALER_ALLOCATION", "TRANSFER", "SALE", "RETURN", "DO_RESERVE", "DO_RELEASE", "DISPATCH", "DELIVERY", "SHORTAGE"],
+      enum: ["INWARD", "DEALER_ALLOCATION", "TRANSFER", "SALE", "RETURN", "DO_RESERVE", "DO_RELEASE", "DISPATCH", "DELIVERY", "SHORTAGE", "OUTLET_TRANSFER", "NETWORK_SALE", "NETWORK_RECEIPT", "PARTNER_RETAIL"],
       index: true,
     },
     fromLocation: { type: String, required: true },

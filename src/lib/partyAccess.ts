@@ -1,24 +1,61 @@
 import mongoose from "mongoose";
-import { JWTPayload } from "@/types";
+import { JWTPayload, isPartnerRole, partyTypeOfRole } from "@/types";
 import { User } from "@/models/User";
 import { Dealer } from "@/models/Dealer";
 import { Distributor } from "@/models/Distributor";
 
 export type PartyType = "DEALER" | "DISTRIBUTOR";
 
-/** The distributor a DISTRIBUTOR login acts for (null for everyone else). */
+/** The distributor a SUPER_DISTRIBUTOR / DISTRIBUTOR login acts for (null for everyone else). */
 export async function distributorOf(user: JWTPayload): Promise<mongoose.Types.ObjectId | null> {
-  if (user.role !== "DISTRIBUTOR") return null;
+  if (partyTypeOfRole(user.role) !== "DISTRIBUTOR") return null;
   const u = await User.findById(user.userId).select("distributor status").lean();
   if (!u || u.status !== "ACTIVE") return null;
   return (u.distributor as mongoose.Types.ObjectId) || null;
+}
+
+/** The party (distributor or dealer record) a partner login acts for. */
+export async function myParty(
+  user: JWTPayload
+): Promise<{ type: PartyType; id: mongoose.Types.ObjectId } | null> {
+  const type = partyTypeOfRole(user.role);
+  if (!type) return null;
+  const u: any = await User.findById(user.userId).select("distributor dealer status").lean();
+  if (!u || u.status !== "ACTIVE") return null;
+  const id = type === "DISTRIBUTOR" ? u.distributor : u.dealer;
+  return id ? { type, id } : null;
+}
+
+/** All parties below a partner: distributors under a super distributor, dealers, sub dealers. */
+export async function downline(
+  type: PartyType,
+  id: mongoose.Types.ObjectId | string
+): Promise<{ DEALER: mongoose.Types.ObjectId[]; DISTRIBUTOR: mongoose.Types.ObjectId[] }> {
+  const oid = new mongoose.Types.ObjectId(String(id));
+  const out = { DEALER: [] as mongoose.Types.ObjectId[], DISTRIBUTOR: [] as mongoose.Types.ObjectId[] };
+  let distributors: mongoose.Types.ObjectId[] = [];
+  let dealers: mongoose.Types.ObjectId[] = [];
+  if (type === "DISTRIBUTOR") {
+    distributors = (await Distributor.find({ parent: oid }).select("_id").lean()).map((d: any) => d._id);
+    out.DISTRIBUTOR = distributors;
+    dealers = (await Dealer.find({ parentDistributor: { $in: [oid, ...distributors] } }).select("_id").lean()).map((d: any) => d._id);
+  } else {
+    dealers = [];
+  }
+  const parentDealers = type === "DEALER" ? [oid, ...dealers] : dealers;
+  const subs = parentDealers.length
+    ? (await Dealer.find({ parentDealer: { $in: parentDealers } }).select("_id").lean()).map((d: any) => d._id)
+    : [];
+  const seen = new Set<string>();
+  out.DEALER = [...dealers, ...subs].filter((d) => (seen.has(String(d)) ? false : (seen.add(String(d)), true)));
+  return out;
 }
 
 /**
  * Which dealers/distributors a user may see and act for:
  *  - Admin, Managing Partner, Business Head: all
  *  - ASM: dealers and distributors assigned to them
- *  - Distributor login: only their own distributor
+ *  - Partner logins: only their own record (their downline is reached through the network APIs)
  *  - FEC: none
  * Returns `null` for "all", otherwise the allowed ids per party type.
  */
@@ -26,9 +63,9 @@ export async function partyScope(
   user: JWTPayload
 ): Promise<null | { DEALER: mongoose.Types.ObjectId[]; DISTRIBUTOR: mongoose.Types.ObjectId[] }> {
   if (["ADMIN", "MANAGING_PARTNER", "BUSINESS_HEAD"].includes(user.role)) return null;
-  if (user.role === "DISTRIBUTOR") {
-    const d = await distributorOf(user);
-    return { DEALER: [], DISTRIBUTOR: d ? [d] : [] };
+  if (isPartnerRole(user.role)) {
+    const me = await myParty(user);
+    return { DEALER: me?.type === "DEALER" ? [me.id] : [], DISTRIBUTOR: me?.type === "DISTRIBUTOR" ? [me.id] : [] };
   }
   if (user.role === "ASM") {
     const uid = new mongoose.Types.ObjectId(user.userId);

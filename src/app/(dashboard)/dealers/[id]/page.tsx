@@ -1,6 +1,7 @@
 "use client";
 import { useSession } from "@/components/layout/session";
 import { CreditPanel } from "@/components/party";
+import { DepositPanel, KycPanel } from "@/components/network";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -130,6 +131,11 @@ export default function DealerDetailPage({
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
+        <KycPanel partyType="DEALER" partyId={String(dealer._id)} canUpload={can("dealer.manage") || can("kyc.verify")} />
+        <DepositPanel partyType="DEALER" partyId={String(dealer._id)} canRecord={can("ledger.manage") && !dealer.parentDistributor && !dealer.parentDealer} />
       </div>
 
       {/* Vehicles In Stock at Dealer */}

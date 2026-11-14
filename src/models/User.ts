@@ -11,6 +11,24 @@ export interface IUser extends Document {
   dealer?: mongoose.Types.ObjectId | null;
   /** For DISTRIBUTOR logins: the distributor company this user acts for. */
   distributor?: mongoose.Types.ObjectId | null;
+  /** For OUTLET logins (and FECs posted at a showroom): the company outlet. */
+  outlet?: mongoose.Types.ObjectId | null;
+  department?: mongoose.Types.ObjectId | null;
+  shift?: mongoose.Types.ObjectId | null;
+  /** FIELD staff punch anywhere (location recorded); OFFICE staff must be inside the office radius. */
+  attendanceMode?: "FIELD" | "OFFICE";
+  profile?: {
+    dob?: string;
+    gender?: string;
+    bloodGroup?: string;
+    address?: string;
+    emergencyName?: string;
+    emergencyPhone?: string;
+    emergencyRelation?: string;
+    photo?: mongoose.Types.ObjectId | null;
+  };
+  noticeDays?: number;
+  exitDate?: Date | null;
   designation: string;
   joiningDate: Date;
   status: "ACTIVE" | "INACTIVE";
@@ -32,12 +50,28 @@ const UserSchema = new Schema<IUser>(
     role: {
       type: String,
       required: true,
-      enum: ["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "DISTRIBUTOR"],
+      enum: ["FEC", "OUTLET", "ASM", "HR_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"],
       index: true,
     },
     reportsTo: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     dealer: { type: Schema.Types.ObjectId, ref: "Dealer", default: null },
     distributor: { type: Schema.Types.ObjectId, ref: "Distributor", default: null, index: true },
+    outlet: { type: Schema.Types.ObjectId, ref: "Outlet", default: null, index: true },
+    department: { type: Schema.Types.ObjectId, ref: "Department", default: null, index: true },
+    shift: { type: Schema.Types.ObjectId, ref: "Shift", default: null },
+    attendanceMode: { type: String, enum: ["FIELD", "OFFICE"], default: "FIELD" },
+    profile: {
+      dob: String,
+      gender: String,
+      bloodGroup: String,
+      address: String,
+      emergencyName: String,
+      emergencyPhone: String,
+      emergencyRelation: String,
+      photo: { type: Schema.Types.ObjectId, ref: "StoredFile", default: null },
+    },
+    noticeDays: { type: Number, default: 30 },
+    exitDate: { type: Date, default: null },
     designation: { type: String, required: true, trim: true },
     joiningDate: { type: Date, required: true, default: Date.now },
     status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE", index: true },

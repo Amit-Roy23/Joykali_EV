@@ -25,10 +25,6 @@ import {
 export const maxDuration = 60;
 
 async function canSee(user: any, d: any) {
-  if (user.role === "DISTRIBUTOR") {
-    const own = await distributorOf(user);
-    return d.partyType === "DISTRIBUTOR" && !!own && String(own) === String(d.party);
-  }
   return canAccessParty(user, d.partyType, d.party);
 }
 

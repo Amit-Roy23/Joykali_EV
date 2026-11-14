@@ -10,7 +10,7 @@ import { PayrollEntry } from "@/models/PayrollEntry";
 import { VehicleModel } from "@/models/VehicleModel";
 import { getTeamUserIds } from "@/lib/rbac";
 import { periodFor, periodOf, PeriodInfo } from "@/lib/period";
-import { JWTPayload } from "@/types";
+import { isPartnerRole, JWTPayload, EMPLOYEE_ROLES } from "@/types";
 import { ChannelOrder } from "@/models/ChannelOrder";
 import { DeliveryOrder } from "@/models/DeliveryOrder";
 import { FleetVehicle } from "@/models/FleetVehicle";
@@ -145,32 +145,12 @@ export async function getDashboardData(user: JWTPayload) {
   const uid = new mongoose.Types.ObjectId(user.userId);
   const inMonth = (p: PeriodInfo) => ({ $gte: p.start, $lte: p.end });
 
-  // ------------------------------------------------------------- DISTRIBUTOR
-  // External partner: only their own account — never company figures.
-  if (user.role === "DISTRIBUTOR") {
-    const distId = await distributorOf(user);
-    if (!distId) return { role: "DISTRIBUTOR", period: cur.period, distributor: null };
-    const [dist, credit, orders, inTransit, invoices] = await Promise.all([
-      Distributor.findById(distId).select("name distributorCode city").lean(),
-      creditSummary("DISTRIBUTOR", distId),
-      ChannelOrder.find({ partyType: "DISTRIBUTOR", party: distId }).sort({ createdAt: -1 }).limit(6).lean(),
-      DeliveryOrder.find({ partyType: "DISTRIBUTOR", party: distId, status: "DISPATCHED" })
-        .select("doCode lines loading.registrationNo loading.driverName loading.driverPhone dispatch.at document.number ewayBill.validUpto")
-        .sort({ "dispatch.at": -1 })
-        .lean(),
-      LedgerEntry.find({ partyType: "DISTRIBUTOR", party: distId }).sort({ date: -1 }).limit(6).lean(),
-    ]);
-    return {
-      role: "DISTRIBUTOR",
-      period: cur.period,
-      distributor: dist,
-      credit,
-      orders,
-      awaitingApproval: orders.filter((o) => o.status === "PENDING_APPROVAL").length,
-      inTransit,
-      ledger: invoices,
-    };
-  }
+  // ---------------------------------------------------------------- PARTNERS
+  // External partners: only their own account and their own downline — never company figures.
+  if (isPartnerRole(user.role)) return partnerDashboard(user, cur);
+
+  // ------------------------------------------------------------------ OUTLET
+  if (user.role === "OUTLET") return outletDashboard(user, cur, periods);
 
   // --------------------------------------------------------------------- FEC
   if (user.role === "FEC") {
@@ -295,7 +275,7 @@ export async function getDashboardData(user: JWTPayload) {
       Vehicle.countDocuments({ status: "IN_STOCK" }),
       Vehicle.countDocuments({ status: "ALLOCATED_TO_DEALER" }),
       Dealer.countDocuments({ status: "ACTIVE" }),
-      User.countDocuments({ status: "ACTIVE", role: { $ne: "DISTRIBUTOR" } }),
+      User.countDocuments({ status: "ACTIVE", role: { $in: [...EMPLOYEE_ROLES] } }),
       IncentiveLedger.aggregate([{ $match: { period: cur.period } }, { $group: { _id: null, t: { $sum: "$totalEarned" } } }]),
       Sale.aggregate([
         { $match: { status: "DELIVERED", saleDate: { $gte: periods[3].start, $lte: cur.end } } },
@@ -409,4 +389,108 @@ export async function getDashboardData(user: JWTPayload) {
     actions,
     recentSales: recent,
   };
+}
+
+
+async function partnerDashboard(user: JWTPayload, cur: PeriodInfo) {
+  const { myParty } = await import("@/lib/partyAccess");
+  const { getParty, supplierRef, tierOf } = await import("./creditService");
+  const { directChildren, TIER_LABEL, ownedStockFilter } = await import("./networkService");
+  const { achievement, kycStatus } = await import("./partnerAdminService");
+  const { NetworkOrder } = await import("@/models/NetworkOrder");
+  const { PartnerSale } = await import("@/models/PartnerSale");
+  const { PartnerTarget } = await import("@/models/PartnerTarget");
+  const { PartyDocument } = await import("@/models/PartyDocument");
+  const me = await myParty(user);
+  if (!me) return { role: "PARTNER", period: cur.period, me: null };
+  const doc: any = await getParty(me.type, me.id);
+  if (!doc) return { role: "PARTNER", period: cur.period, me: null };
+  const tier = tierOf(me.type, doc);
+  const sup = supplierRef(me.type, doc);
+  const supplier: any = sup ? await getParty(sup.type, sup.id) : null;
+
+  const [credit, kids, docs, target] = await Promise.all([
+    creditSummary(me.type, me.id).catch(() => null),
+    directChildren(me.type, me.id),
+    PartyDocument.find({ partyType: me.type, party: me.id }).lean(),
+    PartnerTarget.findOne({ partyType: me.type, party: me.id, period: cur.period }).lean(),
+  ]);
+
+  // Orders I placed and stock on its way to me — from the company or from my supplier.
+  let myOrders: any[] = [];
+  let incoming: any[] = [];
+  if (!sup) {
+    const [orders, dos] = await Promise.all([
+      ChannelOrder.find({ partyType: me.type, party: me.id }).sort({ createdAt: -1 }).limit(6).lean(),
+      DeliveryOrder.find({ partyType: me.type, party: me.id, status: "DISPATCHED" }).sort({ "dispatch.at": -1 }).lean(),
+    ]);
+    myOrders = orders.map((o: any) => ({ id: o._id, code: o.orderCode, status: o.status, total: o.totalValue, units: o.lines.reduce((s: number, l: any) => s + l.quantity, 0), at: o.createdAt, href: `/orders/${o._id}` }));
+    incoming = dos.map((d: any) => ({ id: d._id, code: d.doCode, from: "Joykali EV warehouse", units: d.vehicles?.length || 0, truck: d.loading?.registrationNo, at: d.dispatch?.at, href: `/dispatch/${d._id}` }));
+  } else {
+    const [orders, sales] = await Promise.all([
+      NetworkOrder.find({ buyerType: me.type, buyer: me.id }).sort({ createdAt: -1 }).limit(6).lean(),
+      PartnerSale.find({ buyerKind: me.type, buyer: me.id, status: "IN_TRANSIT" }).sort({ saleDate: -1 }).lean(),
+    ]);
+    myOrders = orders.map((o: any) => ({ id: o._id, code: o.orderCode, status: o.status, total: o.totalValue, units: o.lines.reduce((s: number, l: any) => s + l.quantity, 0), at: o.createdAt, href: `/partner/orders/${o._id}` }));
+    incoming = sales.map((x: any) => ({ id: x._id, code: x.invoiceNo || x.saleCode, from: x.sellerName, units: x.lines.length, at: x.saleDate, href: `/partner/sales/${x._id}` }));
+  }
+
+  // My own trade this month (sales I made).
+  const [monthSales, ownedStock, consignment, pendingFromNetwork, receivable] = await Promise.all([
+    PartnerSale.find({ sellerType: me.type, seller: me.id, status: { $ne: "CANCELLED" }, saleDate: { $gte: cur.start, $lte: cur.end } }).select("buyerKind lines totalValue").lean(),
+    Vehicle.countDocuments(ownedStockFilter(me.type, me.id)),
+    me.type === "DEALER" ? Vehicle.countDocuments({ status: "ALLOCATED_TO_DEALER", currentLocationDealer: me.id }) : Promise.resolve(0),
+    NetworkOrder.countDocuments({ sellerType: me.type, seller: me.id, status: { $in: ["PLACED", "ACCEPTED", "PARTIALLY_FULFILLED"] } }),
+    LedgerEntry.aggregate([
+      { $match: { bookType: me.type, book: me.id } },
+      { $group: { _id: null, bal: { $sum: { $subtract: ["$debit", "$credit"] } } } },
+    ]),
+  ]);
+  const retail = monthSales.filter((x: any) => x.buyerKind === "CUSTOMER");
+  const channel = monthSales.filter((x: any) => x.buyerKind !== "CUSTOMER");
+  const ledger = await LedgerEntry.find({ partyType: me.type, party: me.id, ...(sup ? { bookType: sup.type, book: sup.id } : { book: null }) })
+    .sort({ date: -1, createdAt: -1 })
+    .limit(6)
+    .lean();
+  const ach = await achievement(me.type, doc, cur.period);
+
+  return {
+    role: "PARTNER",
+    period: cur.period,
+    me: { type: me.type, id: me.id, tier, tierLabel: TIER_LABEL[tier], name: doc.name, code: doc.code, city: doc.city, status: doc.status },
+    supplier: supplier ? { name: supplier.name, code: supplier.code } : { name: "Joykali EV Mobility", code: "Company" },
+    buysFromCompany: !sup,
+    credit,
+    kyc: kycStatus(docs as any),
+    myOrders,
+    incoming,
+    stock: { owned: ownedStock, consignment },
+    month: {
+      retailUnits: retail.reduce((s: number, x: any) => s + x.lines.length, 0),
+      retailValue: retail.reduce((s: number, x: any) => s + x.totalValue, 0),
+      channelUnits: channel.reduce((s: number, x: any) => s + x.lines.length, 0),
+      channelValue: channel.reduce((s: number, x: any) => s + x.totalValue, 0),
+    },
+    network: {
+      children: kids.length,
+      pendingOrders: pendingFromNetwork,
+      receivable: Math.max(0, receivable[0]?.bal || 0),
+    },
+    target: target ? { units: (target as any).targetUnits, achieved: ach.units, commissionPerUnit: (target as any).commissionPerUnit } : null,
+    achieved: ach,
+    ledger,
+  };
+}
+
+async function outletDashboard(user: JWTPayload, cur: PeriodInfo, periods: PeriodInfo[]) {
+  const { outletOfUser, outletDay } = await import("./partnerAdminService");
+  const { Outlet } = await import("@/models/Outlet");
+  const outletId = await outletOfUser(user);
+  if (!outletId) return { role: "OUTLET", period: cur.period, outlet: null };
+  const [outlet, day, trend] = await Promise.all([
+    Outlet.findById(outletId).lean(),
+    outletDay(outletId),
+    monthlyTrend({ outlet: outletId }, periods),
+  ]);
+  return { role: "OUTLET", period: cur.period, outlet, ...day, trend };
 }

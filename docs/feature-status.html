@@ -1,0 +1,286 @@
+<title>Joykali Feature Status</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: one reading column; summary strip, phase plan, then a filterable checklist per client section */
+:root{
+  --bg:#f6f7fb; --surface:#ffffff; --fg:#141a2b; --muted:#5b6478; --line:#dfe3ec;
+  --accent:#2f5bd3; --accent-soft:#e7edfc;
+  --done:#127a4b; --done-bg:#e3f5ec; --part:#9a5b00; --part-bg:#fdf1db; --none:#b42343; --none-bg:#fbe6ea;
+  --display:"Archivo",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1320; --surface:#171c2c; --fg:#e8ebf3; --muted:#9aa3b8; --line:#2a3148;
+  --accent:#7d9cf5; --accent-soft:#1f2a4d;
+  --done:#5fd49a; --done-bg:#12301f; --part:#f2b65a; --part-bg:#352610; --none:#f38aa0; --none-bg:#3a1520; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1320; --surface:#171c2c; --fg:#e8ebf3; --muted:#9aa3b8; --line:#2a3148;
+  --accent:#7d9cf5; --accent-soft:#1f2a4d;
+  --done:#5fd49a; --done-bg:#12301f; --part:#f2b65a; --part-bg:#352610; --none:#f38aa0; --none-bg:#3a1520; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.55}
+.wrap{max-width:980px;margin:0 auto;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:clamp(26px,4vw,36px);font-weight:800;letter-spacing:-.01em}
+h2{font-size:20px;font-weight:700}
+.lede{color:var(--muted);max-width:68ch;margin:6px 0 0}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:600}
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.tile b{display:block;font-family:var(--display);font-size:28px;font-variant-numeric:tabular-nums}
+.tile span{color:var(--muted);font-size:13px}
+.bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--line);margin-top:4px}
+.bar i{display:block}
+.phases{display:grid;gap:10px}
+.phase{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:start;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.phase .no{font-family:var(--mono);font-size:12px;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:3px 7px;white-space:nowrap}
+.phase.now{border-color:var(--accent)}
+.phase p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding-block:10px;z-index:5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.filters button,.filters input{font:inherit;font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:99px;padding:6px 14px;cursor:pointer}
+.filters input{cursor:text;flex:1 1 180px;min-width:0;border-radius:10px}
+.filters button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.filters button:focus-visible,.filters input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section.sec{display:grid;gap:8px}
+.sec-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px;border-bottom:2px solid var(--fg);padding-bottom:6px}
+.sec-head small{color:var(--muted);font-variant-numeric:tabular-nums}
+ul.items{list-style:none;margin:0;padding:0;display:grid;gap:0}
+ul.items li{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:12px;align-items:start;padding:8px 2px;border-bottom:1px solid var(--line)}
+.st{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;border-radius:6px;padding:3px 0;text-align:center}
+.st.D{color:var(--done);background:var(--done-bg)} .st.P{color:var(--part);background:var(--part-bg)} .st.N{color:var(--none);background:var(--none-bg)}
+.name{font-weight:500}
+.name .new{display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;line-height:14px;text-align:center;margin-right:6px;vertical-align:1px}
+.note{display:block;color:var(--muted);font-size:13px}
+.ph{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:nowrap}
+.foot{color:var(--muted);font-size:13px}
+@media (max-width:640px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))} ul.items li{grid-template-columns:72px minmax(0,1fr)} .ph{grid-column:2}}
+@media (prefers-reduced-motion:no-preference){ul.items li{transition:background .15s} ul.items li:hover{background:var(--surface)}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Joykali EV Mobility · client feature list review</div>
+    <h1>What is built, what is partly built, what is still to build</h1>
+    <p class="lede">Every line from the client's feature sheet, checked against the software as it stands today. A blue dot marks the sheet's own "newly added" features. "Partly" means the core works but something the sheet asks for is missing; the note says what. Sections 3, 15, 17 and 18 were not in the photos.</p>
+  </header>
+
+  <div class="summary" id="summary"></div>
+
+  <section class="phases" aria-labelledby="plan">
+    <h2 id="plan">Build plan</h2>
+    <div id="phases"></div>
+  </section>
+
+  <div class="filters" role="toolbar" aria-label="Filter features">
+    <button id="f-all" data-f="all" aria-pressed="true">All</button>
+    <button id="f-D" data-f="D" aria-pressed="false">Done</button>
+    <button id="f-P" data-f="P" aria-pressed="false">Partly</button>
+    <button id="f-N" data-f="N" aria-pressed="false">Not done</button>
+    <input id="q" type="search" placeholder="Search a feature" aria-label="Search a feature">
+  </div>
+
+  <div id="list" style="display:grid;gap:28px"></div>
+  <p class="foot">Status as of 14 Nov 2026 after phase 5, branch claude/great-ramanujan-89l6bi.</p>
+</div>
+
+<script>
+const PHASES=[
+ ["4","Channel network and portals","Super Distributor, Sub Dealer, Dealer and Outlet/Showroom logins; territories; business chain tree; network orders and sales with receipt; KYC; security deposits; targets and commission."],
+ ["5","HR, attendance and staff app","Mobile punch with selfie and GPS, biometric import, shifts, duty roster, holidays, leave with balances, corrections, overtime, late/early report, advances and loans, expense claims, documents, ID cards, resignation with full and final settlement, staff targets and performance, HR Manager login, installable staff app, idle logout."],
+ ["6","Products, pricing and billing","Batteries, chargers, spares and accessories alongside vehicles; voltage, Ah and warranty terms; photos; price levels with revision history; schemes and offers applied automatically; quotation and proforma; QR labels; old battery exchange; sales returns; credit and debit notes; payment against invoice."],
+ ["7","Warranty and service","Customer and Service Engineer logins; warranty activation by QR scan; complaints with time limits and escalation; claims needing approval; service centres and job sheets; replacement linked to the old serial; pro-rata warranty."],
+ ["8","Accounts and finance","Accounts login; automatic double-entry books; cash and bank books; journal and contra; trial balance, profit and loss, balance sheet, cash flow; expenses; cheques; bank reconciliation; TDS/TCS; GST reports; ageing; fixed assets; outlet cash closing; freight and transporter ledger; financial year lock."],
+ ["9","Warehouse, security and admin tools","Store login; several warehouses; stock transfer, adjustment, audit and counting by scan; ageing and valuation; alerts; notifications; scheduled reports; budget against actual; branches; two-factor login, login history, login alerts, device restriction, backups and restore, bulk import, Bengali/Hindi screens, dashboard customisation."],
+ ["10","Factory","Factory Manager and QC Engineer logins; raw material, work in progress and finished stock; batches; production; QC pass/fail. Only needed if Joykali manufactures."]
+];
+// [name, status D/P/N, note, new?, phase]
+const S=[
+["1. Login system",[
+["Super Admin login","D","Admin: full control, user and role management.",0],
+["Factory Manager login","N","",0,10],
+["Super Distributor login","D","Buys from the company, appoints and supplies its distributors.",0],
+["Distributor login","D","Orders, credit, deliveries, GRN, ledger.",0],
+["Sub Dealer login","D","Buys from its dealer or distributor, sells to customers.",0],
+["Dealer login","D","Orders, stock, receipts, sales, own sub dealers, statement.",0],
+["Customer login","N","",0,7],
+["Outlet / Showroom login","D","Counter billing from showroom stock, transfers, day closing.",1],
+["Store / Warehouse login","P","Warehouse work is done by staff with dispatch rights; no separate store role.",1,9],
+["QC Engineer login","N","",1,10],
+["Accounts login","N","",1,8],
+["HR Manager login","D","Attendance, leave, documents, joining and exits; no money approvals.",1],
+["Service Engineer login","N","",1,7],
+["Staff / Employee login","D","FEC, ASM, Business Head and Managing Partner, each with own payslips and incentives.",1]]],
+["2. Admin panel",[
+["Complete company dashboard","D","",0],
+["Total sales report","D","Sales register in Excel.",0],
+["Total purchase report","D","",0],
+["Total production report","N","",0,10],
+["Total stock report","D","",0],
+["All distributor management","D","",0],
+["All dealer management","D","",0],
+["Staff and employee management","D","",0],
+["User login and permission management","D","Editable role and permission matrix.",0],
+["Accounts and finance management","P","Party ledgers and receipts only; no books of account.",0,8],
+["Profit and loss report","N","",0,8],
+["GST and tax management","P","GST is calculated on every invoice; no GST returns reports.",0,8],
+["Outstanding payment report","P","Outstanding and overdue shown per party; no combined report.",0,8],
+["Company expenses management","N","",0,8],
+["Target and achievement report","D","Monthly partner targets with achievement and ranking.",0],
+["Daily, weekly, monthly and yearly reports","P","Monthly views only.",0,9],
+["All branch management","N","",0,9],
+["Notification and announcement system","N","",0,9],
+["Audit log and activity tracking","D","",0],
+["Complete business analytics","P","Dashboard charts; deeper analytics come with later phases.",0,9],
+["Multi-level approval (orders, credit, claims, expenses)","D","Orders, credit, schemes, payroll, salary, partner commission, advances, expense claims and final settlements all need Business Head then Managing Partner. Warranty claims will follow the same rule.",1],
+["Outlet / Showroom management","D","Showrooms with their own stock, staff and branch transfers.",1],
+["Zone, district and territory master","D","Zone → district → area; one distributor per area.",1],
+["Price list, scheme and offer control","P","Dealer and distributor price per model; no offers.",1,6],
+["Company profile, document numbering and print format","P","Profile and fixed numbering series; not configurable.",1,9],
+["Budget vs actual comparison","N","",1,9],
+["Scheduled reports sent to management","N","",1,9],
+["Business chain tree view (Super Distributor to Dealer)","D","Live tree with stock and dues at every level.",1]]],
+["4. Inventory and warehouse",[
+["Raw material stock","N","",0,10],["Work in progress stock","N","",0,10],["Finished battery stock","N","Only vehicles are stocked today.",0,6],
+["Model-wise stock","D","",0],["Serial number-wise stock","D","Chassis, motor and battery numbers.",0],
+["Barcode and QR code system","N","Serials are typed or scanned as text; no labels.",0,6],["Batch-wise stock","N","",0,10],
+["Stock transfer","P","Warehouse ↔ showrooms and down the channel; several warehouses come later.",0,9],
+["Stock adjustment","N","",0,9],["Minimum stock alert","N","",0,9],["Damaged product management","N","",0,9],
+["Warehouse management","P","One warehouse.",0,9],["Stock audit","N","",0,9],["Daily stock report","P","Stock report on demand, not daily.",0,9],
+["Multi-warehouse and outlet-wise stock","P","Stock by warehouse, showroom, distributor and dealer; one warehouse only.",1,9],
+["Stock in transit tracking","D","",1],["Stock ageing (oldest stock sold first)","N","",1,9],["Stock valuation report","N","",1,9],
+["Stock counting by scanning","N","",1,9],["Old / exchange battery and scrap stock","N","",1,6],["Stored battery recharge reminder","N","",1,9]]],
+["5. Product management",[
+["Product category management","P","Fixed vehicle categories (2W, 3W, e-rickshaw, loader).",0,6],
+["Electric scooty battery","N","",0,6],["Inverter battery","N","",0,6],["Solar battery","N","",0,6],["Motorcycle battery","N","",0,6],
+["Custom battery manufacturing","N","",0,10],["Product model management","D","",0],["Voltage and Ah specification","N","Only battery type and range.",0,6],
+["Product MRP management","P","Ex-showroom price per model.",0,6],["Dealer price management","D","",0],["Distributor price management","D","",0],
+["Warranty management","N","",0,7],["Product catalogue","P","Model list inside the app; not shown to dealers.",0,6],
+["Product QR code and serial number","P","Serials yes; QR no.",0,6],["E-rickshaw battery","N","",1,6],["Charger, spare parts and accessories","N","Charger number recorded on the vehicle only.",1,6],
+["Super distributor and sub dealer price levels","N","",1,6],["Scheme, discount and offer management","N","",1,6],["Price revision history","N","",1,6],["Product photos and specification sheet","N","",1,6]]],
+["6. Sales and order management",[
+["New order booking","D","",0],["Dealer-wise order","D","",0],["Distributor-wise order","D","",0],["Sub dealer-wise order","D","",0],
+["Online order management","D","Distributor portal.",0],["Order approval system","D","Business Head then Managing Partner.",0],["Order processing","D","",0],
+["Order cancellation","D","",0],["Order tracking","D","",0],["Invoice generation","D","GST tax invoice PDF.",0],["E-way bill management","D","Portal upload file and EWB number check before dispatch.",0],
+["GST invoice","D","CGST + SGST or IGST by state.",0],["Delivery challan","D","",0],["Sales return","P","Retail sale cancel only; no channel returns.",0,6],
+["Credit and debit note","P","Automatic credit note for short delivery; no manual notes.",0,6],["Pending order report","P","Order list filter; no report export.",0,6],
+["Quotation and proforma invoice","N","",1,6],["Outlet counter sale (retail billing)","D","Showroom login bills its own floor stock.",1],
+["Credit limit check before order approval","D","Checked when placed, at final approval and at dispatch.",1],
+["Scheme and discount applied automatically","N","",1,6],["Old battery exchange adjustment","N","",1,6],
+["Part dispatch and balance order tracking","D","",1],["Payment collection against invoice","P","Payments settle oldest dues first; not tied to a chosen invoice.",1,6],
+["Salesperson-wise and area-wise sales report","P","Salesperson yes; area report next.",1,9]]],
+["7. Super distributor management",[
+["Super distributor registration","D","",0],["KYC document upload","D","GST, PAN, Aadhaar, licence, cheque, agreement; company verifies.",0],["Agreement upload","D","",0],["District and area allocation","D","",0],
+["Distributor appointment","D","Starts pending until KYC is verified.",0],["Distributor-wise sales report","P","On screen by buyer; Excel export comes with the reports work.",0,9],["Distributor-wise stock report","P","Stock per partner in the network tree; export next.",0,9],["Product order management","D","",0],
+["Payment collection","D","",0],["Credit limit management","D","The supplying partner sets its buyers' limits.",0],["Sales target management","D","",0],["Commission management","D","Per-unit commission once the target is met, paid as a credit note.",0],
+["Incentive management","D","",0],["Outstanding report","P","Dues per partner in the tree; ageing report in phase 7.",0,9],["Performance ranking","D","",0],
+["Own dashboard with complete network view","D","",1],["Ledger and account statement download","D","Excel download, any date range.",1],["Security deposit record","D","Received, refunded, adjusted against dues.",1],
+["Stock transfer to distributor","D","Secondary invoice; stock travels until the buyer confirms.",1],["Scheme and offer updates","N","",1,6]]],
+["8. Distributor management",[
+["Distributor registration","D","",0],["Distributor profile","D","",0],["Sub dealer appointment","D","",0],["Dealer appointment","D","",0],
+["Product order","D","",0],["Stock management","D","Chassis-level stock and arriving shipments.",0],["Sales management","D","",0],
+["Payment management","D","",0],["Outstanding management","D","",0],["Target management","D","",0],
+["Commission and incentive","D","",0],["Warranty claim","N","",0,7],["Customer complaint","N","",0,7],["Delivery tracking","D","",0],
+["Sales and performance report","P","Sales list and target board on screen; Excel export comes with the reports work.",0,9],["KYC and agreement upload","D","",1],["Area allocation","D","",1],["Credit limit management","D","The supplying partner sets its buyers' limits.",1],
+["Ledger and account statement download","D","Excel download, any date range.",1],["Sales entry to sub dealer / dealer","D","",1]]],
+["9. Sub dealer management",[
+["Sub dealer registration","D","",0],["KYC verification","D","",0],["Dealer appointment","D","",0],["Product booking","D","",0],
+["Product stock management","D","",0],["Sales management","D","",0],["Customer management","P","Customers are captured on every bill; a customer list comes with phase 6.",0,7],["Payment collection","D","",0],
+["Outstanding management","D","",0],["Warranty registration","N","",0,7],["Service request","N","",0,7],["Sales report","D","",0],
+["Order tracking and invoice download","D","",1],["Credit limit management","D","The supplying partner sets its buyers' limits.",1],["Target and incentive","D","",1],
+["Complaint registration","N","",1,7],["Ledger and account statement","D","",1]]],
+["10. Dealer management",[
+["Dealer registration","D","",0],["Dealer ID and password","D","",0],["Product catalogue","D","Every model at the dealer's buying price.",0],
+["Live stock availability","D","Supplier's live stock beside each model.",0],["Product order booking","D","",0],["Order tracking","D","",0],
+["Invoice download","D","Supplier's tax invoice PDF.",0],["Payment history","D","",0],["Customer registration","P","Customer captured on each retail sale.",0,7],
+["Battery serial number registration","P","Battery number stored with the vehicle.",0,7],["Warranty registration","N","",0,7],["Service request","N","",0,7],
+["Complaint registration","N","",0,7],["Dealer target and incentive","D","",0],["Dealer sales report","D","Sales register by dealer.",0],
+["KYC document upload","D","GST, PAN, Aadhaar, licence, cheque, agreement; company verifies.",1],["Scan QR code to sell and activate warranty","N","",1,7],["Credit limit and outstanding view","D","",1],
+["Scheme and offer view","N","",1,6],["Old battery exchange entry","N","",1,6],["Ledger and account statement","D","",1]]],
+["11. Warranty and service",[
+["Customer registration","P","Captured on retail sale.",0,7],["Customer database","P","Inside sale records; no customer list.",0,7],["Battery serial number verification","N","",0,7],
+["Online warranty activation","N","",0,7],["Warranty certificate download","N","",0,7],["Installation date","N","",0,7],["Installation photo upload","N","",0,7],
+["GPS location capture","N","",0,7],["Customer bill upload","N","",0,7],["Customer complaint registration","N","",0,7],["Complaint ticket number","N","",0,7],
+["Service engineer assignment","N","",0,7],["Complaint status tracking","N","",0,7],["Replacement management","N","",0,7],["Repair management","N","",0,7],
+["Warranty claim approval","N","",0,7],["Warranty expiry notification","N","",0,7],["Customer feedback","N","",0,7],["24-hour customer care support","N","",0,7],
+["Service history","N","",0,7],["Warranty check by scanning QR code","N","",1,7],["Full and pro-rata warranty calculation","N","",1,7],
+["Replacement battery linked to old serial number","N","",1,7],["Service centre management","N","",1,7],["Service job sheet with spare parts used","N","",1,7],
+["Complaint time limit and automatic escalation","N","",1,7],["Customer call log","N","",1,7],["Returned battery inspection report from factory","N","",1,7]]],
+["12. Delivery and logistics",[
+["Delivery order","D","",0],["Delivery challan","D","",0],["Transport management","D","",0],["Vehicle management","D","Documents tracked; vehicle locks when one lapses.",0],
+["Driver management","P","Driver name, licence and phone per trip; no driver master.",0,9],["Dispatch management","D","",0],["Delivery tracking","D","",0],
+["Delivery confirmation","D","GRN by receiver.",0],["Delivery photo upload","N","",0,9],["Customer signature","N","",0,9],["Pending delivery report","P","Board view; no export.",0,9],
+["Serial number scan at loading","D","",1],["Route and trip planning","N","",1,9],["Freight and transport cost record","N","",1,8],["Transporter ledger","N","",1,8],
+["Return / replacement pickup management","N","",1,9]]],
+["13. Accounts and finance",[
+["Cash book","N","",0,8],["Bank book","N","",0,8],["Customer ledger","N","",0,8],["Dealer ledger","D","",0],["Distributor ledger","D","",0],
+["Supplier ledger","P","Payments recorded on each purchase.",0,8],["Purchase accounts","P","",0,8],["Sales accounts","P","",0,8],["Expense management","N","",0,8],
+["Payment receipt","D","Numbered receipts.",0],["Payment due reminder","P","Overdue shown; no reminders sent.",0,8],["Credit and debit management","P","",0,8],
+["GST reports","N","",0,8],["Profit and loss account","N","",0,8],["Balance sheet","N","",0,8],["Cash flow report","N","",0,8],
+["Journal and contra voucher","N","",1,8],["Trial balance","N","",1,8],["Bank reconciliation","N","",1,8],["Cheque and post-dated cheque management","N","",1,8],
+["Outstanding ageing analysis","P","Overdue amount per party; no ageing buckets.",1,8],["TDS / TCS record","N","",1,8],["Commission and incentive payout","D","Incentives flow into payroll.",1],
+["Branch / outlet-wise accounts","N","",1,8],["Fixed asset register","N","",1,8],["Outlet daily cash closing","P","Day summary of bills and collections by mode; cash count sign-off in phase 7.",1,8]]],
+["14. HR and employee management",[
+["Employee registration","D","Generated employee codes and reporting line.",0],
+["Employee ID card","D","Printable card with photo and a QR code that shows whether it is still valid.",0],
+["Department management","D","",0],
+["Attendance management","D","Daily status, late, early, overtime and loss of pay worked out automatically.",0],
+["Biometric attendance","P","Machine export import and a device push link; each machine brand still needs its connector set up.",0,9],
+["Salary management","D","",0],["Payroll management","D","Attendance, overtime, claims and loan instalments flow in automatically.",0],
+["Leave management","D","",0],["Staff performance","D","Score from sales against target, attendance and punctuality, ranked.",0],
+["Duty assignment","D","Task and place per day on the roster.",0],["Employee target","D","",0],
+["Employee activity report","P","Activity in the audit log and attendance register; a per-person report comes later.",0,9],
+["Shift and duty roster","D","",1],["Overtime calculation","D","Manager-approved overtime at 2× the ordinary rate, paid in payroll.",1],
+["Late coming and early leaving report","D","On screen and in the Excel register.",1],["Holiday calendar","D","",1],
+["Leave types, balance and approval","D","CL, SL, EL, unpaid; reporting manager or HR approves.",1],
+["Salary advance and loan management","D","Business Head + Managing Partner approve; instalments recovered from salary.",1],
+["PF, ESI and statutory deductions","D","",1],["Salary slip generation","D","",1],["Bonus and incentive","D","",1],
+["Employee documents and joining record","D","HR verifies; the uploader cannot verify.",1],
+["Expense claim and reimbursement","D","Manager checks, BH + MP approve, paid with salary.",1],
+["Resignation and final settlement","D","Leave encashment, gratuity, notice recovery, loans; BH + MP approve.",1]]],
+["16. Security and advanced features",[
+["Individual login ID and password","D","",0],["Role-based access control","D","",0],
+["Department-wise permissions","P","Permissions are per role; departments exist for HR.",0,9],
+["Two-factor authentication","N","",0,9],["Login history","P","Every login is in the audit log; no personal login-history screen yet.",0,9],
+["Activity history","D","Audit log of every change.",0],["Data backup","P","Hosting backups (MongoDB Atlas paid tier).",0,9],
+["Cloud data storage","D","MongoDB Atlas and Vercel.",0],["Data encryption","D","HTTPS in transit, encrypted at rest on Atlas, passwords hashed.",0],
+["Automatic backup","P","Atlas scheduled backups (paid tier).",0,9],
+["Password reset","P","Admin reset and forced change on first login; no self-service email reset.",0,9],
+["Unauthorized login alert","P","Account locks after 5 wrong passwords; no alert message yet.",0,9],
+["Data export to spreadsheet and PDF","D","",0],["Multi-branch management","N","Showrooms exist; full branch accounting comes with phase 8.",0,9],
+["Integration with other systems","P","JSON API, e-way bill file, biometric device link.",0,9],["Dashboard customization","N","",0,9],
+["Entry by one user, approval by another","D","BH + MP approvals, loader ≠ dispatcher, uploader ≠ verifier, no self-approval.",1],
+["Automatic logout when idle","D","After 30 minutes without activity.",1],
+["Device / location-wise login restriction","P","Office staff must punch inside the office radius; login itself is not restricted yet.",1,9],
+["Data restore from backup","N","",1,9],["User-wise data visibility (own area / branch only)","D","",1],
+["Bulk data import","P","Biometric punches only.",1,9],["Multi-language screens","N","",1,9],
+["Financial year closing and lock","P","Payroll months lock; document series restart each year; books lock comes with phase 8.",1,8]]],
+["19. Staff mobile application",[
+["Individual staff login","D","Installable on the phone home screen; opens on My HR.",1],
+["Daily and monthly attendance view","D","",1],["Mobile attendance with photo and location for field staff","D","",1],
+["Salary advance / loan request and balance","D","",1],["Shift and duty roster","D","",1],["Holiday calendar","D","",1]]]
+];
+const L={D:"Done",P:"Partly",N:"Not done"};
+const esc=s=>s.replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+const all=S.flatMap(s=>s[1]);const cnt=k=>all.filter(i=>i[1]===k).length;
+const n=all.length,d=cnt("D"),p=cnt("P"),x=cnt("N");
+document.getElementById("summary").innerHTML=
+`<div class="tile"><b>${n}</b><span>features on the sheet</span><div class="bar"><i style="width:${d/n*100}%;background:var(--done)"></i><i style="width:${p/n*100}%;background:var(--part)"></i><i style="width:${x/n*100}%;background:var(--none)"></i></div></div>
+<div class="tile"><b style="color:var(--done)">${d}</b><span>done</span></div>
+<div class="tile"><b style="color:var(--part)">${p}</b><span>partly done</span></div>
+<div class="tile"><b style="color:var(--none)">${x}</b><span>not done yet</span></div>`;
+document.getElementById("phases").innerHTML=PHASES.map((ph,i)=>{const k=all.filter(it=>it[4]==ph[0]).length;
+return `<div class="phase${i===2?" now":""}"><span class="no">Phase ${ph[0]}</span><div><h3 style="font-size:16px">${ph[1]} <small style="font-family:var(--body);font-weight:400;color:var(--muted)">· ${i<=1?"done":`${k} items`}${i===2?" · next":""}</small></h3><p>${ph[2]}</p></div></div>`}).join("");
+let F="all",Q="";
+function render(){
+ document.getElementById("list").innerHTML=S.map(([title,items])=>{
+  const sh=items.filter(i=>(F==="all"||i[1]===F)&&(!Q||i[0].toLowerCase().includes(Q)));
+  if(!sh.length)return"";
+  const dd=items.filter(i=>i[1]==="D").length;
+  return `<section class="sec"><div class="sec-head"><h2>${esc(title)}</h2><small>${dd} of ${items.length} done</small></div><ul class="items">${sh.map(i=>
+   `<li><span class="st ${i[1]}">${L[i[1]]}</span><span class="name">${i[3]?'<span class="new" title="Newly added feature on the sheet">✓</span>':""}${esc(i[0])}${i[2]?`<span class="note">${esc(i[2])}</span>`:""}</span><span class="ph">${i[4]?"Phase "+i[4]:""}</span></li>`).join("")}</ul></section>`}).join("")||'<p class="foot">No feature matches that search.</p>';
+}
+document.querySelectorAll(".filters button").forEach(b=>b.onclick=()=>{F=b.dataset.f;document.querySelectorAll(".filters button").forEach(o=>o.setAttribute("aria-pressed",o===b));render()});
+document.getElementById("q").oninput=e=>{Q=e.target.value.trim().toLowerCase();render()};
+render();
+</script>

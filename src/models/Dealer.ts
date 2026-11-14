@@ -1,7 +1,18 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
+export type DealerTier = "DEALER" | "SUB_DEALER";
+
 export interface IDealer extends Document {
-  dealerCode: string;
+  dealerCode: string; // JKD-… (sub dealers: JKSB-0001)
+  tier: DealerTier;
+  /**
+   * Who supplies this dealer. Dealers with neither parent are company dealers (stock on
+   * consignment). A dealer under a distributor buys from that distributor; a sub dealer buys
+   * from its parent dealer, or from its distributor when it has no parent dealer.
+   */
+  parentDistributor?: mongoose.Types.ObjectId | null;
+  parentDealer?: mongoose.Types.ObjectId | null;
+  territory?: mongoose.Types.ObjectId | null;
   name: string;
   ownerName: string;
   phone: string;
@@ -16,7 +27,7 @@ export interface IDealer extends Document {
   creditDays: number;
   stateCode: string;
   pincode: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: "PENDING" | "ACTIVE" | "INACTIVE";
   onboardingDate: Date;
   createdBy?: mongoose.Types.ObjectId;
   updatedBy?: mongoose.Types.ObjectId;
@@ -27,6 +38,10 @@ export interface IDealer extends Document {
 const DealerSchema = new Schema<IDealer>(
   {
     dealerCode: { type: String, required: true, unique: true, index: true },
+    tier: { type: String, enum: ["DEALER", "SUB_DEALER"], default: "DEALER", index: true },
+    parentDistributor: { type: Schema.Types.ObjectId, ref: "Distributor", default: null, index: true },
+    parentDealer: { type: Schema.Types.ObjectId, ref: "Dealer", default: null, index: true },
+    territory: { type: Schema.Types.ObjectId, ref: "Territory", default: null },
     name: { type: String, required: true, trim: true },
     ownerName: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
@@ -40,7 +55,7 @@ const DealerSchema = new Schema<IDealer>(
     creditDays: { type: Number, required: true, default: 30 },
     stateCode: { type: String, required: true, default: "19" },
     pincode: { type: String, default: "" },
-    status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE", index: true },
+    status: { type: String, enum: ["PENDING", "ACTIVE", "INACTIVE"], default: "ACTIVE", index: true },
     onboardingDate: { type: Date, required: true, default: Date.now },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
