@@ -10,7 +10,12 @@ const PUBLIC_PATHS = [
   "/api/auth/refresh",
   "/api/health",
   "/api/cron/",
+  "/api/verify-id/",
+  "/api/hr/biometric",
+  "/verify/",
   "/favicon.ico",
+  "/manifest.webmanifest",
+  "/icons/",
   "/_next",
 ];
 

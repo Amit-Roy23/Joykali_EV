@@ -50,6 +50,19 @@ export interface ISetting extends Document {
     /** Warn this many days before a fleet document expires. */
     docExpiryWarningDays: number;
   };
+  hr?: {
+    /** Attendance counts towards pay from this IST date (YYYY-MM-DD); empty = attendance not yet in use. */
+    trackingFrom?: string;
+    /** Every Nth late mark in a month costs half a day (0 = off). */
+    latesPerHalfDay: number;
+    otMultiplier: number;
+    otEligibleRoles: string[];
+    /** Office punch radius for OFFICE-mode staff. */
+    office?: { lat?: number; lng?: number; radiusM?: number };
+    maxAdvancePctOfGross: number;
+    maxLoanMultipleOfGross: number;
+    idleLogoutMinutes: number;
+  };
   updatedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -110,6 +123,16 @@ const SettingSchema = new Schema<ISetting>(
       ewayBillThresholdPaise: { type: Number, default: 5000000 },
       requireSeparateDispatcher: { type: Boolean, default: true },
       docExpiryWarningDays: { type: Number, default: 15 },
+    },
+    hr: {
+      trackingFrom: { type: String, default: "" },
+      latesPerHalfDay: { type: Number, default: 3 },
+      otMultiplier: { type: Number, default: 2 },
+      otEligibleRoles: { type: [String], default: ["FEC", "OUTLET"] },
+      office: { lat: Number, lng: Number, radiusM: { type: Number, default: 200 } },
+      maxAdvancePctOfGross: { type: Number, default: 50 },
+      maxLoanMultipleOfGross: { type: Number, default: 3 },
+      idleLogoutMinutes: { type: Number, default: 30 },
     },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

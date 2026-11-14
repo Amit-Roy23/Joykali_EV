@@ -15,6 +15,9 @@ export const metadata: Metadata = {
   description:
     "Joykali EV Mobility — sales, dealer network, inventory, incentive schemes and payroll in one place.",
   applicationName: "Joykali EV",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Joykali EV", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

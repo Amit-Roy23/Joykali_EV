@@ -7,6 +7,7 @@ import { User } from "@/models/User";
 import { periodOf, periodFor } from "@/lib/period";
 import { generateDraftPayrollRun } from "@/services/payrollService";
 import { activateSalaryStructures } from "@/services/approvalService";
+import { deactivateLeavers } from "@/services/hrMoneyService";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
 
     const expired = await IncentiveScheme.updateMany({ status: "ACTIVE", validTo: { $lt: new Date() } }, { $set: { status: "EXPIRED" } });
     report.schemesExpired = expired.modifiedCount;
+    report.leaversDeactivated = await deactivateLeavers();
 
     const cur = periodOf(new Date());
     const prev = cur.month === 1 ? periodFor(cur.year - 1, 12) : periodFor(cur.year, cur.month - 1);

@@ -1,6 +1,7 @@
 "use client";
 import { useSession } from "@/components/layout/session";
 import { SalaryPanel } from "@/components/salaryPanel";
+import { EmployeeHrPanel } from "@/components/employeeHrPanel";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -190,6 +191,7 @@ export default function EmployeeDetailPage({
 
       {/* Salary: automatic breakup, revisions with BH + MP approval */}
       <SalaryPanel employeeId={String(user._id)} isSelf={String(user._id) === String(session.user?.userId)} />
+      <EmployeeHrPanel employee={user} />
 
       <Card>
         <CardHeader>

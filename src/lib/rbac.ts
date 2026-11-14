@@ -4,6 +4,7 @@ import { User } from "@/models/User";
 import mongoose from "mongoose";
 
 const FEC_BASE: Permission[] = [
+  "hr.self",
   "sales.create",
   "sales.view.own",
   "scheme.view",
@@ -26,6 +27,8 @@ const ASM_BASE: Permission[] = [
   "ledger.view",
   "network.view",
   "outlet.view",
+  "attendance.team",
+  "leave.approve",
 ];
 const BH_BASE: Permission[] = [
   ...ASM_BASE,
@@ -55,6 +58,8 @@ const BH_BASE: Permission[] = [
   "kyc.verify",
   "target.manage",
   "outlet.manage",
+  "hr.manage",
+  "attendance.manage",
 ];
 const MP_BASE: Permission[] = [...BH_BASE, "sales.cancel", "purchase.manage", "payroll.lock", "audit.view"];
 
@@ -70,6 +75,23 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // Admin governs the system but is deliberately NOT an approver: every approval
   // needs the Business Head and then the Managing Partner.
   ADMIN: uniq([...MP_BASE, "settings.manage"]).filter((p) => p !== "approvals.sign"),
+  // HR manager: people operations, no sales, stock or money approvals.
+  HR_MANAGER: [
+    "hr.self",
+    "hr.manage",
+    "attendance.team",
+    "attendance.manage",
+    "leave.approve",
+    "employee.view",
+    "employee.manage",
+    "payroll.view",
+    "payroll.run",
+    "payroll.adjust",
+    "payslip.view.own",
+    "payslip.view.all",
+    "payslip.download",
+    "reports.view",
+  ],
   // Showroom counter login: sells from its own outlet's stock and receives transfers.
   OUTLET: uniq([...FEC_BASE, "outlet.view"]),
   // Channel partner logins see only their own business and their own downline.

@@ -141,6 +141,8 @@ Then open the site, sign in, and you're live.
   drafts the previous month's payroll (still needs BH + MP approval), and every day it activates salary revisions
   whose month has arrived and expires finished incentive schemes. On the Hobby plan Vercel runs it once a day
   within the hour.
+- **Biometric machines** (optional): set `BIOMETRIC_DEVICE_KEY` (16+ random characters) and point the machine's push / middleware to `POST /api/hr/biometric` with header `x-device-key`. Without it, HR imports the machine's CSV export from HR & Attendance → HR setup.
+- **Office radius for punches** and attendance start date are stored in company settings (`hr.office`, `hr.trackingFrom`); the demo seed sets both.
 - **Uploaded fleet documents** are stored in MongoDB (max 2 MB each) because Vercel has no permanent disk.
 - **Function time limit**: heavy routes (payroll generation, scheme approval, payslip ZIP, Excel) are set to
   60 s, which is within every Vercel plan.

@@ -17,7 +17,7 @@ const RolePermissionSchema = new Schema<IRolePermission>(
       type: String,
       required: true,
       unique: true,
-      enum: ["FEC", "OUTLET", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"],
+      enum: ["FEC", "OUTLET", "ASM", "HR_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"],
       index: true,
     },
     permissions: [{ type: String, required: true }],

@@ -14,11 +14,13 @@ import { User } from "@/models/User";
 import { PartnerTarget } from "@/models/PartnerTarget";
 import { LedgerEntry } from "@/models/LedgerEntry";
 import { generateFyCode } from "@/lib/codeGenerator";
+import { AdvanceLoan, ExpenseClaim, Resignation } from "@/models/Hr";
+import { activateAdvance, closeSettlement } from "./hrMoneyService";
 import { assertCredit } from "./creditService";
 import { recalculateForScheme } from "./incentiveService";
 
-export type ApprovalKind = "order" | "scheme" | "payroll" | "credit" | "salary" | "commission";
-export const APPROVAL_KINDS: ApprovalKind[] = ["order", "scheme", "payroll", "credit", "salary", "commission"];
+export type ApprovalKind = "order" | "scheme" | "payroll" | "credit" | "salary" | "commission" | "advance" | "claim" | "settlement";
+export const APPROVAL_KINDS: ApprovalKind[] = ["order", "scheme", "payroll", "credit", "salary", "commission", "advance", "claim", "settlement"];
 
 export const KIND_LABEL: Record<ApprovalKind, string> = {
   order: "Vehicle order",
@@ -27,6 +29,9 @@ export const KIND_LABEL: Record<ApprovalKind, string> = {
   credit: "Credit limit change",
   salary: "Salary revision",
   commission: "Partner commission",
+  advance: "Salary advance / loan",
+  claim: "Expense claim",
+  settlement: "Full & final settlement",
 };
 
 const rupees = (p: number) => `₹${Math.round(p / 100).toLocaleString("en-IN")}`;
@@ -175,6 +180,42 @@ export async function signApproval(
     t.markModified("settlement");
     await t.save();
     summary = `${t.period} commission ${rupees(t.settlement.amount)}`;
+  } else if (kind === "advance") {
+    const a = await AdvanceLoan.findById(id);
+    if (!a) throw new ApprovalError("Request not found", 404);
+    if (a.status !== "PENDING_APPROVAL") throw new ApprovalError(`Request is ${a.status.toLowerCase()}`);
+    if (String(a.employee) === user.userId) throw new ApprovalError("You cannot approve your own advance", 403);
+    result = sign(a.approvals, user, decision, note);
+    a.approvals = result.signatures;
+    if (result.status === "REJECTED") a.status = "REJECTED";
+    await a.save();
+    if (result.status === "APPROVED") await activateAdvance(a._id);
+    summary = `${a.code} ${a.employeeName} ${rupees(a.amount)}`;
+  } else if (kind === "claim") {
+    const c = await ExpenseClaim.findById(id);
+    if (!c) throw new ApprovalError("Claim not found", 404);
+    if (c.status !== "VERIFIED") throw new ApprovalError(c.status === "SUBMITTED" ? "The manager must check the claim first" : `Claim is ${c.status.toLowerCase()}`);
+    if (String(c.employee) === user.userId) throw new ApprovalError("You cannot approve your own claim", 403);
+    result = sign(c.approvals, user, decision, note);
+    c.approvals = result.signatures;
+    if (result.status === "APPROVED") c.status = "APPROVED";
+    if (result.status === "REJECTED") {
+      c.status = "REJECTED";
+      c.rejectReason = note;
+    }
+    await c.save();
+    summary = `${c.code} ${c.employeeName} ${rupees(c.amount)}`;
+  } else if (kind === "settlement") {
+    const r = await Resignation.findById(id);
+    if (!r || !r.settlement) throw new ApprovalError("Settlement not found", 404);
+    if (r.status !== "SETTLEMENT_PENDING") throw new ApprovalError(`Settlement is ${r.status.toLowerCase()}`);
+    if (String(r.employee) === user.userId) throw new ApprovalError("You cannot approve your own settlement", 403);
+    result = sign(r.approvals, user, decision, note);
+    r.approvals = result.signatures;
+    if (result.status === "REJECTED") r.status = "ACCEPTED"; // HR recomputes
+    await r.save();
+    if (result.status === "APPROVED") await closeSettlement(r._id);
+    summary = `${r.employeeName} net ${rupees(r.settlement.net)}`;
   } else {
     throw new ApprovalError("Unknown approval type", 400);
   }
@@ -182,7 +223,7 @@ export async function signApproval(
   await logAudit({
     user,
     action: decision === "APPROVED" ? "APPROVE" : "REJECT",
-    resource: ({ order: "ORDER", scheme: "SCHEME", payroll: "PAYROLL", credit: "CREDIT", salary: "SALARY", commission: "TARGET" } as const)[kind],
+    resource: ({ order: "ORDER", scheme: "SCHEME", payroll: "PAYROLL", credit: "CREDIT", salary: "SALARY", commission: "TARGET", advance: "PAYROLL", claim: "PAYROLL", settlement: "PAYROLL" } as const)[kind],
     resourceId: id,
     after: { level: user.role, decision, note, outcome: result.status, summary },
   });
@@ -335,6 +376,33 @@ export async function listPending(user: JWTPayload): Promise<PendingItem[]> {
       canSign: mine(t.settlement.approvals),
       signatures: t.settlement.approvals || [],
       href: `/targets?period=${t.period}`,
+    });
+  }
+  for (const a of (await AdvanceLoan.find({ status: "PENDING_APPROVAL" }).sort({ createdAt: 1 }).lean()) as any[]) {
+    items.push({
+      kind: "advance", kindLabel: KIND_LABEL.advance, id: String(a._id),
+      title: `${a.employeeName} — ${a.kind === "LOAN" ? "loan" : "salary advance"} ${a.code}`,
+      subtitle: `${rupees(a.amount)}${a.kind === "LOAN" ? ` over ${a.tenureMonths} months (${rupees(a.emi)}/month)` : " recovered next payroll"} · ${a.reason}`,
+      amount: a.amount, submittedAt: a.createdAt, waitingFor: waitingLabel(a.approvals),
+      canSign: mine(a.approvals) && String(a.employee) !== user.userId, signatures: a.approvals || [], href: `/hr/money`,
+    });
+  }
+  for (const c of (await ExpenseClaim.find({ status: "VERIFIED" }).sort({ createdAt: 1 }).lean()) as any[]) {
+    items.push({
+      kind: "claim", kindLabel: KIND_LABEL.claim, id: String(c._id),
+      title: `${c.employeeName} — ${c.code}`,
+      subtitle: `${c.category.toLowerCase().replace("_", " ")} on ${c.date} · ${c.description} · checked by ${c.verifiedByName}`,
+      amount: c.amount, submittedAt: c.createdAt, waitingFor: waitingLabel(c.approvals),
+      canSign: mine(c.approvals) && String(c.employee) !== user.userId, signatures: c.approvals || [], href: `/hr/money`,
+    });
+  }
+  for (const r of (await Resignation.find({ status: "SETTLEMENT_PENDING" }).sort({ updatedAt: 1 }).lean()) as any[]) {
+    items.push({
+      kind: "settlement", kindLabel: KIND_LABEL.settlement, id: String(r._id),
+      title: `${r.employeeName} — last day ${r.acceptedLwd}`,
+      subtitle: r.settlement.lines.filter((l: any) => l.amount).map((l: any) => `${l.label}: ${rupees(l.amount)}`).join(" · "),
+      amount: r.settlement.net, submittedAt: r.updatedAt, waitingFor: waitingLabel(r.approvals),
+      canSign: mine(r.approvals) && String(r.employee) !== user.userId, signatures: r.approvals || [], href: `/hr/exits`,
     });
   }
   return items.sort((a, b) => Number(b.canSign) - Number(a.canSign) || +new Date(a.submittedAt) - +new Date(b.submittedAt));

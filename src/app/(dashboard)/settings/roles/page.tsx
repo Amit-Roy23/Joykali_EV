@@ -60,7 +60,7 @@ const ALL_PERMISSIONS = [
   { key: "audit.view", label: "View Audit Log History", group: "Settings" },
 ];
 
-const ROLES = ["FEC", "OUTLET", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"];
+const ROLES = ["FEC", "OUTLET", "ASM", "HR_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"];
 
 export default function RolesPermissionsPage() {
   const [rolePermissions, setRolePermissions] = useState<Record<string, string[]>>({});

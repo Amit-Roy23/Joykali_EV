@@ -40,3 +40,4 @@ export * from "./PartnerTarget";
 export * from "./NetworkOrder";
 export * from "./PartnerSale";
 export * from "./StockTransfer";
+export * from "./Hr";

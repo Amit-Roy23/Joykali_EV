@@ -33,6 +33,10 @@ import {
   ShoppingCart,
   PackageCheck,
   ReceiptText,
+  Fingerprint,
+  CalendarClock,
+  HandCoins as Coins,
+  DoorOpen,
 } from "lucide-react";
 import { isPartnerRole } from "@/types";
 
@@ -106,6 +110,15 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Dealers", href: "/dealers", icon: Store, permission: "dealer.view" },
       { title: "Employees", href: "/employees", icon: Users, permission: "employee.view" },
       { title: "Org Chart", href: "/employees/tree", icon: Network, permission: "employee.view" },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { title: "My HR", href: "/me", icon: Fingerprint, permission: "hr.self", audience: "staff" },
+      { title: "HR & Attendance", href: "/hr", icon: CalendarClock, permission: "attendance.team", audience: "staff" },
+      { title: "Advances & Claims", href: "/hr/money", icon: Coins, permission: ["attendance.team", "hr.manage", "approvals.sign"], audience: "staff" },
+      { title: "Exits", href: "/hr/exits", icon: DoorOpen, permission: ["attendance.team", "hr.manage", "approvals.sign"], audience: "staff" },
     ],
   },
   {

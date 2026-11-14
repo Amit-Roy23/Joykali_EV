@@ -1,0 +1,20 @@
+{
+  "name": "Joykali EV Mobility",
+  "short_name": "Joykali EV",
+  "description": "Sales, channel, dispatch, payroll and the staff HR app for Joykali EV Mobility.",
+  "start_url": "/me",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0e29",
+  "theme_color": "#0f0e29",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Punch in / out", "url": "/me#today" },
+    { "name": "Apply leave", "url": "/me#leave" }
+  ]
+}

@@ -27,6 +27,8 @@ export interface IAdjustment {
   reason: string;
   addedBy: mongoose.Types.ObjectId;
   addedAt: Date;
+  /** Added automatically from HR (overtime, reimbursements); replaced on every regeneration. */
+  auto?: boolean;
 }
 
 export interface IPayrollEntry extends Document {
@@ -40,6 +42,8 @@ export interface IPayrollEntry extends Document {
   earnings: IEarningsBreakdown;
   deductions: IDeductionsBreakdown;
   adjustments: IAdjustment[];
+  /** What HR fed into this payslip (attendance LOP, approved OT, claims, loan EMIs). */
+  hrAuto?: any;
   grossPay: number; // in paise
   totalDeductions: number; // in paise
   netPay: number; // in paise
@@ -53,6 +57,7 @@ const AdjustmentSchema = new Schema<IAdjustment>(
     reason: { type: String, required: true },
     addedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     addedAt: { type: Date, default: Date.now },
+    auto: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -89,6 +94,7 @@ const PayrollEntrySchema = new Schema<IPayrollEntry>(
       other: { type: Number, required: true, default: 0 },
     },
     adjustments: [AdjustmentSchema],
+    hrAuto: { type: Schema.Types.Mixed, default: null },
     grossPay: { type: Number, required: true, default: 0 },
     totalDeductions: { type: Number, required: true, default: 0 },
     netPay: { type: Number, required: true, default: 0 },

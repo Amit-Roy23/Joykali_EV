@@ -6,13 +6,15 @@ export type UserRole =
   | "ADMIN"
   /** Company showroom / outlet login (an employee tied to one outlet). */
   | "OUTLET"
+  /** HR manager: attendance, leave, documents, joining & exit. Not a finance approver. */
+  | "HR_MANAGER"
   /** External channel partners — outside the employee hierarchy. */
   | "SUPER_DISTRIBUTOR"
   | "DISTRIBUTOR"
   | "DEALER"
   | "SUB_DEALER";
 
-export const EMPLOYEE_ROLES = ["FEC", "OUTLET", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
+export const EMPLOYEE_ROLES = ["FEC", "OUTLET", "ASM", "HR_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
 export const PARTNER_ROLES = ["SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"] as const;
 export const ALL_ROLES = [...EMPLOYEE_ROLES, ...PARTNER_ROLES] as const;
 export type PartnerRole = (typeof PARTNER_ROLES)[number];
@@ -39,6 +41,7 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   MANAGING_PARTNER: 4,
   ADMIN: 5,
   OUTLET: 1,
+  HR_MANAGER: 2.5,
   SUPER_DISTRIBUTOR: 0,
   DISTRIBUTOR: 0,
   DEALER: 0,
@@ -103,7 +106,13 @@ export type Permission =
   | "outlet.view"
   | "outlet.manage"
   | "partner.sell"
-  | "partner.appoint";
+  | "partner.appoint"
+  // --- HR, attendance & staff self-service (phase 5)
+  | "hr.self"
+  | "hr.manage"
+  | "attendance.team"
+  | "attendance.manage"
+  | "leave.approve";
 
 export type VehicleCategory =
   | "2W"

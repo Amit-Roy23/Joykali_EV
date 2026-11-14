@@ -81,6 +81,9 @@ import {
   uploadPartyDocument,
   verifyPartyDocument,
 } from "../src/services/partnerAdminService";
+import { Department, Shift, Holiday, LeaveType, LeaveRequest, AttendancePunch, AttendanceDay, Regularization, EmployeeTarget, EmployeeDocument } from "../src/models/Hr";
+import { requestAdvance, submitClaim, verifyClaim, submitResignation } from "../src/services/hrMoneyService";
+import { applyLeave, approveOvertime } from "../src/services/hrService";
 
 export const DEMO_PASSWORD = "Joykali@123";
 
@@ -970,6 +973,121 @@ async function main() {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Phase 5: HR — departments, shifts, holidays, leave, this month's attendance,
+  // advances, loans, claims, a resignation and staff targets.
+  // ---------------------------------------------------------------------------
+  const todayStr = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+  await Setting.updateOne({}, { $set: { hr: { trackingFrom: `${current.period}-01`, latesPerHalfDay: 3, otMultiplier: 2, otEligibleRoles: ["FEC", "OUTLET"], office: { lat: 22.7225, lng: 88.481, radiusM: 300 }, maxAdvancePctOfGross: 50, maxLoanMultipleOfGross: 3, idleLogoutMinutes: 30 } } });
+  const [depSales, depChannel, depAdmin, depHr, depShowroom] = await Department.create([
+    { name: "Sales", code: "SAL", head: bh._id },
+    { name: "Channel & Logistics", code: "CHL", head: bh._id },
+    { name: "Accounts & Admin", code: "ADM", head: admin._id },
+    { name: "Human Resources", code: "HR" },
+    { name: "Showrooms", code: "SHR" },
+  ]);
+  const general = await Shift.create({ name: "General", code: "GEN", start: "09:30", end: "18:30", graceMinutes: 10, halfDayMinutes: 240, fullDayMinutes: 480, weeklyOffs: [0], isDefault: true });
+  const showroomShift = await Shift.create({ name: "Showroom", code: "SHW", start: "10:30", end: "20:00", graceMinutes: 10, halfDayMinutes: 270, fullDayMinutes: 510, weeklyOffs: [2] });
+  const hy = current.year;
+  await Holiday.create([
+    { date: `${hy}-01-26`, name: "Republic Day", kind: "NATIONAL" },
+    { date: `${hy}-05-01`, name: "May Day", kind: "NATIONAL" },
+    { date: `${hy}-08-15`, name: "Independence Day", kind: "NATIONAL" },
+    { date: `${hy}-10-02`, name: "Gandhi Jayanti", kind: "NATIONAL" },
+    { date: `${hy}-10-19`, name: "Durga Puja (Ashtami)", kind: "FESTIVAL" },
+    { date: `${hy}-10-20`, name: "Durga Puja (Navami)", kind: "FESTIVAL" },
+    { date: `${hy}-10-21`, name: "Bijoya Dashami", kind: "FESTIVAL" },
+    { date: `${hy}-11-11`, name: "Bhai Phonta", kind: "FESTIVAL" },
+    { date: `${hy}-12-25`, name: "Christmas", kind: "FESTIVAL" },
+  ]);
+  await LeaveType.create([
+    { code: "CL", name: "Casual leave", annualQuota: 12, paid: true, halfDayAllowed: true },
+    { code: "SL", name: "Sick leave", annualQuota: 7, paid: true, halfDayAllowed: true },
+    { code: "EL", name: "Earned leave", annualQuota: 15, carryForwardMax: 30, paid: true, encashable: true, halfDayAllowed: false },
+    { code: "LOP", name: "Unpaid leave", annualQuota: 0, paid: false, halfDayAllowed: true },
+  ]);
+  const hrUser = await makeUser("HR_MANAGER", "Rupa Sen", "hr@joykaliev.in", "HR Manager", bh, { basic: 22000, hra: 8800, conveyance: 1600, other: 5600 }, { department: depHr._id, attendanceMode: "OFFICE" });
+  const hrPayload = asPayload(hrUser);
+  await User.updateMany({ role: { $in: ["FEC", "ASM"] } }, { $set: { department: depSales._id, attendanceMode: "FIELD" } });
+  await User.updateMany({ role: { $in: ["BUSINESS_HEAD", "MANAGING_PARTNER"] } }, { $set: { department: depSales._id, attendanceMode: "OFFICE" } });
+  await User.updateMany({ role: "ADMIN" }, { $set: { department: depAdmin._id, attendanceMode: "OFFICE" } });
+  await User.updateOne({ _id: outletUser._id }, { $set: { department: depShowroom._id, shift: showroomShift._id, attendanceMode: "OFFICE" } });
+  void depChannel;
+
+  // This month's punches: mostly on time, some late, a few absences, overtime on busy days.
+  const staff = await User.find({ status: "ACTIVE", role: { $in: ["FEC", "ASM", "OUTLET", "HR_MANAGER"] } }).lean();
+  const at = (date: string, mins: number) => new Date(Date.parse(`${date}T00:00:00+05:30`) + mins * 60000);
+  const holidaySet = new Set((await Holiday.find().lean()).map((h: any) => h.date));
+  const punchDocs: any[] = [];
+  for (const u of staff as any[]) {
+    const sh = String(u.shift || "") === String(showroomShift._id) ? showroomShift : general;
+    const start = Number(sh.start.slice(0, 2)) * 60 + Number(sh.start.slice(3));
+    const end = Number(sh.end.slice(0, 2)) * 60 + Number(sh.end.slice(3));
+    const reliability = u.role === "FEC" ? 0.85 + rand() * 0.12 : 0.97;
+    for (let d = 1; d <= 31; d++) {
+      const date = `${current.period}-${String(d).padStart(2, "0")}`;
+      if (date > todayStr || Number.isNaN(Date.parse(`${date}T00:00:00Z`)) || new Date(`${date}T00:00:00Z`).getUTCDate() !== d) break;
+      const dow = new Date(`${date}T00:00:00Z`).getUTCDay();
+      if (sh.weeklyOffs.includes(dow) || holidaySet.has(date)) continue;
+      if (rand() > reliability) continue; // absent
+      const late = rand() < 0.18 ? between(12, 45) : between(-20, 8);
+      const inMin = start + late;
+      const isToday = date === todayStr;
+      punchDocs.push({ employee: u._id, at: at(date, inMin), date, type: "IN", source: u.attendanceMode === "OFFICE" ? "WEB" : "MOBILE", location: { lat: 22.57 + rand() * 0.2, lng: 88.36 + rand() * 0.15, accuracy: between(8, 40) } });
+      if (isToday) continue; // still at work
+      const stay = rand() < 0.15 ? between(60, 150) : between(-25, 25);
+      punchDocs.push({ employee: u._id, at: at(date, end + stay), date, type: "OUT", source: u.attendanceMode === "OFFICE" ? "WEB" : "MOBILE", location: { lat: 22.57 + rand() * 0.2, lng: 88.36 + rand() * 0.15, accuracy: between(8, 40) } });
+    }
+  }
+  await AttendancePunch.insertMany(punchDocs);
+
+  // Leave: an approved casual leave in the past, a pending sick leave ahead, an unpaid half day.
+  const f1 = fecs[0].user, f2 = fecs[1].user, f3 = fecs[2].user, f4 = fecs[3].user, f5 = fecs[4].user, f6 = fecs[5].user, f12 = fecs[11].user;
+  const firstWorkday = (() => {
+    for (let d = 2; d <= 9; d++) {
+      const ds = `${current.period}-${String(d).padStart(2, "0")}`;
+      if (ds < todayStr && new Date(`${ds}T00:00:00Z`).getUTCDay() !== 0 && !holidaySet.has(ds)) return ds;
+    }
+    return `${current.period}-03`;
+  })();
+  await AttendancePunch.deleteMany({ employee: f2._id, date: firstWorkday });
+  await LeaveRequest.create({ employee: f2._id, employeeName: f2.name, leaveType: (await LeaveType.findOne({ code: "CL" }))!._id, leaveCode: "CL", paid: true, from: firstWorkday, to: firstWorkday, days: 1, reason: "Family function", status: "APPROVED", decidedBy: asmNorth._id, decidedByName: asmNorth.name, decidedAt: new Date() });
+  const nextWeek = new Date(Date.now() + 330 * 60000 + 6 * 86400000).toISOString().slice(0, 10);
+  await applyLeave(asPayload(f6), { leaveCode: "EL", from: nextWeek, to: new Date(Date.parse(`${nextWeek}T00:00:00Z`) + 2 * 86400000).toISOString().slice(0, 10), reason: "Sister's wedding in Siliguri" });
+  await applyLeave(asPayload(f3), { leaveCode: "SL", from: todayStr, to: todayStr, half: true, reason: "Doctor's appointment in the afternoon" });
+  // A missed out-punch the FEC asks to correct.
+  const missedDay = (punchDocs.find((p) => String(p.employee) === String(f5._id) && p.type === "OUT" && p.date < todayStr) || {}).date;
+  if (missedDay) {
+    await AttendancePunch.deleteMany({ employee: f5._id, date: missedDay, type: "OUT" });
+    await Regularization.create({ employee: f5._id, employeeName: f5.name, date: missedDay, outTime: "19:05", reason: "Phone battery died at the Barasat test-ride camp" });
+  }
+  // Overtime for the showroom manager approved by the Kolkata ASM.
+  const otDays = punchDocs.filter((p) => String(p.employee) === String(outletUser._id) && p.type === "OUT").map((p) => p.date);
+  if (otDays.length) await approveOvertime(asmKolkataPayload, String(outletUser._id), otDays);
+
+  // Money: an active loan, a pending advance, claims at every stage, one resignation.
+  const loan = await requestAdvance(asPayload(f2), { kind: "LOAN", amountRupees: 30000, tenureMonths: 6, reason: "Two-wheeler repair after accident" });
+  await signApproval("advance" as any, String(loan._id), bhPayload, "APPROVED");
+  await signApproval("advance" as any, String(loan._id), mpPayload, "APPROVED");
+  await requestAdvance(asPayload(f5), { kind: "ADVANCE", amountRupees: 8000, reason: "Child's school admission fee" });
+  const d3 = new Date(Date.now() + 330 * 60000 - 3 * 86400000).toISOString().slice(0, 10);
+  await submitClaim(asPayload(f1), { date: d3, category: "FUEL", amountRupees: 420, description: "Petrol for dealer visits, Siliguri–Jalpaiguri", kmTravelled: 96 });
+  const c2 = await submitClaim(asPayload(f3), { date: d3, category: "TRAVEL", amountRupees: 1850, description: "Bus + auto to Malda distributor meeting", bill: { name: "ticket.png", type: "image/png", data: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64") } });
+  await verifyClaim(hrPayload, String(c2._id), "VERIFIED");
+  const c3 = await submitClaim(asPayload(f4), { date: d3, category: "CUSTOMER_DEMO", amountRupees: 350, description: "Tea and snacks for a fleet-buyer demo" });
+  await verifyClaim(hrPayload, String(c3._id), "VERIFIED");
+  await signApproval("claim" as any, String(c3._id), bhPayload, "APPROVED");
+  await signApproval("claim" as any, String(c3._id), mpPayload, "APPROVED");
+  await submitResignation(asPayload(f12), { reason: "Moving to Bangalore with family", requestedLwd: new Date(Date.now() + 330 * 60000 + 20 * 86400000).toISOString().slice(0, 10) });
+  // Monthly unit targets for every FEC, set by their ASM.
+  for (const f of fecs) await EmployeeTarget.create({ employee: f.user._id, period: current.period, targetUnits: Math.max(3, Math.round(6 * f.skill)), setByName: "Area Sales Manager" });
+  await EmployeeDocument.create([
+    { employee: f1._id, docType: "AADHAAR", number: "XXXX-XXXX-4521", uploadedBy: f1._id },
+    { employee: f1._id, docType: "PAN", number: "BQKPS4521M", uploadedBy: f1._id, verified: true, verifiedByName: hrUser.name },
+  ]);
+  void hrPayload;
+  void AttendanceDay;
+
   // A light audit trail so the Audit screen isn't empty.
   for (const u of [admin, mp, bh, asmNorth, fecs[0].user]) {
     await logAudit({ user: asPayload(u), action: "LOGIN", resource: "AUTH", resourceId: String(u._id), ipAddress: "103.42.18.7" });
@@ -979,7 +1097,7 @@ async function main() {
   const vehicles = await Vehicle.countDocuments();
   console.log(`\nSeed complete: ${saleIds.length} sales, ${vehicles} vehicles, ${runs} payroll runs.`);
   console.log(`\nDemo accounts (password: ${DEMO_PASSWORD})`);
-  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR", "SUPER_DISTRIBUTOR", "DEALER", "SUB_DEALER", "OUTLET"] } }).sort({ role: 1 }).lean()) {
+  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR", "SUPER_DISTRIBUTOR", "DEALER", "SUB_DEALER", "OUTLET", "HR_MANAGER"] } }).sort({ role: 1 }).lean()) {
     console.log(`  ${u.role.padEnd(17)} ${u.employeeCode.padEnd(13)} ${u.email}`);
   }
   console.log(`  FEC               JKE-FEC-0001  fec1@joykaliev.in (… fec12)`);
@@ -989,6 +1107,7 @@ async function main() {
   console.log(`  DEALER            (Memari)      dealer1@joykaliev.in  (buys from Bardhaman)`);
   console.log(`  SUB_DEALER        JKSB-0001     subdealer1@joykaliev.in (buys from Memari)`);
   console.log(`  OUTLET            showroom@joykaliev.in (Salt Lake showroom counter)`);
+  console.log(`  HR_MANAGER        hr@joykaliev.in      (attendance, leave, exits)`);
   await mongoose.disconnect();
 }
 
