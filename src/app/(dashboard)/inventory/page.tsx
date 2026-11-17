@@ -63,13 +63,15 @@ export default function InventoryPage() {
       .catch(() => {});
   }, []);
 
+  const canAllocate = can("dealer.view") && can("inventory.manage");
   useEffect(() => {
+    if (!canAllocate) return;
     fetch("/api/dealers")
       .then((res) => res.json())
       .then((res) => {
         if (res.success) setDealers(res.data);
       });
-  }, []);
+  }, [canAllocate]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {

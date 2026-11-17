@@ -636,6 +636,15 @@ export async function createPartnerSale(user: JWTPayload, input: PartnerSaleInpu
     .populate("model")
     .lean();
   if (vehicles.length !== items.length) throw new NetworkError("Some vehicles are not in your stock (already sold, in transit or not yours)", 409);
+  // A sale cannot be dated before the vehicle reached the seller.
+  const lastMove = await StockMovement.aggregate([
+    { $match: { vehicle: { $in: vehicles.map((v: any) => v._id) } } },
+    { $group: { _id: "$vehicle", at: { $max: "$timestamp" } } },
+  ]);
+  const arrived = lastMove.reduce((m: number, r: any) => Math.max(m, new Date(r.at).getTime()), 0);
+  if (arrived && saleDate.getTime() < arrived - 60000) {
+    throw new NetworkError(`Sale date is before the vehicle reached you (${new Date(arrived + 330 * 60000).toISOString().slice(0, 10)})`);
+  }
 
   const lines = items.map((i) => {
     const v: any = vehicles.find((x: any) => same(x._id, i.vehicleId));

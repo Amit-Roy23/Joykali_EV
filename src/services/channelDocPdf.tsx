@@ -12,23 +12,23 @@ const dateTime = (d?: Date | string | null) =>
   d ? new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }) : "—";
 
 const s = StyleSheet.create({
-  page: { padding: 28, fontSize: 8.5, fontFamily: "Helvetica", color: "#1e1b4b" },
-  top: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 2, borderBottomColor: "#4338ca", paddingBottom: 8, marginBottom: 10 },
+  page: { padding: 28, fontSize: 8.5, fontFamily: "Helvetica", color: "#0a2a5e" },
+  top: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 2, borderBottomColor: "#0d47a1", paddingBottom: 8, marginBottom: 10 },
   brand: { fontSize: 15, fontFamily: "Helvetica-Bold" },
   muted: { color: "#64748b" },
   title: { fontSize: 13, fontFamily: "Helvetica-Bold", textAlign: "right" },
   box: { borderWidth: 0.8, borderColor: "#cbd5e1", padding: 7, marginBottom: 8 },
   row: { flexDirection: "row" },
   half: { flex: 1 },
-  h: { fontFamily: "Helvetica-Bold", fontSize: 8, color: "#4338ca", marginBottom: 3, textTransform: "uppercase" },
+  h: { fontFamily: "Helvetica-Bold", fontSize: 8, color: "#0d47a1", marginBottom: 3, textTransform: "uppercase" },
   bold: { fontFamily: "Helvetica-Bold" },
-  th: { flexDirection: "row", backgroundColor: "#eef0ff", borderBottomWidth: 0.8, borderBottomColor: "#a5abfc", paddingVertical: 4 },
+  th: { flexDirection: "row", backgroundColor: "#e9f2fd", borderBottomWidth: 0.8, borderBottomColor: "#a9caf5", paddingVertical: 4 },
   tr: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#e2e8f0", paddingVertical: 3.5 },
   c: { paddingHorizontal: 3 },
   right: { textAlign: "right" },
   totals: { marginLeft: "auto", width: 230, marginTop: 6 },
   tline: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
-  grand: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "#1e1b4b", paddingTop: 4, marginTop: 2 },
+  grand: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "#0a2a5e", paddingTop: 4, marginTop: 2 },
   sign: { marginTop: 26, flexDirection: "row", justifyContent: "space-between" },
   foot: { position: "absolute", bottom: 18, left: 28, right: 28, fontSize: 7, color: "#94a3b8", textAlign: "center" },
 });

@@ -921,7 +921,7 @@ async function main() {
 
   // Bardhaman → Memari: 3 received, 2 still on the road; Memari → Kalna 1; retail bills at each level.
   const bdnStock = await Vehicle.find({ status: "WITH_DISTRIBUTOR", currentLocationDistributor: bardhaman._id }).sort({ chassisNumber: 1 }).lean();
-  const s1 = await createPartnerSale(bardhamanUser, { buyerKind: "DEALER", buyerId: String(memari._id), vehicles: bdnStock.slice(0, 3).map((v: any) => ({ vehicleId: String(v._id) })), saleDate: new Date(Date.now() - 6 * day).toISOString() });
+  const s1 = await createPartnerSale(bardhamanUser, { buyerKind: "DEALER", buyerId: String(memari._id), vehicles: bdnStock.slice(0, 3).map((v: any) => ({ vehicleId: String(v._id) })) });
   await receivePartnerSale(memariUser, String(s1._id), { remarks: "All three received" });
   await createPartnerSale(bardhamanUser, { buyerKind: "DEALER", buyerId: String(memari._id), vehicles: bdnStock.slice(3, 5).map((v: any) => ({ vehicleId: String(v._id) })) });
   await createPartnerSale(bardhamanUser, {
@@ -930,7 +930,7 @@ async function main() {
   });
   await recordNetworkPayment(bardhamanUser, { buyerType: "DEALER", buyerId: String(memari._id), amountRupees: 150000, mode: "BANK", reference: `UTR${between(100000000, 999999999)}` });
   const memStock = await Vehicle.find({ status: "WITH_DEALER", currentLocationDealer: memari._id }).lean();
-  const s2 = await createPartnerSale(memariUser, { buyerKind: "DEALER", buyerId: String(kalna._id), vehicles: [{ vehicleId: String(memStock[0]._id) }], saleDate: new Date(Date.now() - 3 * day).toISOString() });
+  const s2 = await createPartnerSale(memariUser, { buyerKind: "DEALER", buyerId: String(kalna._id), vehicles: [{ vehicleId: String(memStock[0]._id) }] });
   await receivePartnerSale(kalnaUser, String(s2._id), { remarks: "Received" });
   await createPartnerSale(memariUser, {
     buyerKind: "CUSTOMER", vehicles: [{ vehicleId: String(memStock[1]._id) }],

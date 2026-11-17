@@ -19,7 +19,7 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     borderBottomWidth: 1.5,
-    borderBottomColor: "#059669",
+    borderBottomColor: "#1565c0",
     paddingBottom: 10,
     marginBottom: 12,
     flexDirection: "row",
@@ -28,7 +28,7 @@ const styles = StyleSheet.create({
   companyName: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#059669",
+    color: "#1565c0",
   },
   tagline: {
     fontSize: 8,
@@ -76,12 +76,12 @@ const styles = StyleSheet.create({
   },
   tableHeader: {
     flexDirection: "row",
-    backgroundColor: "#ecfdf5",
+    backgroundColor: "#e9f2fd",
     borderBottomWidth: 1,
-    borderBottomColor: "#059669",
+    borderBottomColor: "#1565c0",
     padding: 5,
     fontWeight: "bold",
-    color: "#065f46",
+    color: "#0d47a1",
   },
   tableRow: {
     flexDirection: "row",
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   },
   totalBox: {
     borderTopWidth: 1.5,
-    borderTopColor: "#059669",
+    borderTopColor: "#1565c0",
     paddingTop: 6,
     marginTop: 6,
     flexDirection: "row",
@@ -219,7 +219,7 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
           </View>
           <View>
             <Text style={styles.docTitle}>PAYSLIP</Text>
-            <Text style={{ fontSize: 9, textAlign: "right", color: "#059669", marginTop: 3 }}>
+            <Text style={{ fontSize: 9, textAlign: "right", color: "#1565c0", marginTop: 3 }}>
               {monthStr}
             </Text>
             <Text style={{ fontSize: 7, textAlign: "right", color: "#64748b", marginTop: 2 }}>
@@ -318,7 +318,7 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
 
             <View style={styles.totalBox}>
               <Text>Total Gross Earnings</Text>
-              <Text style={{ color: "#059669" }}>{formatINR(props.grossPay)}</Text>
+              <Text style={{ color: "#1565c0" }}>{formatINR(props.grossPay)}</Text>
             </View>
           </View>
 
@@ -367,8 +367,8 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
         {/* Net Pay Box */}
         <View
           style={{
-            backgroundColor: "#ecfdf5",
-            borderColor: "#059669",
+            backgroundColor: "#e9f2fd",
+            borderColor: "#1565c0",
             borderWidth: 1,
             padding: 10,
             borderRadius: 4,
@@ -377,10 +377,10 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
             alignItems: "center",
           }}
         >
-          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#065f46" }}>
+          <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0d47a1" }}>
             NET PAYABLE AMOUNT:
           </Text>
-          <Text style={{ fontSize: 14, fontWeight: "bold", color: "#059669" }}>
+          <Text style={{ fontSize: 14, fontWeight: "bold", color: "#1565c0" }}>
             {formatINR(props.netPay)}
           </Text>
         </View>
@@ -499,7 +499,7 @@ export const InvoiceDocument: React.FC<InvoicePDFProps> = ({ company, sale }) =>
           </View>
           <View>
             <Text style={styles.docTitle}>TAX INVOICE</Text>
-            <Text style={{ fontSize: 9, textAlign: "right", fontWeight: "bold", color: "#059669", marginTop: 3 }}>
+            <Text style={{ fontSize: 9, textAlign: "right", fontWeight: "bold", color: "#1565c0", marginTop: 3 }}>
               Invoice #{sale.saleCode}
             </Text>
             <Text style={{ fontSize: 8, textAlign: "right", color: "#64748b", marginTop: 2 }}>
@@ -511,7 +511,7 @@ export const InvoiceDocument: React.FC<InvoicePDFProps> = ({ company, sale }) =>
         {/* Customer & Dealer Info */}
         <View style={styles.metaContainer}>
           <View style={styles.metaCol}>
-            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#059669", marginBottom: 4 }}>
+            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#1565c0", marginBottom: 4 }}>
               BILL TO (CUSTOMER):
             </Text>
             <Text style={{ fontWeight: "bold", fontSize: 10 }}>{sale.customer.name}</Text>
@@ -530,7 +530,7 @@ export const InvoiceDocument: React.FC<InvoicePDFProps> = ({ company, sale }) =>
           </View>
 
           <View style={styles.metaCol}>
-            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#059669", marginBottom: 4 }}>
+            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#1565c0", marginBottom: 4 }}>
               DISPATCH / OUTLET:
             </Text>
             {sale.dealer ? (
@@ -651,7 +651,7 @@ export const InvoiceDocument: React.FC<InvoicePDFProps> = ({ company, sale }) =>
 
           <View style={styles.totalBox}>
             <Text style={{ fontSize: 11, fontWeight: "bold" }}>TOTAL INVOICE AMOUNT</Text>
-            <Text style={{ fontSize: 13, fontWeight: "bold", color: "#059669" }}>
+            <Text style={{ fontSize: 13, fontWeight: "bold", color: "#1565c0" }}>
               {formatINR(sale.totalAmount)}
             </Text>
           </View>

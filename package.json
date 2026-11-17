@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "seed": "tsx scripts/seed.ts",
     "postinstall": "node scripts/patch-rollup.js",
-    "setup:admin": "tsx scripts/setup-admin.ts"
+    "setup:admin": "tsx scripts/setup-admin.ts",
+    "check:data": "tsx scripts/audit.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

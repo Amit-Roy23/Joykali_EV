@@ -2,9 +2,9 @@ import type { Config } from "tailwindcss";
 
 /**
  * Joykali "Charge" design system.
- * - brand: electric indigo — primary actions, links, focus
- * - volt:  lime accent — highlights on dark surfaces, charge bars, active nav
- * - ink:   near-black indigo — sidebar, hero surfaces
+ * - brand: royal blue chosen by the client (#0D47A1 → #1976C0) — primary actions, links, focus
+ * - volt:  lime accent — highlights on blue surfaces, charge bars, active nav
+ * - ink:   deep navy blue — dark buttons; sidebar and hero use the client's blue gradient
  */
 const config: Config = {
   darkMode: ["class"],
@@ -44,17 +44,17 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
         brand: {
-          50: "#eef0ff",
-          100: "#e0e4ff",
-          200: "#c7ccfe",
-          300: "#a5abfc",
-          400: "#8285f8",
-          500: "#6563f1",
-          600: "#5146e5",
-          700: "#4338ca",
-          800: "#3730a3",
-          900: "#312e81",
-          950: "#1e1b4b",
+          50: "#e9f2fd",
+          100: "#d3e5fb",
+          200: "#a9caf5",
+          300: "#77a9ec",
+          400: "#4589dc",
+          500: "#1e73cf",
+          600: "#1565c0",
+          700: "#0d55ad",
+          800: "#0d47a1",
+          900: "#0b3a85",
+          950: "#072657",
         },
         volt: {
           50: "#f8fee7",
@@ -69,10 +69,10 @@ const config: Config = {
           900: "#3e5515",
         },
         ink: {
-          700: "#23214a",
-          800: "#17153a",
-          900: "#0f0e29",
-          950: "#09081c",
+          700: "#1a4c95",
+          800: "#0f3d82",
+          900: "#0a3170",
+          950: "#06204d",
         },
       },
       borderRadius: {

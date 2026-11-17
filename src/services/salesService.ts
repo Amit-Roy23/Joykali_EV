@@ -1,3 +1,5 @@
+import { periodOf } from "@/lib/period";
+import { PayrollRun } from "@/models/PayrollRun";
 import { Sale, ISale } from "@/models/Sale";
 import { Vehicle } from "@/models/Vehicle";
 import { VehicleModel } from "@/models/VehicleModel";
@@ -106,6 +108,19 @@ export async function createSale(
     }
 
     const saleDateObj = new Date(input.saleDate);
+    if (Number.isNaN(+saleDateObj)) throw new Error("Choose the sale date");
+    // Sale date rules: not in the future, not in a month whose payroll is locked (incentives are final),
+    // and not before the vehicle came into stock.
+    const istDay = (d: Date) => new Date(d.getTime() + 330 * 60000).toISOString().slice(0, 10);
+    if (istDay(saleDateObj) > istDay(new Date())) throw new Error("Sale date cannot be in the future");
+    const sp = periodOf(saleDateObj);
+    if (await PayrollRun.exists({ year: sp.year, month: sp.month, status: "LOCKED" }).session(session ?? null)) {
+      throw new Error(`Payroll for ${sp.period} is locked — a sale cannot be dated in that month`);
+    }
+    const inward: any = await StockMovement.findOne({ vehicle: vehicle._id, movementType: "INWARD" }).session(session ?? null).lean();
+    if (inward && istDay(saleDateObj) < istDay(new Date(inward.timestamp))) {
+      throw new Error(`Sale date is before this vehicle came into stock (${istDay(new Date(inward.timestamp))})`);
+    }
     const saleCode = await generateSaleCode(saleDateObj, session);
 
     if (salesperson.status !== "ACTIVE" || !["FEC", "ASM", "OUTLET"].includes(salesperson.role)) {
