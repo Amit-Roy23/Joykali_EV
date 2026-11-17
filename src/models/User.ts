@@ -13,6 +13,11 @@ export interface IUser extends Document {
   distributor?: mongoose.Types.ObjectId | null;
   /** For OUTLET logins (and FECs posted at a showroom): the company outlet. */
   outlet?: mongoose.Types.ObjectId | null;
+  /** For STORE_MANAGER logins: the warehouse they run. */
+  warehouse?: mongoose.Types.ObjectId | null;
+  /** Statutory numbers for PF / ESI returns. */
+  uan?: string;
+  esiNumber?: string;
   department?: mongoose.Types.ObjectId | null;
   shift?: mongoose.Types.ObjectId | null;
   /** FIELD staff punch anywhere (location recorded); OFFICE staff must be inside the office radius. */
@@ -50,13 +55,16 @@ const UserSchema = new Schema<IUser>(
     role: {
       type: String,
       required: true,
-      enum: ["FEC", "OUTLET", "ASM", "HR_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"],
+      enum: ["FEC", "OUTLET", "ASM", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN", "SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"],
       index: true,
     },
     reportsTo: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     dealer: { type: Schema.Types.ObjectId, ref: "Dealer", default: null },
     distributor: { type: Schema.Types.ObjectId, ref: "Distributor", default: null, index: true },
     outlet: { type: Schema.Types.ObjectId, ref: "Outlet", default: null, index: true },
+    warehouse: { type: Schema.Types.ObjectId, ref: "Warehouse", default: null },
+    uan: { type: String, trim: true, default: "" },
+    esiNumber: { type: String, trim: true, default: "" },
     department: { type: Schema.Types.ObjectId, ref: "Department", default: null, index: true },
     shift: { type: Schema.Types.ObjectId, ref: "Shift", default: null },
     attendanceMode: { type: String, enum: ["FIELD", "OFFICE"], default: "FIELD" },

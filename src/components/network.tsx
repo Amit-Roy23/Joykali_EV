@@ -46,7 +46,7 @@ const DOC_LABEL: Record<string, string> = {
   OTHER: "Other",
 };
 
-function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+export function Field({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("space-y-1.5", className)}>
       <Label>{label}</Label>

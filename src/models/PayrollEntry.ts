@@ -44,6 +44,14 @@ export interface IPayrollEntry extends Document {
   adjustments: IAdjustment[];
   /** What HR fed into this payslip (attendance LOP, approved OT, claims, loan EMIs). */
   hrAuto?: any;
+  /** Salary-sheet columns as paid this month (template columns, pro-rated). */
+  earningLines?: Array<{ key: string; name: string; amount: number }>;
+  /** Custom deduction columns (welfare fund, canteen …); statutory ones are in `deductions`. */
+  deductionLines?: Array<{ key: string; name: string; amount: number }>;
+  /** Employer contributions: PF (EPS + EPF), EDLI, PF admin, ESI. */
+  employer?: { pf: number; eps: number; epf: number; edli: number; pfAdmin: number; esi: number; total: number };
+  pfWage?: number;
+  esiWage?: number;
   grossPay: number; // in paise
   totalDeductions: number; // in paise
   netPay: number; // in paise
@@ -95,6 +103,19 @@ const PayrollEntrySchema = new Schema<IPayrollEntry>(
     },
     adjustments: [AdjustmentSchema],
     hrAuto: { type: Schema.Types.Mixed, default: null },
+    earningLines: [new Schema({ key: String, name: String, amount: Number }, { _id: false })],
+    deductionLines: [new Schema({ key: String, name: String, amount: Number }, { _id: false })],
+    employer: {
+      pf: { type: Number, default: 0 },
+      eps: { type: Number, default: 0 },
+      epf: { type: Number, default: 0 },
+      edli: { type: Number, default: 0 },
+      pfAdmin: { type: Number, default: 0 },
+      esi: { type: Number, default: 0 },
+      total: { type: Number, default: 0 },
+    },
+    pfWage: { type: Number, default: 0 },
+    esiWage: { type: Number, default: 0 },
     grossPay: { type: Number, required: true, default: 0 },
     totalDeductions: { type: Number, required: true, default: 0 },
     netPay: { type: Number, required: true, default: 0 },

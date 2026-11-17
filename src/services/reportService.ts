@@ -155,58 +155,68 @@ export async function generateStockReportExcel(): Promise<Buffer> {
 /**
  * Generate Payroll Register Excel
  */
+/**
+ * Payroll register (salary sheet) with the run's own columns: every earning and deduction
+ * column of the salary template, statutory deductions and the employer's PF / ESI cost.
+ */
 export async function generatePayrollRegisterExcel(payrollRunId: string): Promise<Buffer> {
   const run = await PayrollRun.findById(payrollRunId).lean();
   if (!run) throw new Error("Payroll run not found");
 
-  const entries = await PayrollEntry.find({ payrollRun: run._id })
-    .populate("employee", "name employeeCode role designation pan")
+  const entries: any[] = await PayrollEntry.find({ payrollRun: run._id })
+    .populate("employee", "name employeeCode role designation pan uan esiNumber")
     .lean();
-
+  const linesOf = (e: any) =>
+    e.earningLines?.length
+      ? e.earningLines
+      : [
+          { key: "basic", name: "Basic", amount: e.earnings.basic },
+          { key: "hra", name: "HRA", amount: e.earnings.hra },
+          { key: "conveyance", name: "Conveyance", amount: e.earnings.conveyance },
+          { key: "special", name: "Allowances", amount: e.earnings.otherAllowances },
+        ];
+  const earnCols: Array<{ key: string; name: string }> = [];
+  const dedCols: Array<{ key: string; name: string }> = [];
+  for (const e of entries) {
+    for (const l of linesOf(e)) if (!earnCols.some((c) => c.key === l.key)) earnCols.push({ key: l.key, name: l.name });
+    for (const l of e.deductionLines || []) if (!dedCols.some((c) => c.key === l.key)) dedCols.push({ key: l.key, name: l.name });
+  }
   const workbook = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet(`Payroll ${run.runCode}`);
-
-  worksheet.columns = [
-    { header: "Payslip Code", key: "payslipCode", width: 24 },
-    { header: "Emp Code", key: "empCode", width: 16 },
-    { header: "Name", key: "name", width: 22 },
-    { header: "Designation", key: "designation", width: 18 },
-    { header: "Paid Days", key: "paidDays", width: 12 },
-    { header: "Basic (₹)", key: "basic", width: 14 },
-    { header: "HRA (₹)", key: "hra", width: 14 },
-    { header: "Conveyance (₹)", key: "conveyance", width: 14 },
-    { header: "Allowances (₹)", key: "other", width: 14 },
-    { header: "Incentives (₹)", key: "incentives", width: 16 },
-    { header: "Gross Pay (₹)", key: "gross", width: 16 },
-    { header: "PF (₹)", key: "pf", width: 14 },
-    { header: "ESI (₹)", key: "esi", width: 14 },
-    { header: "PT (₹)", key: "pt", width: 12 },
-    { header: "TDS (₹)", key: "tds", width: 12 },
-    { header: "Total Deductions (₹)", key: "deductions", width: 18 },
-    { header: "Net Pay (₹)", key: "net", width: 16 },
+  const ws = workbook.addWorksheet(`Payroll ${run.runCode}`);
+  const head = [
+    "Payslip code", "Emp code", "Name", "Designation", "UAN", "ESI IP no.", "Working days", "LOP days", "Paid days",
+    ...earnCols.map((c) => c.name), "Overtime / other additions", "Incentives", "Gross pay",
+    "PF (employee)", "ESI (employee)", "Professional tax", "TDS", ...dedCols.map((c) => c.name), "Advance / other recovery", "Total deductions", "Net pay",
+    "PF wages", "Employer PF", "of which EPS", "EDLI", "PF admin", "ESI wages", "Employer ESI", "Cost to company",
   ];
-
-  entries.forEach((e: any) => {
-    worksheet.addRow({
-      payslipCode: e.payslipCode,
-      empCode: e.employee?.employeeCode || "",
-      name: e.employee?.name || "",
-      designation: e.employee?.designation || "",
-      paidDays: e.paidDays,
-      basic: paiseToRupees(e.earnings.basic),
-      hra: paiseToRupees(e.earnings.hra),
-      conveyance: paiseToRupees(e.earnings.conveyance),
-      other: paiseToRupees(e.earnings.otherAllowances),
-      incentives: paiseToRupees(e.earnings.incentives),
-      gross: paiseToRupees(e.grossPay),
-      pf: paiseToRupees(e.deductions.pf),
-      esi: paiseToRupees(e.deductions.esi),
-      pt: paiseToRupees(e.deductions.professionalTax),
-      tds: paiseToRupees(e.deductions.tds),
-      deductions: paiseToRupees(e.totalDeductions),
-      net: paiseToRupees(e.netPay),
+  ws.addRow([`Salary sheet ${run.runCode} · status ${run.status}`]).font = { bold: true, size: 13 };
+  ws.addRow(head).font = { bold: true };
+  const r = (p: number) => paiseToRupees(p || 0);
+  const tot = new Array(head.length).fill(0);
+  for (const e of entries) {
+    const lines = linesOf(e);
+    const custom = (e.deductionLines || []).reduce((s: number, l: any) => s + l.amount, 0);
+    const plus = (e.adjustments || []).filter((a: any) => a.amount > 0).reduce((s: number, a: any) => s + a.amount, 0);
+    const er = e.employer || { pf: 0, eps: 0, edli: 0, pfAdmin: 0, esi: 0, total: 0 };
+    const row = [
+      e.payslipCode, e.employee?.employeeCode || "", e.employee?.name || "", e.employee?.designation || "", e.employee?.uan || "", e.employee?.esiNumber || "",
+      e.workingDays, e.lopDays, e.paidDays,
+      ...earnCols.map((c) => r(lines.find((l: any) => l.key === c.key)?.amount || 0)),
+      r(plus), r(e.earnings.incentives), r(e.grossPay),
+      r(e.deductions.pf), r(e.deductions.esi), r(e.deductions.professionalTax), r(e.deductions.tds),
+      ...dedCols.map((c) => r((e.deductionLines || []).find((l: any) => l.key === c.key)?.amount || 0)),
+      r(e.deductions.advanceRecovery + e.deductions.other - custom), r(e.totalDeductions), r(e.netPay),
+      r(e.pfWage), r(er.pf), r(er.eps), r(er.edli), r(er.pfAdmin), r(e.esiWage), r(er.esi), r(e.grossPay + (er.total || 0)),
+    ];
+    row.forEach((v, i) => {
+      if (i >= 9 && typeof v === "number") tot[i] += v;
     });
-  });
-
+    ws.addRow(row);
+  }
+  const totalRow = ws.addRow(tot.map((v, i) => (i === 2 ? "TOTAL" : i >= 9 ? Math.round(v * 100) / 100 : "")));
+  totalRow.font = { bold: true };
+  ws.getColumn(1).width = 26;
+  ws.getColumn(3).width = 22;
+  for (let i = 10; i <= head.length; i++) ws.getColumn(i).width = 14;
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }

@@ -15,12 +15,14 @@ const monthLabel = (d: string | Date) =>
   new Date(d).toLocaleString("en-IN", { month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
 
 function Breakup({ b }: { b: any }) {
-  const rows: Array<[string, number, string?]> = [
-    ["Basic", b.basic],
-    ["HRA", b.hra],
-    ["Conveyance", b.conveyance],
-    ["Special allowance", b.otherAllowances],
-  ];
+  const rows: Array<[string, number, string?]> = b.lines?.length
+    ? b.lines.map((l: any) => [l.name, l.amount])
+    : [
+        ["Basic", b.basic],
+        ["HRA", b.hra],
+        ["Conveyance", b.conveyance],
+        ["Special allowance", b.otherAllowances],
+      ];
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       <div className="rounded-xl bg-slate-50 p-3">
@@ -39,9 +41,10 @@ function Breakup({ b }: { b: any }) {
       <div className="rounded-xl bg-slate-50 p-3">
         <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Employee deductions</p>
         {[
-          ["PF (12%, ₹15k ceiling)", b.employee.pf],
-          ["ESI (0.75%)", b.employee.esi],
+          ["Provident fund (PF)", b.employee.pf],
+          ["ESI", b.employee.esi],
           ["Professional tax (WB)", b.employee.professionalTax],
+          ...(b.deductionLines || []).map((l: any) => [l.name, l.amount]),
         ].map(([k, v]) => (
           <div key={k as string} className="flex justify-between text-xs">
             <span className="text-slate-500">{k}</span>
@@ -56,11 +59,17 @@ function Breakup({ b }: { b: any }) {
       <div className="rounded-xl bg-ink-900 p-3 text-white">
         <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Cost to company</p>
         <div className="flex justify-between text-xs">
-          <span className="text-slate-400">Employer PF</span>
+          <span className="text-slate-400">Employer PF{b.employer.eps != null ? ` (EPS ${rupees(b.employer.eps)})` : ""}</span>
           <span className="tabular">{rupees(b.employer.pf)}</span>
         </div>
+        {b.employer.edli != null && (
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-400">EDLI + PF admin</span>
+            <span className="tabular">{rupees((b.employer.edli || 0) + (b.employer.pfAdmin || 0))}</span>
+          </div>
+        )}
         <div className="flex justify-between text-xs">
-          <span className="text-slate-400">Employer ESI (3.25%)</span>
+          <span className="text-slate-400">Employer ESI</span>
           <span className="tabular">{rupees(b.employer.esi)}</span>
         </div>
         <div className="mt-1 flex justify-between border-t border-white/10 pt-1 text-sm font-semibold">
@@ -183,12 +192,12 @@ function ReviseModal({ employeeId, current, onClose, onSaved }: { employeeId: st
   useEffect(() => {
     if (!Number(amount)) return setPreview(null);
     const t = setTimeout(() => {
-      api<any>("/api/salary/preview", { method: "POST", json: { mode, amount: Number(amount), flags } })
+      api<any>("/api/salary/preview", { method: "POST", json: { mode, amount: Number(amount), flags, effectiveMonth } })
         .then((p) => setPreview(p.breakup))
         .catch((e) => setError(e.message));
     }, 250);
     return () => clearTimeout(t);
-  }, [mode, amount, flags]);
+  }, [mode, amount, flags, effectiveMonth]);
 
   const save = async () => {
     setBusy(true);

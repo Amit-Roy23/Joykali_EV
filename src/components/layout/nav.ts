@@ -37,6 +37,13 @@ import {
   CalendarClock,
   HandCoins as Coins,
   DoorOpen,
+  Building,
+  Landmark,
+  BookOpenCheck,
+  LineChart,
+  Scale,
+  PieChart,
+  SlidersHorizontal,
 } from "lucide-react";
 import { isPartnerRole } from "@/types";
 
@@ -99,6 +106,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Stock",
     items: [
       { title: "Vehicle Inventory", href: "/inventory", icon: Warehouse, permission: "inventory.view" },
+      { title: "Warehouses", href: "/warehouses", icon: Building, permission: "warehouse.view", audience: "staff" },
       { title: "Models & Pricing", href: "/inventory/models", icon: Layers, permission: "inventory.view" },
       { title: "Purchases", href: "/purchases", icon: PackagePlus, permission: "purchase.view" },
       { title: "Suppliers", href: "/suppliers", icon: Factory, permission: "purchase.view" },
@@ -129,6 +137,18 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Incentive Schemes", href: "/schemes", icon: Sparkles, permission: "scheme.view" },
       { title: "Scheme Builder", href: "/schemes/builder", icon: Wand2, permission: "scheme.create" },
       { title: "Payroll Runs", href: "/payroll", icon: Wallet, permission: "payroll.view" },
+      { title: "Salary Structure & PF/ESI", href: "/payroll/setup", icon: SlidersHorizontal, permission: "payroll.view", audience: "staff" },
+    ],
+  },
+  {
+    label: "Accounts",
+    items: [
+      { title: "Accounts", href: "/accounts", icon: Landmark, permission: "accounts.view", audience: "staff" },
+      { title: "Cash & Bank Books", href: "/accounts/books", icon: BookOpenCheck, permission: "accounts.view", audience: "staff" },
+      { title: "Profit & Loss", href: "/accounts/pnl", icon: LineChart, permission: "accounts.view", audience: "staff" },
+      { title: "Expenses", href: "/accounts/expenses", icon: Receipt, permission: ["accounts.view", "expense.create"], audience: "staff" },
+      { title: "Outstanding", href: "/accounts/outstanding", icon: Scale, permission: "accounts.view", audience: "staff" },
+      { title: "Budget vs Actual", href: "/accounts/budget", icon: PieChart, permission: "accounts.view", audience: "staff" },
     ],
   },
   {

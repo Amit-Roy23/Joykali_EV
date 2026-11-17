@@ -52,6 +52,8 @@ const ROLE_PREFIX_MAP: Record<UserRole, string> = {
   SUB_DEALER: "SDL",
   OUTLET: "OUT",
   HR_MANAGER: "HR",
+  ACCOUNTANT: "ACC",
+  STORE_MANAGER: "STR",
 };
 
 /**
@@ -166,6 +168,9 @@ export const FY_SERIES = {
   ADVANCE: "JKAD",
   LOAN: "JKLN",
   CLAIM: "JKEC",
+  WAREHOUSE_TRANSFER: "JKWT",
+  EXPENSE: "JKEX",
+  VOUCHER: "JKV",
 } as const;
 
 export async function generateFyCode(

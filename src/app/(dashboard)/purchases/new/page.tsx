@@ -1,5 +1,6 @@
 "use client";
 
+import { WarehousePicker } from "@/components/warehousePicker";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -17,6 +18,7 @@ export default function NewPurchasePage() {
 
   const [supplierId, setSupplierId] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -121,6 +123,7 @@ export default function NewPurchasePage() {
         invoiceNumber,
         invoiceDate,
         notes,
+        warehouseId: warehouseId || undefined,
         lineItems: [
           {
             model: selectedModel,
@@ -219,6 +222,12 @@ export default function NewPurchasePage() {
                 onChange={(e) => setInvoiceDate(e.target.value)}
                 className="mt-1"
               />
+            </div>
+            <div>
+              <Label>Receive into warehouse</Label>
+              <div className="mt-1">
+                <WarehousePicker id="pur-wh" value={warehouseId} onChange={setWarehouseId} />
+              </div>
             </div>
           </CardContent>
         </Card>

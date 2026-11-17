@@ -35,7 +35,7 @@
 
   ::selection {
     background: #cdf264;
-    color: #0f0e29;
+    color: #0a3170;
   }
 
   h1,
@@ -65,7 +65,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #6563f1;
+    outline: 2px solid #1e73cf;
     outline-offset: 2px;
   }
 }
@@ -85,16 +85,19 @@
     border-radius: 999px;
   }
 
-  /* Ink hero surface with a soft electric glow + fine grid. */
+  /* Brand surface: the client's royal-blue gradient (#0D47A1 → #1976C0) with a fine scan-line texture. */
   .surface-ink {
-    background-color: #0f0e29;
+    background-color: #0d47a1;
     background-image:
-      radial-gradient(60rem 30rem at 110% -10%, rgba(101, 99, 241, 0.35), transparent 60%),
-      radial-gradient(40rem 24rem at -10% 120%, rgba(185, 233, 55, 0.12), transparent 60%),
-      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-    background-size: auto, auto, 28px 28px, 28px 28px;
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px),
+      radial-gradient(50rem 26rem at 115% -10%, rgba(255, 255, 255, 0.10), transparent 60%),
+      linear-gradient(180deg, #0d47a1 0%, #0f56ad 45%, #1565c0 75%, #1976c0 100%);
   }
+  /* Grey text tuned for dark navy reads poorly on blue: lift it to soft blue-white. */
+  .surface-ink .text-slate-300 { color: rgb(226 238 255 / 0.92); }
+  .surface-ink .text-slate-400 { color: rgb(214 230 252 / 0.82); }
+  .surface-ink .text-slate-500 { color: rgb(200 220 250 / 0.72); }
+  .surface-ink .text-slate-600 { color: rgb(190 212 246 / 0.7); }
 
   /* Animated stripes for the "charging" bar motif. */
   .charge-stripes {

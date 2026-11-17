@@ -10,7 +10,7 @@ import { StatusBadge } from "@/components/ui/badge";
 import { cn } from "@/components/ui/button";
 import { formatINR, formatRupees, formatRupeesShort } from "@/lib/money";
 
-const BRAND = "#5146e5";
+const BRAND = "#1565c0";
 const BRAND_SOFT = "#8285f8";
 
 /* ---------------------------------------------------------------- */

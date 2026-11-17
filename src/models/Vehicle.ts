@@ -12,6 +12,8 @@ export interface IVehicle {
   status: VehicleStatus;
   currentLocationType: "WAREHOUSE" | "DEALER" | "IN_TRANSIT" | "DISTRIBUTOR" | "OUTLET";
   currentLocationOutlet?: mongoose.Types.ObjectId | null;
+  /** Company warehouse holding the vehicle while currentLocationType is WAREHOUSE (null = main warehouse). */
+  warehouse?: mongoose.Types.ObjectId | null;
   /** Network sale / outlet transfer currently moving this vehicle. */
   transfer?: mongoose.Types.ObjectId | null;
   currentLocationDealer?: mongoose.Types.ObjectId | null;
@@ -48,6 +50,7 @@ const VehicleSchema = new Schema<IVehicle>(
     currentLocationDealer: { type: Schema.Types.ObjectId, ref: "Dealer", default: null, index: true },
     currentLocationDistributor: { type: Schema.Types.ObjectId, ref: "Distributor", default: null, index: true },
     currentLocationOutlet: { type: Schema.Types.ObjectId, ref: "Outlet", default: null, index: true },
+    warehouse: { type: Schema.Types.ObjectId, ref: "Warehouse", default: null, index: true },
     transfer: { type: Schema.Types.ObjectId, default: null },
     deliveryOrder: { type: Schema.Types.ObjectId, ref: "DeliveryOrder", default: null, index: true },
     purchase: { type: Schema.Types.ObjectId, ref: "Purchase", default: null },

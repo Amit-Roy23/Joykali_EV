@@ -16,7 +16,7 @@ const s = StyleSheet.create({
   name: { fontSize: 11, fontFamily: "Helvetica-Bold", marginBottom: 2 },
   line: { fontSize: 7.5, marginBottom: 1.5 },
   label: { color: "#64748b" },
-  code: { marginTop: 4, fontSize: 9, fontFamily: "Helvetica-Bold", color: "#4338ca" },
+  code: { marginTop: 4, fontSize: 9, fontFamily: "Helvetica-Bold", color: "#0d47a1" },
   foot: { position: "absolute", bottom: 0, left: 0, right: 0, height: 6, backgroundColor: "#c6f432" },
   back: { padding: 10, flexDirection: "row", gap: 10 },
   qr: { width: 78, height: 78 },
@@ -48,7 +48,7 @@ function Card({ company, emp, photo, qrPng, validTill }: IdCardProps) {
             <Image style={s.photo} src={{ data: photo.data, format: photo.contentType.includes("png") ? "png" : "jpg" }} />
           ) : (
             <View style={s.initials}>
-              <Text style={{ fontSize: 20, fontFamily: "Helvetica-Bold", color: "#4338ca" }}>{initials}</Text>
+              <Text style={{ fontSize: 20, fontFamily: "Helvetica-Bold", color: "#0d47a1" }}>{initials}</Text>
             </View>
           )}
           <View style={{ flex: 1 }}>

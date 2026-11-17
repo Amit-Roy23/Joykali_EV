@@ -44,7 +44,11 @@ export interface LogAuditParams {
     | "KYC"
     | "DEPOSIT"
     | "TARGET"
-    | "PARTNER_SALE";
+    | "PARTNER_SALE"
+    | "WAREHOUSE"
+    | "EXPENSE"
+    | "ACCOUNTS"
+    | "BUDGET";
   resourceId?: string;
   before?: any;
   after?: any;

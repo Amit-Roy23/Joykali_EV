@@ -52,6 +52,9 @@ export interface IDeliveryOrder extends Document {
   doCode: string; // JKDO/2026-27/0001
   order: mongoose.Types.ObjectId;
   orderCode: string;
+  /** Warehouse the units are picked and dispatched from (null = main warehouse). */
+  warehouse?: mongoose.Types.ObjectId | null;
+  warehouseName?: string;
   partyType: "DEALER" | "DISTRIBUTOR";
   party: mongoose.Types.ObjectId;
   partySnapshot: {
@@ -153,6 +156,8 @@ const DeliveryOrderSchema = new Schema<IDeliveryOrder>(
     doCode: { type: String, required: true, unique: true, index: true },
     order: { type: Schema.Types.ObjectId, ref: "ChannelOrder", required: true, index: true },
     orderCode: { type: String, required: true },
+    warehouse: { type: Schema.Types.ObjectId, ref: "Warehouse", default: null },
+    warehouseName: { type: String },
     partyType: { type: String, enum: ["DEALER", "DISTRIBUTOR"], required: true },
     party: { type: Schema.Types.ObjectId, required: true, index: true },
     partySnapshot: {

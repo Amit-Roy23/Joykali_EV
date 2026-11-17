@@ -8,10 +8,10 @@ export function BrandLogo({ className }: { className?: string }) {
       <defs>
         <linearGradient id="jk-ring" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#cdf264" />
-          <stop offset="1" stopColor="#8285f8" />
+          <stop offset="1" stopColor="#77a9ec" />
         </linearGradient>
       </defs>
-      <rect x="1" y="1" width="38" height="38" rx="12" fill="#17153a" stroke="url(#jk-ring)" strokeWidth="1.5" />
+      <rect x="1" y="1" width="38" height="38" rx="12" fill="#0a3170" stroke="url(#jk-ring)" strokeWidth="1.5" />
       <path d="M22.5 8 12 22.2h7.1L17.6 32 28 17.6h-7.2L22.5 8Z" fill="#cdf264" />
     </svg>
   );

@@ -112,11 +112,11 @@ function ExecutiveDashboard({ data, header }: { data: any; header: React.ReactNo
         <div className="surface-ink relative flex flex-col justify-between gap-6 overflow-hidden rounded-3xl p-5 text-white shadow-lift sm:p-6 lg:col-span-2">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Revenue this month</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Retail billing this month</p>
               <p className="mt-2 font-display text-4xl font-bold tracking-tight tabular sm:text-5xl">{formatRupeesShort(k.revenue)}</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-300">
                 {k.revenueTrend != null && <TrendPill value={k.revenueTrend} />}
-                <span>vs same days last month · {formatRupees(k.revenue)} invoiced</span>
+                <span>vs same days last month · {formatRupees(k.revenue)} billed incl. GST, registration &amp; insurance</span>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-center sm:gap-3">

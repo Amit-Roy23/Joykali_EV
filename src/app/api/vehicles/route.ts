@@ -1,3 +1,5 @@
+import { isValidObjectId } from "mongoose";
+import { inWarehouse } from "@/services/warehouseService";
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { Vehicle } from "@/models/Vehicle";
@@ -22,6 +24,7 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status");
     const locationType = searchParams.get("locationType");
     const dealerId = searchParams.get("dealerId");
+    const warehouseId = searchParams.get("warehouse");
 
     const scopeFilter = await getScopeFilter(auth.user, "inventory");
     const query: any = { ...scopeFilter };
@@ -38,11 +41,15 @@ export async function GET(req: NextRequest) {
     if (status) query.status = status;
     if (locationType) query.currentLocationType = locationType;
     if (dealerId) query.currentLocationDealer = dealerId;
+    if (warehouseId && isValidObjectId(warehouseId)) {
+      Object.assign(query, { currentLocationType: "WAREHOUSE", ...(await inWarehouse(warehouseId)) });
+    }
 
     const total = await Vehicle.countDocuments(query);
     const vehicles = await Vehicle.find(query)
       .populate("model")
       .populate("currentLocationDealer", "name dealerCode city")
+      .populate("warehouse", "name code")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

@@ -12,23 +12,23 @@ const dateTime = (d?: Date | string | null) =>
   d ? new Date(d).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }) : "—";
 
 const s = StyleSheet.create({
-  page: { padding: 28, fontSize: 8.5, fontFamily: "Helvetica", color: "#1e1b4b" },
-  top: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 2, borderBottomColor: "#4338ca", paddingBottom: 8, marginBottom: 10 },
+  page: { padding: 28, fontSize: 8.5, fontFamily: "Helvetica", color: "#0a2a5e" },
+  top: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 2, borderBottomColor: "#0d47a1", paddingBottom: 8, marginBottom: 10 },
   brand: { fontSize: 15, fontFamily: "Helvetica-Bold" },
   muted: { color: "#64748b" },
   title: { fontSize: 13, fontFamily: "Helvetica-Bold", textAlign: "right" },
   box: { borderWidth: 0.8, borderColor: "#cbd5e1", padding: 7, marginBottom: 8 },
   row: { flexDirection: "row" },
   half: { flex: 1 },
-  h: { fontFamily: "Helvetica-Bold", fontSize: 8, color: "#4338ca", marginBottom: 3, textTransform: "uppercase" },
+  h: { fontFamily: "Helvetica-Bold", fontSize: 8, color: "#0d47a1", marginBottom: 3, textTransform: "uppercase" },
   bold: { fontFamily: "Helvetica-Bold" },
-  th: { flexDirection: "row", backgroundColor: "#eef0ff", borderBottomWidth: 0.8, borderBottomColor: "#a5abfc", paddingVertical: 4 },
+  th: { flexDirection: "row", backgroundColor: "#e9f2fd", borderBottomWidth: 0.8, borderBottomColor: "#a9caf5", paddingVertical: 4 },
   tr: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#e2e8f0", paddingVertical: 3.5 },
   c: { paddingHorizontal: 3 },
   right: { textAlign: "right" },
   totals: { marginLeft: "auto", width: 230, marginTop: 6 },
   tline: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 2 },
-  grand: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "#1e1b4b", paddingTop: 4, marginTop: 2 },
+  grand: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: "#0a2a5e", paddingTop: 4, marginTop: 2 },
   sign: { marginTop: 26, flexDirection: "row", justifyContent: "space-between" },
   foot: { position: "absolute", bottom: 18, left: 28, right: 28, fontSize: 7, color: "#94a3b8", textAlign: "center" },
 });
@@ -145,4 +145,88 @@ function ChannelDoc({ company, d }: ChannelDocProps) {
 
 export async function generateChannelDocPDF(props: ChannelDocProps): Promise<Buffer> {
   return renderToBuffer(<ChannelDoc {...props} />);
+}
+
+/* ------------------------------------------------------------------ */
+/* Warehouse → warehouse transfer challan                              */
+/* ------------------------------------------------------------------ */
+export interface TransferChallanProps {
+  company: ChannelDocProps["company"];
+  t: any; // lean WarehouseTransfer with fromWarehouse / toWarehouse
+}
+
+function TransferChallan({ company, t }: TransferChallanProps) {
+  const addr = (w: any) => (w ? `${w.address}, ${w.city}${w.pincode ? ` - ${w.pincode}` : ""} (State code ${w.stateCode})` : "—");
+  return (
+    <Document title={t.transferCode}>
+      <Page size="A4" style={s.page}>
+        <View style={s.top}>
+          <View>
+            <Text style={s.brand}>{company.name}</Text>
+            <Text style={s.muted}>{company.address}, {company.city}, {company.state} - {company.pincode}</Text>
+            <Text style={s.muted}>GSTIN {company.gstin} · PAN {company.pan}</Text>
+          </View>
+          <View>
+            <Text style={s.title}>DELIVERY CHALLAN</Text>
+            <Text style={[s.muted, s.right]}>Stock transfer between own warehouses — not a sale</Text>
+          </View>
+        </View>
+        <View style={[s.row, { gap: 8 }]}>
+          <View style={[s.box, s.half]}>
+            <Text style={s.h}>From</Text>
+            <Text style={s.bold}>{t.fromName}</Text>
+            <Text>{addr(t.fromWarehouse)}</Text>
+            <Text style={[s.h, { marginTop: 6 }]}>To</Text>
+            <Text style={s.bold}>{t.toName}</Text>
+            <Text>{addr(t.toWarehouse)}</Text>
+          </View>
+          <View style={[s.box, s.half]}>
+            <Text style={s.h}>Document</Text>
+            <Text>Challan no: <Text style={s.bold}>{t.transferCode}</Text></Text>
+            <Text>Date: {date(t.createdAt)}</Text>
+            <Text>Movement: {t.interState ? `Inter-state branch transfer · Tax invoice ${t.transport?.invoiceNo || "—"}` : "Intra-state, same GSTIN"}</Text>
+            <Text>E-way bill: {t.transport?.ewayBillNo || "not required"}</Text>
+            <Text>Vehicle: {t.transport?.vehicleNo || "—"} · Driver: {t.transport?.driverName || "—"} {t.transport?.driverPhone ? `(${t.transport.driverPhone})` : ""}</Text>
+            <Text>Sent by: {t.createdByName}</Text>
+          </View>
+        </View>
+        <View style={s.th}>
+          <Text style={[s.c, { width: 20 }]}>#</Text>
+          <Text style={[s.c, { flex: 1 }]}>Description</Text>
+          <Text style={[s.c, { width: 130 }]}>Chassis</Text>
+          <Text style={[s.c, { width: 90 }, s.right]}>Value (cost)</Text>
+        </View>
+        {t.vehicles.map((v: any, i: number) => (
+          <View key={v.chassisNumber} style={s.tr} wrap={false}>
+            <Text style={[s.c, { width: 20 }]}>{i + 1}</Text>
+            <Text style={[s.c, { flex: 1 }]}>{v.modelName} — Electric vehicle</Text>
+            <Text style={[s.c, { width: 130 }]}>{v.chassisNumber}</Text>
+            <Text style={[s.c, { width: 90 }, s.right]}>{money(v.value || 0)}</Text>
+          </View>
+        ))}
+        <View style={s.totals}>
+          <View style={s.grand}><Text style={s.bold}>{t.vehicles.length} unit(s) · Consignment value</Text><Text style={s.bold}>{money(t.totalValue || 0)}</Text></View>
+        </View>
+        <Text style={{ marginTop: 6 }}>Amount in words: <Text style={s.bold}>{numberToWordsINR(t.totalValue || 0)}</Text></Text>
+        {t.remarks ? <Text style={{ marginTop: 6 }}>Remarks: {t.remarks}</Text> : null}
+        <View style={s.sign}>
+          <View>
+            <Text style={s.muted}>Received the above vehicles at {t.toName}</Text>
+            <Text style={{ marginTop: 22 }}>Store in-charge signature</Text>
+          </View>
+          <View>
+            <Text style={[s.right, s.bold]}>For {company.name}</Text>
+            <Text style={{ marginTop: 22, textAlign: "right" }}>Authorised signatory</Text>
+          </View>
+        </View>
+        <Text style={s.foot} fixed>
+          Delivery challan under Rule 55, CGST Rules — transfer of own goods between places of business. · Computer-generated document.
+        </Text>
+      </Page>
+    </Document>
+  );
+}
+
+export async function generateTransferChallanPDF(props: TransferChallanProps): Promise<Buffer> {
+  return renderToBuffer(<TransferChallan {...props} />);
 }

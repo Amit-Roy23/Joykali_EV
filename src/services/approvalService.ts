@@ -15,12 +15,14 @@ import { PartnerTarget } from "@/models/PartnerTarget";
 import { LedgerEntry } from "@/models/LedgerEntry";
 import { generateFyCode } from "@/lib/codeGenerator";
 import { AdvanceLoan, ExpenseClaim, Resignation } from "@/models/Hr";
+import { Expense } from "@/models/Accounts";
+import { SalaryTemplate } from "@/models/SalaryTemplate";
 import { activateAdvance, closeSettlement } from "./hrMoneyService";
 import { assertCredit } from "./creditService";
 import { recalculateForScheme } from "./incentiveService";
 
-export type ApprovalKind = "order" | "scheme" | "payroll" | "credit" | "salary" | "commission" | "advance" | "claim" | "settlement";
-export const APPROVAL_KINDS: ApprovalKind[] = ["order", "scheme", "payroll", "credit", "salary", "commission", "advance", "claim", "settlement"];
+export type ApprovalKind = "order" | "scheme" | "payroll" | "credit" | "salary" | "commission" | "advance" | "claim" | "settlement" | "expense" | "salaryTemplate";
+export const APPROVAL_KINDS: ApprovalKind[] = ["order", "scheme", "payroll", "credit", "salary", "commission", "advance", "claim", "settlement", "expense", "salaryTemplate"];
 
 export const KIND_LABEL: Record<ApprovalKind, string> = {
   order: "Vehicle order",
@@ -32,6 +34,8 @@ export const KIND_LABEL: Record<ApprovalKind, string> = {
   advance: "Salary advance / loan",
   claim: "Expense claim",
   settlement: "Full & final settlement",
+  expense: "Company expense",
+  salaryTemplate: "Salary structure template",
 };
 
 const rupees = (p: number) => `₹${Math.round(p / 100).toLocaleString("en-IN")}`;
@@ -216,6 +220,34 @@ export async function signApproval(
     await r.save();
     if (result.status === "APPROVED") await closeSettlement(r._id);
     summary = `${r.employeeName} net ${rupees(r.settlement.net)}`;
+  } else if (kind === "expense") {
+    const e = await Expense.findById(id);
+    if (!e) throw new ApprovalError("Expense not found", 404);
+    if (e.status !== "PENDING_APPROVAL") throw new ApprovalError(`Expense is ${e.status.toLowerCase().replace("_", " ")}`);
+    if (String(e.createdBy) === user.userId) throw new ApprovalError("You cannot approve an expense you entered", 403);
+    result = sign(e.approvals, user, decision, note);
+    e.approvals = result.signatures;
+    if (result.status === "APPROVED") e.status = "APPROVED";
+    if (result.status === "REJECTED") {
+      e.status = "REJECTED";
+      e.rejectReason = note;
+    }
+    await e.save();
+    summary = `${e.code} ${e.category} ${rupees(e.total)}`;
+  } else if (kind === "salaryTemplate") {
+    const t = await SalaryTemplate.findById(id);
+    if (!t) throw new ApprovalError("Salary template not found", 404);
+    if (t.status !== "PENDING_APPROVAL") throw new ApprovalError(`Template is ${t.status.toLowerCase().replace("_", " ")}`);
+    if (String(t.proposedBy) === user.userId) throw new ApprovalError("You cannot approve a template you proposed", 403);
+    result = sign(t.approvals, user, decision, note);
+    t.approvals = result.signatures;
+    if (result.status === "APPROVED") {
+      t.status = "APPROVED";
+      await SalaryTemplate.updateMany({ _id: { $ne: t._id }, status: "APPROVED", effectiveFrom: t.effectiveFrom }, { $set: { status: "SUPERSEDED" } });
+    }
+    if (result.status === "REJECTED") t.status = "REJECTED";
+    await t.save();
+    summary = `Salary template from ${t.effectiveFrom}`;
   } else {
     throw new ApprovalError("Unknown approval type", 400);
   }
@@ -223,7 +255,7 @@ export async function signApproval(
   await logAudit({
     user,
     action: decision === "APPROVED" ? "APPROVE" : "REJECT",
-    resource: ({ order: "ORDER", scheme: "SCHEME", payroll: "PAYROLL", credit: "CREDIT", salary: "SALARY", commission: "TARGET", advance: "PAYROLL", claim: "PAYROLL", settlement: "PAYROLL" } as const)[kind],
+    resource: ({ order: "ORDER", scheme: "SCHEME", payroll: "PAYROLL", credit: "CREDIT", salary: "SALARY", commission: "TARGET", advance: "PAYROLL", claim: "PAYROLL", settlement: "PAYROLL", expense: "EXPENSE", salaryTemplate: "SALARY" } as const)[kind],
     resourceId: id,
     after: { level: user.role, decision, note, outcome: result.status, summary },
   });
@@ -403,6 +435,24 @@ export async function listPending(user: JWTPayload): Promise<PendingItem[]> {
       subtitle: r.settlement.lines.filter((l: any) => l.amount).map((l: any) => `${l.label}: ${rupees(l.amount)}`).join(" · "),
       amount: r.settlement.net, submittedAt: r.updatedAt, waitingFor: waitingLabel(r.approvals),
       canSign: mine(r.approvals) && String(r.employee) !== user.userId, signatures: r.approvals || [], href: `/hr/exits`,
+    });
+  }
+  for (const e of (await Expense.find({ status: "PENDING_APPROVAL" }).sort({ createdAt: 1 }).lean()) as any[]) {
+    items.push({
+      kind: "expense", kindLabel: KIND_LABEL.expense, id: String(e._id),
+      title: `${e.code} — ${e.category}`,
+      subtitle: `${e.description}${e.vendor ? ` · ${e.vendor}` : ""} · bill ${e.billNo || "—"} dated ${e.date} · ${e.costCentre || "Head office"} · entered by ${e.createdByName}`,
+      amount: e.total, submittedAt: e.createdAt, waitingFor: waitingLabel(e.approvals),
+      canSign: mine(e.approvals) && String(e.createdBy) !== user.userId, signatures: e.approvals || [], href: `/accounts/expenses`,
+    });
+  }
+  for (const t of (await SalaryTemplate.find({ status: "PENDING_APPROVAL" }).sort({ createdAt: 1 }).lean()) as any[]) {
+    items.push({
+      kind: "salaryTemplate", kindLabel: KIND_LABEL.salaryTemplate, id: String(t._id),
+      title: `Salary columns from ${t.effectiveFrom}`,
+      subtitle: `${t.components.filter((c: any) => c.active !== false).map((c: any) => c.name).join(", ")} · ${t.reason || ""} · by ${t.proposedByName}`,
+      submittedAt: t.createdAt, waitingFor: waitingLabel(t.approvals),
+      canSign: mine(t.approvals) && String(t.proposedBy) !== user.userId, signatures: t.approvals || [], href: `/payroll/setup`,
     });
   }
   return items.sort((a, b) => Number(b.canSign) - Number(a.canSign) || +new Date(a.submittedAt) - +new Date(b.submittedAt));

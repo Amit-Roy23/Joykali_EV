@@ -250,6 +250,16 @@ export async function updateProfile(user: JWTPayload, employeeId: string, input:
     if (input.shiftId !== undefined) set.shift = input.shiftId && mongoose.isValidObjectId(input.shiftId) ? oid(input.shiftId) : null;
     if (input.attendanceMode) set.attendanceMode = input.attendanceMode === "OFFICE" ? "OFFICE" : "FIELD";
     if (input.noticeDays != null) set.noticeDays = Math.min(180, Math.max(0, Number(input.noticeDays)));
+    if (input.uan !== undefined) {
+      const uan = String(input.uan || "").replace(/\s/g, "");
+      if (uan && !/^\d{12}$/.test(uan)) throw new HrError("UAN must be 12 digits");
+      set.uan = uan;
+    }
+    if (input.esiNumber !== undefined) {
+      const ip = String(input.esiNumber || "").replace(/\s/g, "");
+      if (ip && !/^\d{10}$/.test(ip)) throw new HrError("ESI IP number must be 10 digits");
+      set.esiNumber = ip;
+    }
   }
   await User.updateOne({ _id: oid(employeeId) }, { $set: set });
   await logAudit({ user, action: "UPDATE", resource: "EMPLOYEE", resourceId: employeeId, after: set });
