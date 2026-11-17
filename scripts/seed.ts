@@ -84,6 +84,11 @@ import {
 import { Department, Shift, Holiday, LeaveType, LeaveRequest, AttendancePunch, AttendanceDay, Regularization, EmployeeTarget, EmployeeDocument } from "../src/models/Hr";
 import { requestAdvance, submitClaim, verifyClaim, submitResignation } from "../src/services/hrMoneyService";
 import { applyLeave, approveOvertime } from "../src/services/hrService";
+import { createWarehouseTransfer, mainWarehouse, receiveWarehouseTransfer, saveWarehouse, setMinStock } from "../src/services/warehouseService";
+import { accountBalances, createExpense, createVoucher, ensureAccounts, recordPayout, saveMoneyAccount, setBudget, SALARY_HEAD } from "../src/services/accountsService";
+import { proposeTemplate } from "../src/services/salaryTemplateService";
+import { DEFAULT_STATUTORY } from "../src/services/salaryTemplateEngine";
+import { MoneyAccount } from "../src/models/Accounts";
 
 export const DEMO_PASSWORD = "Joykali@123";
 
@@ -709,7 +714,7 @@ async function main() {
   }
 
   // Fresh stock for channel orders.
-  const bump: Array<[string, number]> = [["FALCON", 14], ["STORM", 12], ["CITYRIDE", 6], ["CARGO", 4]];
+  const bump: Array<[string, number]> = [["FALCON", 14], ["STORM", 12], ["ZIPPY", 8], ["CITYRIDE", 6], ["CARGO", 4]];
   for (const supplier of [supplierMain, supplierCargo]) {
     const lineItems = bump
       .map(([k, q]) => ({ spec: modelSpecs.find((m) => m.key === k)!, q }))
@@ -1088,6 +1093,180 @@ async function main() {
   void hrPayload;
   void AttendanceDay;
 
+  // ---------------------------------------------------------------------------
+  // Phase 6: several warehouses with transfers, accounts (cash/bank books,
+  // expenses, vouchers, payouts, budgets) and the editable salary structure.
+  // ---------------------------------------------------------------------------
+  console.log("• Warehouses, store & accounts logins, transfers");
+  const PNG = { name: "bill.png", type: "image/png", data: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64") };
+  const storeUser = await makeUser("STORE_MANAGER", "Bapi Mahato", "store@joykaliev.in", "Store Manager — Siliguri Warehouse", asmNorth, { basic: 11000, hra: 4400, conveyance: 1600, other: 2000, esi: true }, { attendanceMode: "OFFICE" });
+  const accountsUser = await makeUser("ACCOUNTANT", "Nabanita Dutta", "accounts@joykaliev.in", "Accounts Manager", mp, { basic: 20000, hra: 8000, conveyance: 1600, other: 4400 }, { attendanceMode: "OFFICE" });
+  const storePayload = asPayload(storeUser);
+  const accountsPayload = asPayload(accountsUser);
+  const mainWh = await mainWarehouse();
+  mainWh.name = "Main Warehouse — Barasat";
+  await mainWh.save();
+  const siliguri = await saveWarehouse(asPayload(admin), { name: "Siliguri Warehouse", address: "Plot 7, Sevoke Road Industrial Estate", city: "Siliguri", state: "West Bengal", stateCode: "19", pincode: "734001", phone: "9800012345", managerId: String(storeUser._id) });
+  const dhanbad = await saveWarehouse(asPayload(admin), { name: "Dhanbad Depot", address: "Govindpur Road, Near Bus Stand", city: "Dhanbad", state: "Jharkhand", stateCode: "20", pincode: "828109", phone: "9800054321" });
+
+  // Stock bought straight into Siliguri.
+  const sgLines = [["STORM", 4], ["ZIPPY", 3]].map(([k, q]: any) => {
+    const spec = modelSpecs.find((m) => m.key === k)!;
+    return {
+      model: String(models[k]._id), quantity: q, unitCost: spec.cost, gstRate: 5,
+      vehicles: Array.from({ length: q }, () => {
+        chassisSeq += 1;
+        const code = `${k.slice(0, 3)}${current.year % 100}${String(current.month).padStart(2, "0")}${chassisSeq}`;
+        return { chassisNumber: `MD9JK${code}`, motorNumber: `MTR${code}`, batteryNumber: `BAT${code}`, chargerNumber: `CHG${code}`, color: pick([...COLORS]) };
+      }),
+    };
+  });
+  await createPurchaseAgain({ supplier: String(supplierMain._id), invoiceNumber: `VDM/${current.year}/SG/${between(100, 999)}`, invoiceDate: ymd(current.year, current.month, Math.max(1, todayIst - 6)), lineItems: sgLines, notes: "Direct to Siliguri", warehouseId: String(siliguri._id) }, bhPayload);
+
+  // Main → Siliguri: sent by the Business Head, checked in by the Siliguri store manager.
+  const wt1 = await createWarehouseTransfer(bhPayload, {
+    fromId: String(mainWh._id), toId: String(siliguri._id),
+    lines: [{ modelId: M("FALCON"), quantity: 2 }, { modelId: M("CITYRIDE"), quantity: 1 }],
+    transport: { vehicleNo: "WB 23 C 4410", driverName: "Gopal Roy", driverPhone: "9832011223", ewayBillNo: "331009876512" },
+    remarks: "Stock for North Bengal dealers",
+  });
+  await receiveWarehouseTransfer(storePayload, String(wt1._id));
+  // Main → Dhanbad (another state): taxable branch transfer, still on the road.
+  await createWarehouseTransfer(bhPayload, {
+    fromId: String(mainWh._id), toId: String(dhanbad._id),
+    lines: [{ modelId: M("STORM"), quantity: 2 }],
+    transport: { vehicleNo: "WB 25 F 9021", driverName: "Shyamal Saha", driverPhone: "9830099887", ewayBillNo: "331009876598", invoiceNo: "JKBT/2026-27/0003" },
+    remarks: "Opening stock for the Jharkhand depot",
+  });
+  // Siliguri → Main: sent by the store manager, waiting for Barasat to check it in.
+  await createWarehouseTransfer(storePayload, {
+    fromId: String(siliguri._id), toId: String(mainWh._id),
+    lines: [{ modelId: M("ZIPPY"), quantity: 1 }],
+    transport: { vehicleNo: "WB 73 B 1180", driverName: "Mithun Paul", driverPhone: "9775501234" },
+    remarks: "Slow mover back to Barasat",
+  });
+  await setMinStock(asPayload(admin), String(siliguri._id), [{ modelId: M("FALCON"), qty: 4 }, { modelId: M("STORM"), qty: 3 }, { modelId: M("CITYRIDE"), qty: 2 }]);
+  await setMinStock(asPayload(admin), String(mainWh._id), [{ modelId: M("AUTO"), qty: 2 }, { modelId: M("CARGO"), qty: 3 }]);
+
+  // PF / ESI numbers for everyone on payroll.
+  for (const u of await User.find({ role: { $in: ["FEC", "OUTLET", "ASM", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] } }).select("_id").lean()) {
+    const ss: any = await SalaryStructure.findOne({ employee: u._id }).lean();
+    await User.updateOne({ _id: u._id }, { $set: { uan: `1009${between(10000000, 99999999)}`, esiNumber: ss?.fixedDeductions?.esi ? `31${between(10000000, 99999999)}` : "" } });
+  }
+
+  console.log("• Salary structure with editable columns (approved) + current month payroll");
+  const tpl = await proposeTemplate(hrPayload, {
+    effectiveFrom: current.period,
+    reason: "Add a medical allowance and a staff welfare fund as agreed with the staff committee",
+    components: [
+      { key: "basic", name: "Basic", kind: "EARNING", calc: "PCT_GROSS", value: 50, pfWage: true, prorate: true, active: true },
+      { key: "hra", name: "HRA", kind: "EARNING", calc: "PCT_BASIC", value: 40, pfWage: false, prorate: true, active: true },
+      { key: "conveyance", name: "Conveyance", kind: "EARNING", calc: "FIXED", value: 160000, pfWage: false, prorate: true, active: true },
+      { key: "medical", name: "Medical allowance", kind: "EARNING", calc: "PCT_BASIC", value: 5, pfWage: false, prorate: true, active: true },
+      { key: "special", name: "Special allowance", kind: "EARNING", calc: "BALANCE", value: 0, pfWage: false, prorate: true, active: true },
+      { key: "welfare", name: "Staff welfare fund", kind: "DEDUCTION", calc: "FIXED", value: 5000, pfWage: false, prorate: false, active: true },
+    ],
+    statutory: { ...DEFAULT_STATUTORY },
+  });
+  await signApproval("salaryTemplate" as any, String(tpl._id), bhPayload, "APPROVED");
+  await signApproval("salaryTemplate" as any, String(tpl._id), mpPayload, "APPROVED");
+  await generateDraftPayrollRun(current.year, current.month, bhPayload, `Monthly payroll ${current.period}`);
+
+  console.log("• Accounts: cash & bank, supplier payments, salaries paid, expenses, vouchers, budgets");
+  await ensureAccounts();
+  const fyFrom = `${current.month < 4 ? current.year - 1 : current.year}-04-01`;
+  const cashAcc = await MoneyAccount.findOne({ kind: "CASH" });
+  const bankAcc = await MoneyAccount.findOne({ kind: "BANK" });
+  cashAcc!.openingBalance = rupeesToPaise(150000);
+  cashAcc!.openingDate = fyFrom;
+  await cashAcc!.save();
+  bankAcc!.name = "SBI Current A/c — Barasat";
+  bankAcc!.bankName = "State Bank of India";
+  bankAcc!.accountNo = "38291045562";
+  bankAcc!.ifsc = "SBIN0001234";
+  bankAcc!.openingBalance = rupeesToPaise(5000000);
+  bankAcc!.openingDate = fyFrom;
+  await bankAcc!.save();
+  const hdfc = await saveMoneyAccount(accountsPayload, { name: "HDFC Current A/c — Salaries", kind: "BANK", bankName: "HDFC Bank", accountNo: "50200061234567", ifsc: "HDFC0004567", openingRupees: 1200000, openingDate: fyFrom });
+  const dayOf = (p: { year: number; month: number }, d: number) => `${p.year}-${String(p.month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const todayYmd = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+  const clampDay = (s: string) => (s > todayYmd ? todayYmd : s);
+
+  // Supplier invoices: older ones paid in full from SBI, the latest left part-paid / unpaid.
+  const purchasesAll = await (await import("../src/models/Purchase")).Purchase.find().sort({ invoiceDate: 1 }).lean();
+  for (const [i, pch] of purchasesAll.entries()) {
+    const inv = new Date(new Date(pch.invoiceDate).getTime() + 330 * 60000);
+    const age = (Date.now() - inv.getTime()) / 86400000;
+    if (age < 10) continue;
+    const payOn = clampDay(new Date(inv.getTime() + 20 * 86400000).toISOString().slice(0, 10));
+    const part = i === purchasesAll.length - 4;
+    await recordPayout(accountsPayload, "purchase", String(pch._id), { accountId: String(bankAcc!._id), date: payOn, reference: `NEFT/${between(100000, 999999)}`, ...(part ? { amountRupees: Math.round(pch.totalAmount / 200) } : {}) });
+  }
+  // Salaries of locked months paid from HDFC on the 1st of the next month; the loan paid out in cash… by bank.
+  for (const r of await PayrollRun.find({ status: "LOCKED" }).sort({ year: 1, month: 1 }).lean()) {
+    const nm = r.month === 12 ? { year: r.year + 1, month: 1 } : { year: r.year, month: r.month + 1 };
+    await recordPayout(accountsPayload, "payroll", String(r._id), { accountId: String(hdfc._id), date: clampDay(dayOf(nm, 1)), reference: `Salary ${r.runCode}` });
+  }
+  await recordPayout(accountsPayload, "advance", String(loan._id), { accountId: String(bankAcc!._id), date: todayYmd, reference: "IMPS to employee" });
+
+  // Working-capital loan from the bank in the first month (a receipt that is not income).
+  await createVoucher(accountsPayload, { type: "RECEIPT", date: clampDay(dayOf(first, 2)), accountId: String(bankAcc!._id), amountRupees: 5000000, head: "Loan received", narration: "SBI working-capital term loan disbursed", reference: "SBI/WCTL/2026/118" });
+  // Contra: fund the salary account from SBI each month, deposit surplus cash.
+  for (const p of months.slice(0, -1)) {
+    await createVoucher(accountsPayload, { type: "CONTRA", date: clampDay(dayOf(p, 28)), accountId: String(bankAcc!._id), toAccountId: String(hdfc._id), amountRupees: 600000, head: "Transfer between banks", narration: `Fund salary account for ${p.period}` });
+  }
+  // Showroom cash banked at every month end, keeping a ₹50,000 float.
+  for (const p of months.slice(0, -1)) {
+    const eom = clampDay(dayOf(p, new Date(Date.UTC(p.year, p.month, 0)).getUTCDate()));
+    const bal = (await accountBalances(eom)).find((a: any) => a.kind === "CASH")!.balance;
+    if (bal > rupeesToPaise(60000)) await createVoucher(accountsPayload, { type: "CONTRA", date: eom, accountId: String(cashAcc!._id), toAccountId: String(bankAcc!._id), amountRupees: Math.floor((bal - rupeesToPaise(50000)) / 100), head: "Cash deposited in bank", narration: `Month-end cash deposit ${p.period}` });
+  }
+  // Monthly running costs.
+  for (const [mi, p] of months.entries()) {
+    const last = mi === months.length - 1;
+    const d = (n: number) => clampDay(dayOf(p, n));
+    const mk = async (x: any, approve: boolean, pay: { acc: any; on: string } | null) => {
+      const e = await createExpense(accountsPayload, { ...x, bill: PNG, payNow: !approve && pay ? { accountId: String(pay.acc._id), date: pay.on, reference: x.ref } : null });
+      if (approve) {
+        await signApproval("expense" as any, String(e._id), bhPayload, "APPROVED");
+        await signApproval("expense" as any, String(e._id), mpPayload, "APPROVED");
+        if (pay) await recordPayout(accountsPayload, "expense", String(e._id), { accountId: String(pay.acc._id), date: pay.on, reference: x.ref });
+      }
+      return e;
+    };
+    await mk({ date: d(1), category: "Rent", description: `Barasat warehouse & office rent ${p.period}`, vendor: "Sri Durga Properties", billNo: `R/${p.period}`, amountRupees: 45000, gstRupees: 8100, gstInput: true, costCentre: "Main Warehouse — Barasat", ref: `CHQ ${between(100000, 999999)}` }, true, last && todayIst < 6 ? null : { acc: bankAcc, on: d(5) });
+    await mk({ date: d(8), category: "Electricity & water", description: `WBSEDCL bill ${p.period} — warehouse & charging bay`, vendor: "WBSEDCL", billNo: `E${between(10000, 99999)}`, amountRupees: 6600 + between(0, 2400), costCentre: "Main Warehouse — Barasat", ref: "UPI" }, false, { acc: bankAcc, on: d(9) });
+    await mk({ date: d(12), category: "Fuel & conveyance", description: "Diesel for the delivery truck and pilot runs", vendor: "IOCL Barasat", amountRupees: 3200 + between(0, 1800), costCentre: "Head office", ref: "cash" }, false, { acc: cashAcc, on: d(12) });
+    if (mi % 2 === 0) await mk({ date: d(15), category: "Repairs & maintenance", description: "Charger and lift servicing", vendor: "PowerTech Services", amountRupees: 4600, gstRupees: 828, gstInput: true, costCentre: "Main Warehouse — Barasat", ref: "cash" }, false, { acc: cashAcc, on: d(16) });
+    if (mi % 3 === 1) await mk({ date: d(18), category: "Marketing & advertising", description: "Local newspaper ads and hoardings", vendor: "Bartaman Ads", amountRupees: 22000, gstRupees: 3960, gstInput: true, costCentre: "Head office", ref: `NEFT ${between(10000, 99999)}` }, true, { acc: bankAcc, on: d(22) });
+    await mk({ date: d(20), category: "Telephone & internet", description: "Jio fibre + staff SIMs", vendor: "Reliance Jio", amountRupees: 2950, gstRupees: 531, gstInput: true, costCentre: "Head office", ref: "auto-debit" }, false, { acc: bankAcc, on: d(20) });
+    await createVoucher(accountsPayload, { type: "PAYMENT", date: d(Math.min(25, 28)), accountId: String(bankAcc!._id), amountRupees: 350 + between(0, 300), head: "Bank charges", narration: "NEFT / RTGS charges for the month" });
+    if (!last) await createVoucher(accountsPayload, { type: "RECEIPT", date: d(28), accountId: String(bankAcc!._id), amountRupees: 4200 + between(0, 800), head: "Interest income", narration: "Sweep FD interest" });
+  }
+  // This month: marketing bill with the Business Head's signature, waiting for the MP; an approved bill to pay; a store petty-cash bill.
+  const mkt = await createExpense(accountsPayload, { date: todayYmd, category: "Marketing & advertising", description: "Puja pandal branding — Siliguri", vendor: "North Star Events", billNo: "NSE/118", amountRupees: 35000, gstRupees: 6300, gstInput: true, costCentre: "Siliguri Warehouse", bill: PNG });
+  await signApproval("expense" as any, String(mkt._id), bhPayload, "APPROVED");
+  const ins = await createExpense(accountsPayload, { date: todayYmd, category: "Insurance", description: "Stock-in-warehouse insurance renewal", vendor: "New India Assurance", billNo: "NIA/77821", amountRupees: 18500, gstRupees: 3330, costCentre: "Main Warehouse — Barasat", bill: PNG });
+  await signApproval("expense" as any, String(ins._id), bhPayload, "APPROVED");
+  await signApproval("expense" as any, String(ins._id), mpPayload, "APPROVED");
+  await createExpense(storePayload, { date: todayYmd, category: "Office supplies & printing", description: "Stock register and labels", vendor: "Sevoke Stationers", amountRupees: 640, costCentre: "Siliguri Warehouse" });
+  // Surplus showroom cash deposited in the bank.
+  const cashNow = (await accountBalances(todayYmd)).find((a: any) => a.kind === "CASH")!.balance;
+  if (cashNow > rupeesToPaise(60000)) await createVoucher(accountsPayload, { type: "CONTRA", date: todayYmd, accountId: String(cashAcc!._id), toAccountId: String(bankAcc!._id), amountRupees: Math.floor((cashNow - rupeesToPaise(50000)) / 100), head: "Cash deposited in bank", narration: "Cash deposited at SBI Barasat" });
+  // Budgets for this month and last month.
+  for (const p of months.slice(-2)) {
+    await setBudget(accountsPayload, p.period, [
+      { head: SALARY_HEAD, amountRupees: 620000 },
+      { head: "Rent", amountRupees: 45000 },
+      { head: "Electricity & water", amountRupees: 9000 },
+      { head: "Fuel & conveyance", amountRupees: 4000 },
+      { head: "Marketing & advertising", amountRupees: 30000 },
+      { head: "Repairs & maintenance", amountRupees: 5000 },
+      { head: "Telephone & internet", amountRupees: 3000 },
+      { head: "Insurance", amountRupees: 10000 },
+    ]);
+  }
+
   // A light audit trail so the Audit screen isn't empty.
   for (const u of [admin, mp, bh, asmNorth, fecs[0].user]) {
     await logAudit({ user: asPayload(u), action: "LOGIN", resource: "AUTH", resourceId: String(u._id), ipAddress: "103.42.18.7" });
@@ -1097,7 +1276,7 @@ async function main() {
   const vehicles = await Vehicle.countDocuments();
   console.log(`\nSeed complete: ${saleIds.length} sales, ${vehicles} vehicles, ${runs} payroll runs.`);
   console.log(`\nDemo accounts (password: ${DEMO_PASSWORD})`);
-  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR", "SUPER_DISTRIBUTOR", "DEALER", "SUB_DEALER", "OUTLET", "HR_MANAGER"] } }).sort({ role: 1 }).lean()) {
+  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR", "SUPER_DISTRIBUTOR", "DEALER", "SUB_DEALER", "OUTLET", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER"] } }).sort({ role: 1 }).lean()) {
     console.log(`  ${u.role.padEnd(17)} ${u.employeeCode.padEnd(13)} ${u.email}`);
   }
   console.log(`  FEC               JKE-FEC-0001  fec1@joykaliev.in (… fec12)`);
@@ -1108,6 +1287,8 @@ async function main() {
   console.log(`  SUB_DEALER        JKSB-0001     subdealer1@joykaliev.in (buys from Memari)`);
   console.log(`  OUTLET            showroom@joykaliev.in (Salt Lake showroom counter)`);
   console.log(`  HR_MANAGER        hr@joykaliev.in      (attendance, leave, exits)`);
+  console.log(`  ACCOUNTANT        accounts@joykaliev.in (cash & bank books, expenses, P&L)`);
+  console.log(`  STORE_MANAGER     store@joykaliev.in    (Siliguri warehouse)`);
   await mongoose.disconnect();
 }
 

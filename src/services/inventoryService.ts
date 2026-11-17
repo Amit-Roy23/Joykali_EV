@@ -4,6 +4,7 @@ import { StockMovement } from "@/models/StockMovement";
 import { withTransaction } from "@/lib/db";
 import { JWTPayload } from "@/types";
 import mongoose from "mongoose";
+import { mainWarehouse } from "./warehouseService";
 
 export async function bulkAllocateVehiclesToDealer(
   vehicleIds: string[],
@@ -70,6 +71,7 @@ export async function returnVehicleToWarehouse(
 
     vehicle.status = "IN_STOCK";
     vehicle.currentLocationType = "WAREHOUSE";
+    vehicle.warehouse = (await mainWarehouse(session))._id as any;
     vehicle.currentLocationDealer = null;
     await vehicle.save({ session });
 

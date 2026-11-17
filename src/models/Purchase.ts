@@ -15,6 +15,9 @@ export interface IPaymentRecord {
   mode: PaymentMode;
   reference?: string;
   notes?: string;
+  /** Cash / bank account it was paid from (Accounts). */
+  account?: mongoose.Types.ObjectId | null;
+  byName?: string;
 }
 
 export interface IPurchase extends Document {
@@ -29,6 +32,8 @@ export interface IPurchase extends Document {
   paymentStatus: PaymentStatus;
   payments: IPaymentRecord[];
   notes?: string;
+  /** Warehouse the goods were received into. */
+  warehouse?: mongoose.Types.ObjectId | null;
   createdBy: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -52,6 +57,8 @@ const PaymentRecordSchema = new Schema<IPaymentRecord>(
     mode: { type: String, enum: ["CASH", "UPI", "BANK", "FINANCE"], required: true },
     reference: { type: String },
     notes: { type: String },
+    account: { type: Schema.Types.ObjectId, ref: "MoneyAccount", default: null },
+    byName: { type: String },
   },
   { _id: false }
 );
@@ -74,6 +81,7 @@ const PurchaseSchema = new Schema<IPurchase>(
     },
     payments: [PaymentRecordSchema],
     notes: { type: String },
+    warehouse: { type: Schema.Types.ObjectId, ref: "Warehouse", default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },
   { timestamps: true }

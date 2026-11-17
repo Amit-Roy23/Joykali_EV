@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { ApprovalSignature, ApprovalSignatureSchema } from "@/lib/approval";
+import { PaymentStamp, PaymentStampSchema } from "./Accounts";
 
 const ref = (m: string, extra: Record<string, any> = {}) => ({ type: Schema.Types.ObjectId, ref: m, ...extra });
 const model = <T,>(name: string, schema: Schema<T>): Model<T> => (mongoose.models[name] as Model<T>) || mongoose.model<T>(name, schema);
@@ -287,6 +288,8 @@ export interface IAdvanceLoan extends Document {
   startPeriod?: string; // first payroll month that recovers
   balance: number;
   recoveries: Array<{ period: string; amount: number; payrollRun?: mongoose.Types.ObjectId; at: Date; note?: string }>;
+  /** Paid out to the employee by Accounts (cash or bank). */
+  disbursement?: PaymentStamp | null;
   createdAt: Date;
 }
 export const AdvanceLoan = model<IAdvanceLoan>(
@@ -305,6 +308,7 @@ export const AdvanceLoan = model<IAdvanceLoan>(
       approvals: [ApprovalSignatureSchema],
       startPeriod: { type: String },
       balance: { type: Number, required: true },
+      disbursement: { type: PaymentStampSchema, default: null },
       recoveries: [
         new Schema(
           { period: String, amount: Number, payrollRun: { type: Schema.Types.ObjectId, ref: "PayrollRun" }, at: Date, note: String },
@@ -405,6 +409,8 @@ export interface IResignation extends Document {
   settlement?: { lines: Array<{ label: string; amount: number }>; earnings: number; deductions: number; net: number; computedAt: Date; inputs: any } | null;
   approvals: ApprovalSignature[];
   settledAt?: Date;
+  /** Final dues paid out (or recovered) by Accounts. */
+  payment?: PaymentStamp | null;
 }
 export const Resignation = model<IResignation>(
   "Resignation",
@@ -421,6 +427,7 @@ export const Resignation = model<IResignation>(
       status: { type: String, enum: ["SUBMITTED", "ACCEPTED", "WITHDRAWN", "SETTLEMENT_PENDING", "SETTLED", "REJECTED"], default: "SUBMITTED", index: true },
       acceptedByName: { type: String },
       settlement: { type: Schema.Types.Mixed, default: null },
+      payment: { type: PaymentStampSchema, default: null },
       approvals: [ApprovalSignatureSchema],
       settledAt: { type: Date },
     },

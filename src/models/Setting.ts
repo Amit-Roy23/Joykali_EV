@@ -63,6 +63,14 @@ export interface ISetting extends Document {
     maxLoanMultipleOfGross: number;
     idleLogoutMinutes: number;
   };
+  accounts?: {
+    /** Heads offered for company expenses (and budgets). */
+    expenseCategories: string[];
+    /** Expenses at or above this total need Business Head + Managing Partner approval before payment. */
+    expenseApprovalPaise: number;
+    /** Heads for receipts that are income in the P&L (anything else is capital / loans). */
+    incomeHeads: string[];
+  };
   updatedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
@@ -133,6 +141,29 @@ const SettingSchema = new Schema<ISetting>(
       maxAdvancePctOfGross: { type: Number, default: 50 },
       maxLoanMultipleOfGross: { type: Number, default: 3 },
       idleLogoutMinutes: { type: Number, default: 30 },
+    },
+    accounts: {
+      expenseCategories: {
+        type: [String],
+        default: [
+          "Rent",
+          "Electricity & water",
+          "Fuel & conveyance",
+          "Freight & transport",
+          "Repairs & maintenance",
+          "Office supplies & printing",
+          "Telephone & internet",
+          "Marketing & advertising",
+          "Professional & legal fees",
+          "Bank charges",
+          "Insurance",
+          "Travel",
+          "Staff welfare",
+          "Miscellaneous",
+        ],
+      },
+      expenseApprovalPaise: { type: Number, default: 1000000 },
+      incomeHeads: { type: [String], default: ["Interest income", "Scrap sale", "Commission received", "Other income"] },
     },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },

@@ -9,6 +9,9 @@ export interface IStockTransfer extends Document {
   transferCode: string; // JKST/2026-27/0001
   direction: "TO_OUTLET" | "TO_WAREHOUSE";
   outlet: mongoose.Types.ObjectId;
+  /** Company warehouse at the other end (null = main warehouse). */
+  warehouse?: mongoose.Types.ObjectId | null;
+  warehouseName?: string;
   outletName: string;
   vehicles: Array<{ vehicle: mongoose.Types.ObjectId; chassisNumber: string; modelName: string }>;
   status: "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
@@ -26,6 +29,8 @@ const StockTransferSchema = new Schema<IStockTransfer>(
     transferCode: { type: String, required: true, unique: true },
     direction: { type: String, enum: ["TO_OUTLET", "TO_WAREHOUSE"], required: true },
     outlet: { type: Schema.Types.ObjectId, ref: "Outlet", required: true, index: true },
+    warehouse: { type: Schema.Types.ObjectId, ref: "Warehouse", default: null },
+    warehouseName: { type: String },
     outletName: { type: String, required: true },
     vehicles: [
       new Schema(

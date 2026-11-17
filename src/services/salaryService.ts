@@ -7,7 +7,9 @@ import { User } from "@/models/User";
 import { canManageRole } from "@/lib/rbac";
 import { periodFor, periodOf } from "@/lib/period";
 import { logAudit } from "@/lib/audit";
-import { buildSalaryFromGross, costSalary, DEFAULT_SALARY_RULES, grossFromAnnualCtc, statutorySettingsFrom } from "./payrollEngine";
+import { breakupFromGross, computePayslip, grossForCtc, legacyFields } from "./salaryTemplateEngine";
+import { currentPeriod, setupFor, SalarySetup } from "./salaryTemplateService";
+import { monthLines } from "./payrollCalc";
 
 export class SalaryError extends Error {
   status: number;
@@ -23,22 +25,35 @@ export interface SalaryInput {
   flags: { pf: boolean; esi: boolean; professionalTax: boolean };
 }
 
-async function rules() {
-  const s: any = await Setting.findOne().lean();
-  return {
-    salaryRules: { ...DEFAULT_SALARY_RULES, ...(s?.salaryRules || {}) },
-    statutory: { ...statutorySettingsFrom(s?.statutoryDeductions), employerEsiRate: s?.statutoryDeductions?.employerEsiRate ?? 3.25 },
-  };
-}
-
-/** Automatic component split + deductions + CTC for a gross or CTC figure. */
-export async function previewSalary(input: SalaryInput) {
+/** Automatic split into the company's salary columns + PF/ESI/PT + CTC, for a gross or CTC figure. */
+export async function previewSalary(input: SalaryInput & { effectiveMonth?: string }) {
   const amount = Math.round(Number(input.amountRupees) * 100);
   if (!Number.isFinite(amount) || amount <= 0) throw new SalaryError("Enter a salary amount");
-  const { salaryRules, statutory } = await rules();
+  const period = /^\d{4}-\d{2}$/.test(input.effectiveMonth || "") ? input.effectiveMonth! : currentPeriod();
+  const setup = await setupFor(period);
   const flags = { pf: !!input.flags?.pf, esi: !!input.flags?.esi, professionalTax: !!input.flags?.professionalTax };
-  const gross = input.mode === "CTC" ? grossFromAnnualCtc(amount, flags, salaryRules, statutory) : amount;
-  return { flags, rules: salaryRules, breakup: buildSalaryFromGross(gross, flags, salaryRules, statutory) };
+  const gross = input.mode === "CTC" ? grossForCtc(amount, setup.components, setup.statutory, flags) : amount;
+  return { flags, period, columns: setup.components, source: setup.source, breakup: breakupFromGross(gross, setup.components, setup.statutory, flags) };
+}
+
+/** Breakup of a stored structure under the setup of its month (fixed amounts before the first template). */
+export function structureBreakup(struct: any, setup: SalarySetup) {
+  const lines = monthLines(struct, setup);
+  const flags = struct.fixedDeductions || { pf: true, esi: false, professionalTax: true };
+  const r = computePayslip({ earnings: lines, deductions: setup.components.filter((c) => c.kind === "DEDUCTION"), statutory: setup.statutory, flags, workingDays: 30, lopDays: 0 });
+  const employeeTotal = r.deductions.pf + r.deductions.esi + r.deductions.professionalTax + r.deductionLines.reduce((t, l) => t + l.amount, 0);
+  const monthlyCtc = r.grossPay + r.employer.total;
+  return {
+    gross: r.grossPay,
+    ...legacyFields(lines),
+    lines: r.earningLines,
+    deductionLines: r.deductionLines,
+    employee: { pf: r.deductions.pf, esi: r.deductions.esi, professionalTax: r.deductions.professionalTax, total: employeeTotal },
+    employer: r.employer,
+    netTakeHome: r.grossPay - employeeTotal,
+    monthlyCtc,
+    annualCtc: monthlyCtc * 12,
+  };
 }
 
 /**
@@ -85,7 +100,7 @@ export async function proposeRevision(
   if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(String(bank.ifsc).toUpperCase())) throw new SalaryError("Invalid IFSC code");
   if (!/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) throw new SalaryError("Invalid PAN");
 
-  const { breakup, flags } = await previewSalary(input);
+  const { breakup, flags } = await previewSalary({ ...input, effectiveMonth: input.effectiveMonth });
   if (breakup.gross < 100000) throw new SalaryError("Gross salary looks too low (below ₹1,000/month)");
 
   const doc = await SalaryStructure.create({
@@ -121,13 +136,11 @@ export async function salaryHistory(employeeId: string) {
     .populate("proposedBy", "name employeeCode")
     .sort({ effectiveFrom: -1, createdAt: -1 })
     .lean();
-  const { statutory } = await rules();
-  return list.map((s: any) => {
-    const breakup = costSalary(
-      { basic: s.basic, hra: s.hra, conveyance: s.conveyance, otherAllowances: s.otherAllowances },
-      s.fixedDeductions || { pf: true, esi: false, professionalTax: true },
-      statutory
-    );
-    return { ...s, status: s.status || "APPROVED", gross: breakup.gross, breakup };
-  });
+  const out = [];
+  for (const s of list as any[]) {
+    const eff = new Date(new Date(s.effectiveFrom).getTime() + 330 * 60000).toISOString().slice(0, 7);
+    const breakup = structureBreakup(s, await setupFor(eff));
+    out.push({ ...s, status: s.status || "APPROVED", gross: breakup.gross, breakup });
+  }
+  return out;
 }

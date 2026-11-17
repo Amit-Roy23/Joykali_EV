@@ -8,13 +8,15 @@ export type UserRole =
   | "OUTLET"
   /** HR manager: attendance, leave, documents, joining & exit. Not a finance approver. */
   | "HR_MANAGER"
+  | "ACCOUNTANT"
+  | "STORE_MANAGER"
   /** External channel partners — outside the employee hierarchy. */
   | "SUPER_DISTRIBUTOR"
   | "DISTRIBUTOR"
   | "DEALER"
   | "SUB_DEALER";
 
-export const EMPLOYEE_ROLES = ["FEC", "OUTLET", "ASM", "HR_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
+export const EMPLOYEE_ROLES = ["FEC", "OUTLET", "ASM", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
 export const PARTNER_ROLES = ["SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"] as const;
 export const ALL_ROLES = [...EMPLOYEE_ROLES, ...PARTNER_ROLES] as const;
 export type PartnerRole = (typeof PARTNER_ROLES)[number];
@@ -42,6 +44,8 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   ADMIN: 5,
   OUTLET: 1,
   HR_MANAGER: 2.5,
+  ACCOUNTANT: 2.5,
+  STORE_MANAGER: 1.5,
   SUPER_DISTRIBUTOR: 0,
   DISTRIBUTOR: 0,
   DEALER: 0,
@@ -112,7 +116,14 @@ export type Permission =
   | "hr.manage"
   | "attendance.team"
   | "attendance.manage"
-  | "leave.approve";
+  | "leave.approve"
+  // Phase 6: warehouses, accounts, payroll setup
+  | "warehouse.view"
+  | "warehouse.transfer"
+  | "warehouse.manage"
+  | "accounts.view"
+  | "accounts.manage"
+  | "expense.create";
 
 export type VehicleCategory =
   | "2W"

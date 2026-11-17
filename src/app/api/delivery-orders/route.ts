@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     if (sp.get("status")) query.status = { $in: sp.get("status")!.split(",") };
     if (sp.get("order")) query.order = sp.get("order");
     const list = await DeliveryOrder.find(query)
-      .select("doCode orderCode partyType partySnapshot.name partySnapshot.city lines status loading.registrationNo document.number document.totalValue ewayBill dispatch grn.grnNo vehicles.chassisNumber createdAt updatedAt")
+      .select("doCode orderCode warehouseName partyType partySnapshot.name partySnapshot.city lines status loading.registrationNo document.number document.totalValue ewayBill dispatch grn.grnNo vehicles.chassisNumber createdAt updatedAt")
       .sort({ updatedAt: -1 })
       .limit(300)
       .lean();
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const auth = await authenticateAndAuthorize(req, "dispatch.manage");
     if (auth.error) return auth.error;
     const b = await req.json();
-    return jsonResponse(await createDeliveryOrder(b.orderId, b.lines, auth.user), undefined, 201);
+    return jsonResponse(await createDeliveryOrder(b.orderId, b.lines, auth.user, b.warehouseId), undefined, 201);
   } catch (e) {
     return failure(e, "Failed to create delivery order");
   }

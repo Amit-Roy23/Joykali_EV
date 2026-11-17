@@ -172,6 +172,12 @@ export interface PayslipPDFProps {
     incentives: number;
     incentiveBreakdown?: Array<{ schemeName: string; amount: number }>;
   };
+  /** Template salary columns; when present they replace the four fixed earning rows. */
+  earningLines?: Array<{ name: string; amount: number }>;
+  deductionLines?: Array<{ name: string; amount: number }>;
+  adjustments?: Array<{ amount: number; reason: string }>;
+  employer?: { pf: number; eps: number; epf: number; edli: number; pfAdmin: number; esi: number; total: number } | null;
+  statutoryIds?: { uan?: string; esiNumber?: string };
   deductions: {
     pf: number;
     esi: number;
@@ -272,22 +278,28 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
               <Text style={styles.colDesc}>Earnings Component</Text>
               <Text style={styles.colAmount}>Amount</Text>
             </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.colDesc}>Basic Salary</Text>
-              <Text style={styles.colAmount}>{formatINR(props.earnings.basic)}</Text>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.colDesc}>House Rent Allowance (HRA)</Text>
-              <Text style={styles.colAmount}>{formatINR(props.earnings.hra)}</Text>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.colDesc}>Conveyance / Travel Allowance</Text>
-              <Text style={styles.colAmount}>{formatINR(props.earnings.conveyance)}</Text>
-            </View>
-            <View style={styles.tableRow}>
-              <Text style={styles.colDesc}>Other Allowances</Text>
-              <Text style={styles.colAmount}>{formatINR(props.earnings.otherAllowances)}</Text>
-            </View>
+            {(props.earningLines?.length
+              ? props.earningLines
+              : [
+                  { name: "Basic Salary", amount: props.earnings.basic },
+                  { name: "House Rent Allowance (HRA)", amount: props.earnings.hra },
+                  { name: "Conveyance / Travel Allowance", amount: props.earnings.conveyance },
+                  { name: "Other Allowances", amount: props.earnings.otherAllowances },
+                ]
+            ).map((l, i) => (
+              <View key={`e${i}`} style={styles.tableRow}>
+                <Text style={styles.colDesc}>{l.name}</Text>
+                <Text style={styles.colAmount}>{formatINR(l.amount)}</Text>
+              </View>
+            ))}
+            {(props.adjustments || [])
+              .filter((a) => a.amount > 0)
+              .map((a, i) => (
+                <View key={`a${i}`} style={styles.tableRow}>
+                  <Text style={styles.colDesc}>{a.reason}</Text>
+                  <Text style={styles.colAmount}>{formatINR(a.amount)}</Text>
+                </View>
+              ))}
             <View style={styles.tableRow}>
               <Text style={styles.colDesc}>Sales Performance Incentives</Text>
               <Text style={styles.colAmount}>{formatINR(props.earnings.incentives)}</Text>
@@ -332,10 +344,16 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
               <Text style={styles.colDesc}>Tax Deducted at Source (TDS)</Text>
               <Text style={styles.colAmount}>{formatINR(props.deductions.tds)}</Text>
             </View>
+            {(props.deductionLines || []).map((l, i) => (
+              <View key={`d${i}`} style={styles.tableRow}>
+                <Text style={styles.colDesc}>{l.name}</Text>
+                <Text style={styles.colAmount}>{formatINR(l.amount)}</Text>
+              </View>
+            ))}
             <View style={styles.tableRow}>
               <Text style={styles.colDesc}>Advance / Other Deductions</Text>
               <Text style={styles.colAmount}>
-                {formatINR(props.deductions.advanceRecovery + props.deductions.other)}
+                {formatINR(props.deductions.advanceRecovery + props.deductions.other - (props.deductionLines || []).reduce((s, l) => s + l.amount, 0))}
               </Text>
             </View>
 
@@ -366,6 +384,16 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
             {formatINR(props.netPay)}
           </Text>
         </View>
+
+        {props.employer && props.employer.total > 0 ? (
+          <View style={{ marginTop: 6, padding: 6, borderWidth: 0.5, borderColor: "#cbd5e1", borderRadius: 4 }}>
+            <Text style={{ fontSize: 7.5, color: "#475569" }}>
+              Employer contributions (not deducted from you): PF {formatINR(props.employer.pf)} (pension EPS {formatINR(props.employer.eps)}, EPF {formatINR(props.employer.epf)}) · EDLI {formatINR(props.employer.edli)} · PF admin {formatINR(props.employer.pfAdmin)} · ESI {formatINR(props.employer.esi)}
+              {props.statutoryIds?.uan ? ` · UAN ${props.statutoryIds.uan}` : ""}
+              {props.statutoryIds?.esiNumber ? ` · ESI IP ${props.statutoryIds.esiNumber}` : ""}
+            </Text>
+          </View>
+        ) : null}
 
         {/* Net Pay In Words */}
         <View style={styles.wordsBox}>

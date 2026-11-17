@@ -1,5 +1,6 @@
 "use client";
 
+import { WarehousePicker } from "@/components/warehousePicker";
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -24,6 +25,7 @@ export default function OrderDetailPage() {
   const [doQty, setDoQty] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
   const [doError, setDoError] = useState<string | null>(null);
+  const [doWh, setDoWh] = useState("");
 
   const load = useCallback(() => {
     api<any>(`/api/orders/${id}`)
@@ -52,7 +54,7 @@ export default function OrderDetailPage() {
     try {
       const d = await api<any>("/api/delivery-orders", {
         method: "POST",
-        json: { orderId: o._id, lines: o.lines.map((l: any) => ({ modelId: l.model, quantity: doQty[l.model] || 0 })) },
+        json: { orderId: o._id, warehouseId: doWh || undefined, lines: o.lines.map((l: any) => ({ modelId: l.model, quantity: doQty[l.model] || 0 })) },
       });
       router.push(`/dispatch/${d._id}`);
     } catch (e: any) {
@@ -187,6 +189,10 @@ export default function OrderDetailPage() {
 
       <Modal isOpen={doOpen} onClose={() => setDoOpen(false)} title="Raise a warehouse delivery order" description="Choose how many of each model to ship now. The rest stays open on the order." maxWidth="lg">
         <div className="space-y-3">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase text-slate-500">Ship from</p>
+            <WarehousePicker id="do-wh" value={doWh} onChange={setDoWh} />
+          </div>
           {o.lines.map((l: any) => {
             const max = l.quantity - (l.dispatchedQty || 0);
             return (

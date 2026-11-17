@@ -7,6 +7,7 @@ import { rupeesToPaise } from "@/lib/money";
 import { withTransaction } from "@/lib/db";
 import { JWTPayload } from "@/types";
 import mongoose from "mongoose";
+import { resolveWarehouse } from "./warehouseService";
 
 export interface VehicleInwardItem {
   chassisNumber: string;
@@ -30,12 +31,15 @@ export interface CreatePurchaseInput {
   invoiceDate: Date | string;
   lineItems: PurchaseLineItemInput[];
   notes?: string;
+  /** Warehouse receiving the goods (default: main). */
+  warehouseId?: string | null;
 }
 
 export async function createPurchase(
   input: CreatePurchaseInput,
   user: JWTPayload
 ): Promise<IPurchase> {
+  const warehouse = await resolveWarehouse(input.warehouseId);
   return await withTransaction(async (session) => {
     const supplier = await Supplier.findById(input.supplier).session(session ?? null);
     if (!supplier) {
@@ -108,6 +112,7 @@ export async function createPurchase(
           paymentStatus: "UNPAID",
           payments: [],
           notes: input.notes,
+          warehouse: warehouse._id,
           createdBy: new mongoose.Types.ObjectId(user.userId),
         },
       ],
@@ -130,6 +135,7 @@ export async function createPurchase(
                 model: new mongoose.Types.ObjectId(item.model),
                 status: "IN_STOCK",
                 currentLocationType: "WAREHOUSE",
+                warehouse: warehouse._id,
                 purchase: purchase._id,
               },
             ],
@@ -143,7 +149,7 @@ export async function createPurchase(
                 vehicle: vehicle._id,
                 movementType: "INWARD",
                 fromLocation: `Supplier: ${supplier.name}`,
-                toLocation: "Main Warehouse",
+                toLocation: `Warehouse: ${warehouse.name}`,
                 performedBy: new mongoose.Types.ObjectId(user.userId),
                 reference: purchase.purchaseCode,
                 notes: `Purchase Inward invoice #${input.invoiceNumber}`,

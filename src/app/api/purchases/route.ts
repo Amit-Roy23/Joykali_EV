@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       return errorResponse(parseResult.error.errors[0].message, 400);
     }
 
-    const purchase = await createPurchase(parseResult.data, auth.user);
+    const purchase = await createPurchase({ ...parseResult.data, warehouseId: typeof body.warehouseId === "string" ? body.warehouseId : null }, auth.user);
 
     await logAudit({
       user: auth.user,

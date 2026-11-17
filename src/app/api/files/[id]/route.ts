@@ -6,6 +6,7 @@ import { FleetVehicle } from "@/models/FleetVehicle";
 import { PartyDocument } from "@/models/PartyDocument";
 import { User } from "@/models/User";
 import { AttendancePunch, EmployeeDocument, ExpenseClaim } from "@/models/Hr";
+import { Expense } from "@/models/Accounts";
 import { authenticateAndAuthorize, errorResponse, failure, isValidId } from "@/lib/apiHelper";
 import { hasPermission } from "@/lib/rbac";
 import { JWTPayload } from "@/types";
@@ -14,12 +15,13 @@ import { teamScope } from "@/services/hrService";
 
 /**
  * Who may open a stored file depends on what the file belongs to:
- * the uploader; fleet papers → fleet.view; KYC papers → the partner, its supplier and staff;
+ * the uploader; fleet papers → fleet.view; company expense bills → accounts / approvers; KYC papers → the partner, its supplier and staff;
  * punch selfies, employee documents, claim bills, photos → the employee, their managers, HR / approvers.
  */
 async function canOpen(user: JWTPayload, fileId: mongoose.Types.ObjectId, uploadedBy: any) {
   if (String(uploadedBy) === user.userId) return true;
   if (await FleetVehicle.exists({ "documents.file": fileId })) return hasPermission(user.role, "fleet.view");
+  if (await Expense.exists({ bill: fileId })) return (await hasPermission(user.role, "accounts.view")) || (await hasPermission(user.role, "approvals.sign"));
   const kyc: any = await PartyDocument.findOne({ file: fileId }).select("partyType party").lean();
   if (kyc) return (await canActOnParty(user, kyc.partyType, kyc.party)).ok;
   const photoOf: any = await User.findOne({ "profile.photo": fileId }).select("_id").lean();

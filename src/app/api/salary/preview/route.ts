@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     const auth = await authenticateAndAuthorize(req, "salary.manage");
     if (auth.error) return auth.error;
     const b = await req.json();
-    return jsonResponse(await previewSalary({ mode: b.mode === "CTC" ? "CTC" : "GROSS", amountRupees: b.amount, flags: b.flags }));
+    return jsonResponse(await previewSalary({ mode: b.mode === "CTC" ? "CTC" : "GROSS", amountRupees: b.amount, flags: b.flags, effectiveMonth: b.effectiveMonth }));
   } catch (e) {
     return failure(e, "Failed to calculate");
   }

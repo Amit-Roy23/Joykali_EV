@@ -7,7 +7,7 @@ import { PayrollRun } from "@/models/PayrollRun";
 import { PayrollEntry } from "@/models/PayrollEntry";
 import { Setting } from "@/models/Setting";
 import { computeIncentives } from "./incentiveEngine";
-import { calculatePayrollEntry, statutorySettingsFrom } from "./payrollEngine";
+import { applyCalc, ensureSnapshotSetup, runPayslip } from "./payrollCalc";
 import { periodOf, periodsBetween } from "@/lib/period";
 import { UserRole, EMPLOYEE_ROLES } from "@/types";
 
@@ -160,9 +160,6 @@ export async function syncOpenPayrollIncentives(
   });
   if (!run) return 0;
 
-  const setting = await Setting.findOne().lean();
-  const statutory = statutorySettingsFrom(setting?.statutoryDeductions);
-
   const entries = await PayrollEntry.find({
     payrollRun: run._id,
     employee: { $in: employeeIds },
@@ -173,15 +170,8 @@ export async function syncOpenPayrollIncentives(
       employee: entry.employee,
       period,
     }).lean();
-    const snap = entry.salaryStructureSnapshot || {};
-    const calc = calculatePayrollEntry({
-      salary: {
-        basic: snap.basic || 0,
-        hra: snap.hra || 0,
-        conveyance: snap.conveyance || 0,
-        otherAllowances: snap.otherAllowances || 0,
-        fixedDeductions: snap.fixedDeductions || {},
-      },
+    await ensureSnapshotSetup(entry);
+    const calc = runPayslip(entry.salaryStructureSnapshot, {
       workingDays: entry.workingDays,
       lopDays: entry.lopDays,
       incentives: ledger?.totalEarned || 0,
@@ -190,19 +180,11 @@ export async function syncOpenPayrollIncentives(
         schemeName: b.schemeName,
         amount: b.earnedAmount,
       })),
-      adjustments: (entry.adjustments || []).map((a) => ({
-        amount: a.amount,
-        reason: a.reason,
-      })),
+      adjustments: entry.adjustments || [],
       tds: entry.deductions?.tds || 0,
       advanceRecovery: entry.deductions?.advanceRecovery || 0,
-      settings: statutory,
     });
-    entry.earnings = calc.earnings as any;
-    entry.deductions = calc.deductions;
-    entry.grossPay = calc.grossPay;
-    entry.totalDeductions = calc.totalDeductions;
-    entry.netPay = calc.netPay;
+    applyCalc(entry, calc);
     await entry.save();
   }
 

@@ -3,6 +3,7 @@ import { useSession } from "@/components/layout/session";
 import { ApprovalPanel } from "@/components/workflow";
 
 import React, { useEffect, useState, use } from "react";
+import { StatutoryCard } from "@/components/statutoryCard";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -145,6 +146,18 @@ export default function PayrollRunDetailPage({
   }
 
   const { run, entries = [] } = data;
+  // Salary-sheet columns of this run (template columns; older runs show the four fixed ones).
+  const linesOf = (e: any) =>
+    e.earningLines?.length
+      ? e.earningLines
+      : [
+          { key: "basic", name: "Basic", amount: e.earnings.basic },
+          { key: "hra", name: "HRA", amount: e.earnings.hra },
+          { key: "conveyance", name: "Conveyance", amount: e.earnings.conveyance },
+          { key: "special", name: "Allowances", amount: e.earnings.otherAllowances },
+        ];
+  const sheetCols: Array<{ key: string; name: string }> = [];
+  for (const e of entries) for (const l of linesOf(e)) if (!sheetCols.some((c) => c.key === l.key)) sheetCols.push({ key: l.key, name: l.name });
   const isLocked = run.status === "LOCKED";
   const isApproved = run.status === "APPROVED" || isLocked;
 
@@ -262,6 +275,8 @@ export default function PayrollRunDetailPage({
       </div>
 
       {/* Entries Register Table */}
+      <StatutoryCard runId={run._id} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Employee Payout Register</CardTitle>
@@ -272,10 +287,14 @@ export default function PayrollRunDetailPage({
               <TableRow>
                 <TableHead>Employee</TableHead>
                 <TableHead>Days (Paid / LOP)</TableHead>
-                <TableHead className="text-right">Basic</TableHead>
-                <TableHead className="text-right">Allowances</TableHead>
+                {sheetCols.map((c) => (
+                  <TableHead key={c.key} className="text-right whitespace-nowrap">
+                    {c.name}
+                  </TableHead>
+                ))}
                 <TableHead className="text-right">Incentives</TableHead>
                 <TableHead className="text-right">Gross</TableHead>
+                <TableHead className="text-right whitespace-nowrap">PF / ESI / PT</TableHead>
                 <TableHead className="text-right">Deductions</TableHead>
                 <TableHead className="text-right">Net Pay</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -283,11 +302,6 @@ export default function PayrollRunDetailPage({
             </TableHeader>
             <TableBody>
               {entries.map((entry: any) => {
-                const allowances =
-                  entry.earnings.hra +
-                  entry.earnings.conveyance +
-                  entry.earnings.otherAllowances;
-
                 return (
                   <TableRow key={entry._id}>
                     <TableCell>
@@ -302,17 +316,19 @@ export default function PayrollRunDetailPage({
                         <span className="text-red-500 ml-1 font-semibold">({entry.lopDays} LOP)</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right text-xs">
-                      {formatINR(entry.earnings.basic)}
-                    </TableCell>
-                    <TableCell className="text-right text-xs">
-                      {formatINR(allowances)}
-                    </TableCell>
+                    {sheetCols.map((c) => (
+                      <TableCell key={c.key} className="text-right text-xs">
+                        {formatINR(linesOf(entry).find((l: any) => l.key === c.key)?.amount || 0)}
+                      </TableCell>
+                    ))}
                     <TableCell className="text-right text-xs font-semibold text-brand-600">
                       {formatINR(entry.earnings.incentives)}
                     </TableCell>
                     <TableCell className="text-right text-xs font-medium">
                       {formatINR(entry.grossPay)}
+                    </TableCell>
+                    <TableCell className="text-right text-[11px] text-slate-600 whitespace-nowrap">
+                      {formatINR(entry.deductions.pf)} / {formatINR(entry.deductions.esi)} / {formatINR(entry.deductions.professionalTax)}
                     </TableCell>
                     <TableCell className="text-right text-xs text-red-600">
                       -{formatINR(entry.totalDeductions)}

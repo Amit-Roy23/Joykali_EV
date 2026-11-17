@@ -5,7 +5,9 @@ import { SalaryStructure } from "@/models/SalaryStructure";
 import { IncentiveLedger } from "@/models/IncentiveLedger";
 import { Setting } from "@/models/Setting";
 import { generatePayrollRunCode, generatePayslipCode } from "@/lib/codeGenerator";
-import { calculatePayrollEntry, statutorySettingsFrom } from "./payrollEngine";
+import { legacyFields } from "./salaryTemplateEngine";
+import { setupFor } from "./salaryTemplateService";
+import { applyCalc, ensureSnapshotSetup, monthLines, runPayslip } from "./payrollCalc";
 import { recalculateIncentivesForPeriod } from "./incentiveService";
 import { periodFor } from "@/lib/period";
 import { withTransaction } from "@/lib/db";
@@ -42,8 +44,8 @@ export async function generateDraftPayrollRun(
       throw new Error(`Payroll run for ${runCode} is LOCKED and cannot be regenerated`);
     }
 
-    // Get company settings for statutory deduction rules
-    const settings = await Setting.findOne().session(session ?? null).lean();
+    // Salary columns and PF / ESI / PT options in force for this month.
+    const setup = await setupFor(period);
 
     // Fetch active employees
     // Employees only — distributor logins are external partners, not on payroll.
@@ -118,7 +120,8 @@ export async function generateDraftPayrollRun(
 
       const workingDays = existingEntry?.workingDays || daysInMonth;
       // HR feeds: attendance loss of pay, approved overtime, approved claims, loan / advance EMIs.
-      const hr = await hrPayrollInputs(emp, period, { basic: salaryStruct.basic, otherAllowances: salaryStruct.otherAllowances }, emp.role);
+      const earningsFull = monthLines(salaryStruct, setup);
+      const hr = await hrPayrollInputs(emp, period, legacyFields(earningsFull), emp.role);
       const manualLop = existingEntry?.hrAuto?.lopFromAttendance ? 0 : existingEntry?.lopDays || 0;
       const lopDays = hr.lopDays != null ? hr.lopDays : manualLop;
       const manualAdjustments = (existingEntry?.adjustments || []).filter((a: any) => !a.auto);
@@ -132,26 +135,11 @@ export async function generateDraftPayrollRun(
       const loanRecovery = hr.loans.reduce((s, l) => s + l.amount, 0);
       const advanceRecovery = hr.loans.length ? loanRecovery : existingEntry?.hrAuto?.loans?.length ? 0 : existingEntry?.deductions?.advanceRecovery || 0;
 
-      const calc = calculatePayrollEntry({
-        salary: {
-          basic: salaryStruct.basic,
-          hra: salaryStruct.hra,
-          conveyance: salaryStruct.conveyance,
-          otherAllowances: salaryStruct.otherAllowances,
-          fixedDeductions: salaryStruct.fixedDeductions,
-        },
-        workingDays,
-        lopDays,
-        incentives: incentiveEarned,
-        incentiveBreakdown,
-        adjustments: adjustments.map((a: any) => ({
-          amount: a.amount,
-          reason: a.reason,
-        })),
-        tds,
-        advanceRecovery,
-        settings: statutorySettingsFrom(settings?.statutoryDeductions),
-      });
+      const snapshot = {
+        ...salaryStruct,
+        setup: { source: setup.source, templateId: setup.templateId, earnings: earningsFull, deductions: setup.components.filter((c) => c.kind === "DEDUCTION"), statutory: setup.statutory },
+      };
+      const calc = runPayslip(snapshot, { workingDays, lopDays, incentives: incentiveEarned, incentiveBreakdown, adjustments, tds, advanceRecovery });
 
       const payslipCode = generatePayslipCode(year, month, emp.employeeCode);
 
@@ -161,12 +149,17 @@ export async function generateDraftPayrollRun(
           payrollRun: payrollRun._id,
           employee: emp._id,
           payslipCode,
-          salaryStructureSnapshot: salaryStruct,
+          salaryStructureSnapshot: snapshot,
           workingDays: calc.workingDays,
           lopDays: calc.lopDays,
           paidDays: calc.paidDays,
           earnings: calc.earnings,
           deductions: calc.deductions,
+          earningLines: calc.earningLines,
+          deductionLines: calc.deductionLines,
+          employer: calc.employer,
+          pfWage: calc.pfWage,
+          esiWage: calc.esiWage,
           adjustments,
           hrAuto: {
             lopFromAttendance: hr.lopDays != null,
@@ -229,7 +222,6 @@ export async function adjustPayrollEntry(
       throw new Error("Cannot modify an entry in a LOCKED payroll run");
     }
 
-    const settings = await Setting.findOne().session(session ?? null).lean();
     const workingDays = data.workingDays ?? entry.workingDays;
     if (data.lopDays !== undefined && data.lopDays < 0) {
       throw new Error("LOP days cannot be negative");
@@ -252,14 +244,8 @@ export async function adjustPayrollEntry(
         ? rupeesToPaise(data.advanceRecovery)
         : entry.deductions.advanceRecovery;
 
-    const calc = calculatePayrollEntry({
-      salary: {
-        basic: entry.salaryStructureSnapshot.basic,
-        hra: entry.salaryStructureSnapshot.hra,
-        conveyance: entry.salaryStructureSnapshot.conveyance,
-        otherAllowances: entry.salaryStructureSnapshot.otherAllowances,
-        fixedDeductions: entry.salaryStructureSnapshot.fixedDeductions,
-      },
+    await ensureSnapshotSetup(entry, session);
+    const calc = runPayslip(entry.salaryStructureSnapshot, {
       workingDays,
       lopDays,
       incentives: entry.earnings.incentives,
@@ -268,24 +254,13 @@ export async function adjustPayrollEntry(
         schemeName: b.schemeName,
         amount: b.amount,
       })),
-      adjustments: adjustments.map((a: any) => ({
-        amount: a.amount,
-        reason: a.reason,
-      })),
+      adjustments,
       tds: tdsPaise,
       advanceRecovery: advanceRecoveryPaise,
-      settings: statutorySettingsFrom(settings?.statutoryDeductions),
     });
 
-    entry.workingDays = calc.workingDays;
-    entry.lopDays = calc.lopDays;
-    entry.paidDays = calc.paidDays;
-    entry.earnings = calc.earnings as any;
-    entry.deductions = calc.deductions;
+    applyCalc(entry, calc);
     entry.adjustments = adjustments;
-    entry.grossPay = calc.grossPay;
-    entry.totalDeductions = calc.totalDeductions;
-    entry.netPay = calc.netPay;
     await entry.save({ session });
 
     // Recalculate run totals

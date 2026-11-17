@@ -24,6 +24,8 @@ export function EmployeeHrPanel({ employee }: { employee: any }) {
     shiftId: String(employee.shift?._id || employee.shift || ""),
     attendanceMode: employee.attendanceMode || "FIELD",
     noticeDays: String(employee.noticeDays ?? 30),
+    uan: employee.uan || "",
+    esiNumber: employee.esiNumber || "",
     dob: employee.profile?.dob || "",
     gender: employee.profile?.gender || "",
   });
@@ -95,6 +97,14 @@ export function EmployeeHrPanel({ employee }: { employee: any }) {
           <div className="space-y-1.5">
             <Label>Notice period (days)</Label>
             <Input id="hr-notice" disabled={!isHr} inputMode="numeric" value={f.noticeDays} onChange={(e) => setF({ ...f, noticeDays: e.target.value.replace(/\D/g, "") })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>PF UAN (12 digits)</Label>
+            <Input id="hr-uan" disabled={!isHr} inputMode="numeric" value={f.uan} onChange={(e) => setF({ ...f, uan: e.target.value.replace(/\D/g, "").slice(0, 12) })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>ESI IP number (10 digits)</Label>
+            <Input id="hr-esi" disabled={!isHr} inputMode="numeric" value={f.esiNumber} onChange={(e) => setF({ ...f, esiNumber: e.target.value.replace(/\D/g, "").slice(0, 10) })} />
           </div>
           <div className="space-y-1.5">
             <Label>Date of birth</Label>

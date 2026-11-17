@@ -41,3 +41,7 @@ export * from "./NetworkOrder";
 export * from "./PartnerSale";
 export * from "./StockTransfer";
 export * from "./Hr";
+export * from "./Warehouse";
+export * from "./WarehouseTransfer";
+export * from "./Accounts";
+export * from "./SalaryTemplate";

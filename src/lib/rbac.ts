@@ -60,8 +60,13 @@ const BH_BASE: Permission[] = [
   "outlet.manage",
   "hr.manage",
   "attendance.manage",
+  "warehouse.view",
+  "warehouse.transfer",
+  "warehouse.manage",
+  "accounts.view",
+  "expense.create",
 ];
-const MP_BASE: Permission[] = [...BH_BASE, "sales.cancel", "purchase.manage", "payroll.lock", "audit.view"];
+const MP_BASE: Permission[] = [...BH_BASE, "sales.cancel", "purchase.manage", "payroll.lock", "audit.view", "accounts.manage"];
 
 const PARTNER_BASE: Permission[] = ["portal.access", "order.view", "order.create", "dispatch.view", "grn.record", "ledger.view"];
 
@@ -91,6 +96,45 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "payslip.view.all",
     "payslip.download",
     "reports.view",
+  ],
+  // Accounts: books, expenses, cash and bank, P&L, payroll setup (PF/ESI). Not an approver.
+  ACCOUNTANT: [
+    "hr.self",
+    "accounts.view",
+    "accounts.manage",
+    "expense.create",
+    "ledger.view",
+    "ledger.manage",
+    "purchase.view",
+    "distributor.view",
+    "dealer.view",
+    "order.view",
+    "dispatch.view",
+    "payroll.view",
+    "payroll.run",
+    "payroll.adjust",
+    "payslip.view.own",
+    "payslip.view.all",
+    "payslip.download",
+    "employee.view",
+    "reports.view",
+    "inventory.view",
+    "warehouse.view",
+  ],
+  // Store / warehouse in-charge: stock, transfers and loading for their warehouse.
+  STORE_MANAGER: [
+    "hr.self",
+    "payslip.view.own",
+    "payslip.download",
+    "inventory.view",
+    "warehouse.view",
+    "warehouse.transfer",
+    "dispatch.view",
+    "dispatch.manage",
+    "purchase.view",
+    "fleet.view",
+    "outlet.view",
+    "expense.create",
   ],
   // Showroom counter login: sells from its own outlet's stock and receives transfers.
   OUTLET: uniq([...FEC_BASE, "outlet.view"]),
@@ -269,7 +313,7 @@ export async function getScopeFilter(
   }
 
   if (resource === "inventory") {
-    if (user.role === "BUSINESS_HEAD" || user.role === "ASM") {
+    if (["BUSINESS_HEAD", "ASM", "MANAGING_PARTNER", "ADMIN", "ACCOUNTANT", "STORE_MANAGER"].includes(user.role)) {
       return {};
     }
     // FEC sees warehouse and their own dealer inventory

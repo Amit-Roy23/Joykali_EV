@@ -146,3 +146,87 @@ function ChannelDoc({ company, d }: ChannelDocProps) {
 export async function generateChannelDocPDF(props: ChannelDocProps): Promise<Buffer> {
   return renderToBuffer(<ChannelDoc {...props} />);
 }
+
+/* ------------------------------------------------------------------ */
+/* Warehouse → warehouse transfer challan                              */
+/* ------------------------------------------------------------------ */
+export interface TransferChallanProps {
+  company: ChannelDocProps["company"];
+  t: any; // lean WarehouseTransfer with fromWarehouse / toWarehouse
+}
+
+function TransferChallan({ company, t }: TransferChallanProps) {
+  const addr = (w: any) => (w ? `${w.address}, ${w.city}${w.pincode ? ` - ${w.pincode}` : ""} (State code ${w.stateCode})` : "—");
+  return (
+    <Document title={t.transferCode}>
+      <Page size="A4" style={s.page}>
+        <View style={s.top}>
+          <View>
+            <Text style={s.brand}>{company.name}</Text>
+            <Text style={s.muted}>{company.address}, {company.city}, {company.state} - {company.pincode}</Text>
+            <Text style={s.muted}>GSTIN {company.gstin} · PAN {company.pan}</Text>
+          </View>
+          <View>
+            <Text style={s.title}>DELIVERY CHALLAN</Text>
+            <Text style={[s.muted, s.right]}>Stock transfer between own warehouses — not a sale</Text>
+          </View>
+        </View>
+        <View style={[s.row, { gap: 8 }]}>
+          <View style={[s.box, s.half]}>
+            <Text style={s.h}>From</Text>
+            <Text style={s.bold}>{t.fromName}</Text>
+            <Text>{addr(t.fromWarehouse)}</Text>
+            <Text style={[s.h, { marginTop: 6 }]}>To</Text>
+            <Text style={s.bold}>{t.toName}</Text>
+            <Text>{addr(t.toWarehouse)}</Text>
+          </View>
+          <View style={[s.box, s.half]}>
+            <Text style={s.h}>Document</Text>
+            <Text>Challan no: <Text style={s.bold}>{t.transferCode}</Text></Text>
+            <Text>Date: {date(t.createdAt)}</Text>
+            <Text>Movement: {t.interState ? `Inter-state branch transfer · Tax invoice ${t.transport?.invoiceNo || "—"}` : "Intra-state, same GSTIN"}</Text>
+            <Text>E-way bill: {t.transport?.ewayBillNo || "not required"}</Text>
+            <Text>Vehicle: {t.transport?.vehicleNo || "—"} · Driver: {t.transport?.driverName || "—"} {t.transport?.driverPhone ? `(${t.transport.driverPhone})` : ""}</Text>
+            <Text>Sent by: {t.createdByName}</Text>
+          </View>
+        </View>
+        <View style={s.th}>
+          <Text style={[s.c, { width: 20 }]}>#</Text>
+          <Text style={[s.c, { flex: 1 }]}>Description</Text>
+          <Text style={[s.c, { width: 130 }]}>Chassis</Text>
+          <Text style={[s.c, { width: 90 }, s.right]}>Value (cost)</Text>
+        </View>
+        {t.vehicles.map((v: any, i: number) => (
+          <View key={v.chassisNumber} style={s.tr} wrap={false}>
+            <Text style={[s.c, { width: 20 }]}>{i + 1}</Text>
+            <Text style={[s.c, { flex: 1 }]}>{v.modelName} — Electric vehicle</Text>
+            <Text style={[s.c, { width: 130 }]}>{v.chassisNumber}</Text>
+            <Text style={[s.c, { width: 90 }, s.right]}>{money(v.value || 0)}</Text>
+          </View>
+        ))}
+        <View style={s.totals}>
+          <View style={s.grand}><Text style={s.bold}>{t.vehicles.length} unit(s) · Consignment value</Text><Text style={s.bold}>{money(t.totalValue || 0)}</Text></View>
+        </View>
+        <Text style={{ marginTop: 6 }}>Amount in words: <Text style={s.bold}>{numberToWordsINR(t.totalValue || 0)}</Text></Text>
+        {t.remarks ? <Text style={{ marginTop: 6 }}>Remarks: {t.remarks}</Text> : null}
+        <View style={s.sign}>
+          <View>
+            <Text style={s.muted}>Received the above vehicles at {t.toName}</Text>
+            <Text style={{ marginTop: 22 }}>Store in-charge signature</Text>
+          </View>
+          <View>
+            <Text style={[s.right, s.bold]}>For {company.name}</Text>
+            <Text style={{ marginTop: 22, textAlign: "right" }}>Authorised signatory</Text>
+          </View>
+        </View>
+        <Text style={s.foot} fixed>
+          Delivery challan under Rule 55, CGST Rules — transfer of own goods between places of business. · Computer-generated document.
+        </Text>
+      </Page>
+    </Document>
+  );
+}
+
+export async function generateTransferChallanPDF(props: TransferChallanProps): Promise<Buffer> {
+  return renderToBuffer(<TransferChallan {...props} />);
+}

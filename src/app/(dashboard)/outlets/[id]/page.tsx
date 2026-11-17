@@ -1,5 +1,6 @@
 "use client";
 
+import { WarehousePicker } from "@/components/warehousePicker";
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -28,6 +29,7 @@ export default function OutletDetail() {
   const [pool, setPool] = useState<any[]>([]);
   const [pick, setPick] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
+  const [wh, setWh] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
@@ -35,20 +37,23 @@ export default function OutletDetail() {
   }, [id, date]);
   useEffect(load, [load]);
 
+  const loadPool = async (dir: "TO_OUTLET" | "TO_WAREHOUSE", warehouse: string) => {
+    if (dir === "TO_OUTLET") {
+      const res = await fetch(`/api/vehicles?status=IN_STOCK&limit=100${warehouse ? `&warehouse=${warehouse}` : ""}`).then((r) => r.json());
+      setPool(res.data || []);
+    } else setPool(d.stock);
+  };
   const openSend = async (dir: "TO_OUTLET" | "TO_WAREHOUSE") => {
     setSend(dir);
     setPick(new Set());
     setQ("");
-    if (dir === "TO_OUTLET") {
-      const res = await fetch(`/api/vehicles?status=IN_STOCK&limit=100`).then((r) => r.json());
-      setPool(res.data || []);
-    } else setPool(d.stock);
+    await loadPool(dir, wh);
   };
   const doSend = async () => {
     setBusy(true);
     setError(null);
     try {
-      const t = await api<any>("/api/outlets/transfers", { method: "POST", json: { outletId: id, direction: send, vehicleIds: [...pick] } });
+      const t = await api<any>("/api/outlets/transfers", { method: "POST", json: { outletId: id, direction: send, vehicleIds: [...pick], warehouseId: wh || undefined } });
       setSend(null);
       setNotice(`${t.transferCode}: ${t.vehicles.length} vehicle(s) ${send === "TO_OUTLET" ? `sent to ${d.outlet.name}` : "sent back to the warehouse"}. The receiving side must confirm.`);
       load();
@@ -190,6 +195,18 @@ export default function OutletDetail() {
       </Card>
 
       <Modal isOpen={!!send} onClose={() => setSend(null)} maxWidth="2xl" title={send === "TO_OUTLET" ? `Send stock to ${d.outlet.name}` : "Return stock to the warehouse"} description="Branch transfer within the company — a transfer note is issued, no invoice.">
+        <div className="mb-3">
+          <p className="mb-1 text-xs font-semibold uppercase text-slate-500">{send === "TO_OUTLET" ? "From warehouse" : "To warehouse"}</p>
+          <WarehousePicker
+            id="ot-wh"
+            value={wh}
+            onChange={(v) => {
+              setWh(v);
+              setPick(new Set());
+              if (send) loadPool(send, v);
+            }}
+          />
+        </div>
         <div className="relative mb-3">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input id="pool-q" className="pl-9" placeholder="Chassis or model" value={q} onChange={(e) => setQ(e.target.value)} />

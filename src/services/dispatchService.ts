@@ -15,6 +15,7 @@ import { documentTotals, ewbValidUpto, isEwbNumber } from "@/lib/gstDocs";
 import { logAudit } from "@/lib/audit";
 import { assertCredit, getParty, lineValue } from "./creditService";
 import { refreshOrderStatus } from "./orderService";
+import { canOperate, freeStockFilter, mainWarehouse, resolveWarehouse } from "./warehouseService";
 
 export class DispatchError extends Error {
   status: number;
@@ -103,7 +104,12 @@ export async function createDeliveryOrder(
   orderId: string,
   lines: Array<{ modelId: string; quantity: number }>,
   user: JWTPayload,
+  warehouseId?: string | null,
 ) {
+  const warehouse = await resolveWarehouse(warehouseId);
+  if (!(await canOperate(user, warehouse._id)) && user.role === "STORE_MANAGER")
+    throw new DispatchError(`You can only raise delivery orders from your own warehouse`, 403);
+  const whFree = await freeStockFilter(warehouse._id);
   if (!mongoose.isValidObjectId(orderId))
     throw new DispatchError("Order not found", 404);
   const order = await ChannelOrder.findById(orderId);
@@ -132,14 +138,10 @@ export async function createDeliveryOrder(
         400,
       );
     // Only what the warehouse actually has can be promised.
-    const free = await Vehicle.countDocuments({
-      model: line.model,
-      status: "IN_STOCK",
-      currentLocationType: "WAREHOUSE",
-    });
+    const free = await Vehicle.countDocuments({ ...whFree, model: line.model });
     if (q > free)
       throw new DispatchError(
-        `${line.modelName}: only ${free} unit(s) in warehouse stock`,
+        `${line.modelName}: only ${free} unit(s) in ${warehouse.name}`,
         400,
       );
     doLines.push({
@@ -201,6 +203,8 @@ export async function createDeliveryOrder(
     doCode: await generateFyCode("DO"),
     order: order._id,
     orderCode: order.orderCode,
+    warehouse: warehouse._id,
+    warehouseName: warehouse.name,
     partyType: order.partyType,
     party: order.party,
     partySnapshot: {
@@ -356,13 +360,13 @@ export async function pickVehicle(
 
   // Atomic reservation — fails if someone else took or sold it meanwhile.
   const reserved = await Vehicle.findOneAndUpdate(
-    { _id: vehicle._id, status: "IN_STOCK", currentLocationType: "WAREHOUSE" },
+    { _id: vehicle._id, ...(await freeStockFilter(d.warehouse || (await mainWarehouse())._id)) },
     { $set: { status: "RESERVED", deliveryOrder: d._id } },
     { new: true },
   );
   if (!reserved)
     throw new DispatchError(
-      `${chassis} is not free warehouse stock (status ${vehicle.status.toLowerCase().replace(/_/g, " ")})`,
+      `${chassis} is not free stock in ${d.warehouseName || "this warehouse"} (status ${vehicle.status.toLowerCase().replace(/_/g, " ")})`,
     );
 
   d.vehicles.push({
@@ -432,8 +436,7 @@ export async function autoPick(id: string, user: JWTPayload) {
     if (need <= 0) continue;
     const candidates = await Vehicle.find({
       model: line.model,
-      status: "IN_STOCK",
-      currentLocationType: "WAREHOUSE",
+      ...(await freeStockFilter(d.warehouse || (await mainWarehouse())._id)),
     })
       .sort({ createdAt: 1 })
       .limit(need + 5)
@@ -682,7 +685,7 @@ export async function dispatchDO(id: string, user: JWTPayload) {
     d.vehicles.map((v) => ({
       vehicle: v.vehicle,
       movementType: "DISPATCH",
-      fromLocation: "Main Warehouse",
+      fromLocation: `Warehouse: ${d.warehouseName || "Main Warehouse"}`,
       toLocation: `In transit to ${d.partySnapshot.name} (${d.loading!.registrationNo})`,
       performedBy: oid(user.userId),
       reference: `${d.doCode} / ${d.document!.number}`,

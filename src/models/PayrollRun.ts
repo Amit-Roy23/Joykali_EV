@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
+import { PaymentStamp, PaymentStampSchema } from "./Accounts";
 import { ApprovalSignature, ApprovalSignatureSchema } from "@/lib/approval";
 import { PayrollRunStatus } from "@/types";
 
@@ -24,6 +25,8 @@ export interface IPayrollRun extends Document {
   lockedBy?: mongoose.Types.ObjectId | null;
   lockedAt?: Date | null;
   notes?: string;
+  /** Net salaries paid out by Accounts after the run is locked. */
+  payment?: PaymentStamp | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -58,6 +61,7 @@ const PayrollRunSchema = new Schema<IPayrollRun>(
     lockedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
     lockedAt: { type: Date, default: null },
     notes: { type: String },
+    payment: { type: PaymentStampSchema, default: null },
   },
   { timestamps: true }
 );

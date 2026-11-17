@@ -24,6 +24,7 @@ import { rupeesToPaise } from "@/lib/money";
 import { generateFyCode, generateOutletCode } from "@/lib/codeGenerator";
 import { getCurrentPeriod, getPeriodBounds } from "@/lib/period";
 import { getParty, supplierRef, tierOf } from "./creditService";
+import { freeStockFilter, mainWarehouse, resolveWarehouse } from "./warehouseService";
 import { canActOnParty, commissionEarned, depositHeld, isDirectChild, NetworkError, ownedStockFilter, TIER_LABEL } from "./networkService";
 
 const oid = (v: any) => new mongoose.Types.ObjectId(String(v));
@@ -520,7 +521,7 @@ export async function canSeeOutlet(user: JWTPayload, outletId: any) {
 }
 
 /** Send company stock from the warehouse to an outlet (or back). Branch transfer — no invoice. */
-export async function createStockTransfer(user: JWTPayload, input: { outletId: string; direction: "TO_OUTLET" | "TO_WAREHOUSE"; vehicleIds: string[]; remarks?: string }) {
+export async function createStockTransfer(user: JWTPayload, input: { outletId: string; direction: "TO_OUTLET" | "TO_WAREHOUSE"; vehicleIds: string[]; remarks?: string; warehouseId?: string | null }) {
   if (!mongoose.isValidObjectId(input.outletId)) throw new NetworkError("Outlet not found", 404);
   const outlet = await Outlet.findById(input.outletId).lean();
   if (!outlet || outlet.status !== "ACTIVE") throw new NetworkError("Outlet not found or inactive", 404);
@@ -532,9 +533,10 @@ export async function createStockTransfer(user: JWTPayload, input: { outletId: s
   }
   const ids = [...new Set((input.vehicleIds || []).filter((v) => mongoose.isValidObjectId(v)))];
   if (!ids.length) throw new NetworkError("Pick at least one vehicle");
-  const from = dir === "TO_OUTLET" ? { status: "IN_STOCK", currentLocationType: "WAREHOUSE" } : { status: "AT_OUTLET", currentLocationOutlet: outlet._id };
+  const wh = await resolveWarehouse(input.warehouseId);
+  const from = dir === "TO_OUTLET" ? await freeStockFilter(wh._id) : { status: "AT_OUTLET", currentLocationOutlet: outlet._id };
   const vehicles = await Vehicle.find({ _id: { $in: ids }, ...from }).populate("model", "name variant").lean();
-  if (vehicles.length !== ids.length) throw new NetworkError(dir === "TO_OUTLET" ? "Some vehicles are not free in the warehouse" : "Some vehicles are not at this outlet", 409);
+  if (vehicles.length !== ids.length) throw new NetworkError(dir === "TO_OUTLET" ? `Some vehicles are not free in ${wh.name}` : "Some vehicles are not at this outlet", 409);
 
   const transfer = await withTransaction(async (session) => {
     const code = await generateFyCode("STOCK_TRANSFER", new Date(), session);
@@ -545,6 +547,8 @@ export async function createStockTransfer(user: JWTPayload, input: { outletId: s
           direction: dir,
           outlet: outlet._id,
           outletName: outlet.name,
+          warehouse: wh._id,
+          warehouseName: wh.name,
           vehicles: vehicles.map((v: any) => ({ vehicle: v._id, chassisNumber: v.chassisNumber, modelName: `${v.model?.name || ""} ${v.model?.variant || ""}`.trim() })),
           createdBy: oid(user.userId),
           createdByName: user.name,
@@ -559,8 +563,8 @@ export async function createStockTransfer(user: JWTPayload, input: { outletId: s
       vehicles.map((v: any) => ({
         vehicle: v._id,
         movementType: "OUTLET_TRANSFER",
-        fromLocation: dir === "TO_OUTLET" ? "Main Warehouse" : `Outlet: ${outlet.name}`,
-        toLocation: dir === "TO_OUTLET" ? `In transit to ${outlet.name}` : "In transit to warehouse",
+        fromLocation: dir === "TO_OUTLET" ? `Warehouse: ${wh.name}` : `Outlet: ${outlet.name}`,
+        toLocation: dir === "TO_OUTLET" ? `In transit to ${outlet.name}` : `In transit to ${wh.name}`,
         performedBy: oid(user.userId),
         reference: code,
         timestamp: new Date(),
@@ -588,7 +592,7 @@ export async function receiveStockTransfer(user: JWTPayload, id: string) {
   const to =
     t.direction === "TO_OUTLET"
       ? { status: "AT_OUTLET", currentLocationType: "OUTLET", currentLocationOutlet: t.outlet, transfer: null }
-      : { status: "IN_STOCK", currentLocationType: "WAREHOUSE", currentLocationOutlet: null, transfer: null };
+      : { status: "IN_STOCK", currentLocationType: "WAREHOUSE", currentLocationOutlet: null, transfer: null, warehouse: t.warehouse || (await mainWarehouse())._id };
   await withTransaction(async (session) => {
     await Vehicle.updateMany({ transfer: t._id }, { $set: to }, { session });
     await StockMovement.create(
@@ -596,7 +600,7 @@ export async function receiveStockTransfer(user: JWTPayload, id: string) {
         vehicle: v.vehicle,
         movementType: "OUTLET_TRANSFER",
         fromLocation: "In transit",
-        toLocation: t.direction === "TO_OUTLET" ? `Outlet: ${t.outletName}` : "Main Warehouse",
+        toLocation: t.direction === "TO_OUTLET" ? `Outlet: ${t.outletName}` : `Warehouse: ${t.warehouseName || "Main Warehouse"}`,
         performedBy: oid(user.userId),
         reference: t.transferCode,
         timestamp: new Date(),

@@ -19,6 +19,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [locationType, setLocationType] = useState("");
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
@@ -36,7 +37,8 @@ export default function InventoryPage() {
       limit: "15",
       search,
       ...(status && { status }),
-      ...(locationType && { locationType }),
+      ...(locationType && !locationType.startsWith("WH:") && { locationType }),
+      ...(locationType.startsWith("WH:") && { warehouse: locationType.slice(3) }),
     });
 
     fetch(`/api/vehicles?${params.toString()}`)
@@ -53,6 +55,13 @@ export default function InventoryPage() {
   useEffect(() => {
     fetchVehicles();
   }, [page, status, locationType]);
+
+  useEffect(() => {
+    fetch("/api/warehouses?simple=1")
+      .then((res) => res.json())
+      .then((res) => res.success && setWarehouses(res.data.warehouses))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/dealers")
@@ -176,7 +185,12 @@ export default function InventoryPage() {
               className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
             >
               <option value="">All Locations</option>
-              <option value="WAREHOUSE">Main Warehouse</option>
+              <option value="WAREHOUSE">All warehouses</option>
+              {warehouses.map((w) => (
+                <option key={w._id} value={`WH:${w._id}`}>
+                  {w.name}
+                </option>
+              ))}
               <option value="DEALER">Dealers</option>
               <option value="DISTRIBUTOR">Distributors</option>
               <option value="OUTLET">Company showrooms</option>
@@ -235,8 +249,12 @@ export default function InventoryPage() {
                         <span className="font-medium text-teal-800">
                           {v.currentLocationDealer.name} ({v.currentLocationDealer.city})
                         </span>
+                      ) : v.currentLocationType === "WAREHOUSE" ? (
+                        <span className="text-slate-600 font-medium">{v.warehouse?.name || warehouses.find((w) => w.isMain)?.name || "Main Warehouse"}</span>
                       ) : (
-                        <span className="text-slate-600 font-medium">Main Central Warehouse</span>
+                        <span className="text-slate-600 font-medium">
+                          {({ DISTRIBUTOR: "With distributor", OUTLET: "Company showroom", IN_TRANSIT: "In transit", DEALER: "With dealer" } as Record<string, string>)[v.currentLocationType] || v.currentLocationType}
+                        </span>
                       )}
                     </TableCell>
                     <TableCell>
