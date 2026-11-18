@@ -1,5 +1,6 @@
 import React from "react";
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import { LOGO_PNG_DATA_URI } from "@/lib/brandLogo";
 import { numberToWordsINR } from "@/lib/money";
 import { documentTotals } from "@/lib/gstDocs";
 
@@ -15,6 +16,7 @@ const s = StyleSheet.create({
   page: { padding: 28, fontSize: 8.5, fontFamily: "Helvetica", color: "#0a2a5e" },
   top: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 2, borderBottomColor: "#0d47a1", paddingBottom: 8, marginBottom: 10 },
   brand: { fontSize: 15, fontFamily: "Helvetica-Bold" },
+  logo: { width: 135, height: 30, marginBottom: 4, marginLeft: -2 },
   muted: { color: "#64748b" },
   title: { fontSize: 13, fontFamily: "Helvetica-Bold", textAlign: "right" },
   box: { borderWidth: 0.8, borderColor: "#cbd5e1", padding: 7, marginBottom: 8 },
@@ -46,7 +48,8 @@ function ChannelDoc({ company, d }: ChannelDocProps) {
       <Page size="A4" style={s.page}>
         <View style={s.top}>
           <View>
-            <Text style={s.brand}>{company.name}</Text>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={LOGO_PNG_DATA_URI} style={s.logo} />
             <Text style={s.muted}>{company.address}, {company.city}, {company.state} - {company.pincode}</Text>
             <Text style={s.muted}>GSTIN {company.gstin} · PAN {company.pan} · State code {company.stateCode}</Text>
           </View>
@@ -162,7 +165,8 @@ function TransferChallan({ company, t }: TransferChallanProps) {
       <Page size="A4" style={s.page}>
         <View style={s.top}>
           <View>
-            <Text style={s.brand}>{company.name}</Text>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={LOGO_PNG_DATA_URI} style={s.logo} />
             <Text style={s.muted}>{company.address}, {company.city}, {company.state} - {company.pincode}</Text>
             <Text style={s.muted}>GSTIN {company.gstin} · PAN {company.pan}</Text>
           </View>
@@ -246,7 +250,8 @@ function GrnNote({ company, row, lines }: GrnNoteProps) {
       <Page size="A4" style={s.page}>
         <View style={s.top}>
           <View>
-            <Text style={s.brand}>{company.name}</Text>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={LOGO_PNG_DATA_URI} style={s.logo} />
             <Text style={s.muted}>{company.address}, {company.city}, {company.state} - {company.pincode}</Text>
             <Text style={s.muted}>GSTIN {company.gstin}</Text>
           </View>
@@ -323,7 +328,8 @@ function ReceiptDoc({ company, e, party, accountName }: ReceiptProps) {
       <Page size="A5" orientation="landscape" style={s.page}>
         <View style={s.top}>
           <View>
-            <Text style={s.brand}>{company.name}</Text>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={LOGO_PNG_DATA_URI} style={s.logo} />
             <Text style={s.muted}>{company.address}, {company.city}, {company.state} - {company.pincode}</Text>
             <Text style={s.muted}>GSTIN {company.gstin}</Text>
           </View>

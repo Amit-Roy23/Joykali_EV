@@ -1,6 +1,7 @@
 import React from "react";
 import {
   Document,
+  Image,
   Page,
   Text,
   View,
@@ -9,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import JSZip from "jszip";
 import { formatINR, numberToWordsINR } from "@/lib/money";
+import { LOGO_PNG_DATA_URI } from "@/lib/brandLogo";
 
 const styles = StyleSheet.create({
   page: {
@@ -208,8 +210,8 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
         {/* Header */}
         <View style={styles.headerContainer}>
           <View>
-            <Text style={styles.companyName}>{props.company.name}</Text>
-            <Text style={styles.tagline}>Electric Mobility Redefined</Text>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={LOGO_PNG_DATA_URI} style={{ width: 144, height: 32, marginBottom: 4, marginLeft: -2 }} />
             <Text style={styles.headerDetails}>
               {props.company.address}, {props.company.city}, {props.company.state} - {props.company.pincode}
             </Text>
@@ -485,8 +487,8 @@ export const InvoiceDocument: React.FC<InvoicePDFProps> = ({ company, sale }) =>
         {/* Header */}
         <View style={styles.headerContainer}>
           <View>
-            <Text style={styles.companyName}>{company.name}</Text>
-            <Text style={styles.tagline}>Authorized Electric Vehicle Dealership</Text>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={LOGO_PNG_DATA_URI} style={{ width: 144, height: 32, marginBottom: 4, marginLeft: -2 }} />
             <Text style={styles.headerDetails}>
               {company.address}, {company.city}, {company.state} - {company.pincode}
             </Text>

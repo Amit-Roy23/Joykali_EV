@@ -71,7 +71,7 @@ export default function LoginPage() {
     <div className="min-h-dvh bg-background lg:grid lg:grid-cols-[1.05fr_1fr]">
       {/* ---------------------------------------------------------- hero */}
       <section className="surface-ink relative overflow-hidden px-6 pb-10 pt-[max(2rem,env(safe-area-inset-top))] text-white sm:px-10 lg:flex lg:flex-col lg:justify-between lg:px-14 lg:py-12">
-        <BrandMark />
+        <BrandMark className="h-12 self-start sm:h-14" />
 
         <div className="mt-10 max-w-xl lg:mt-0">
           <p className="inline-flex items-center gap-2 rounded-full border border-volt-300/30 bg-volt-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-volt-300">
