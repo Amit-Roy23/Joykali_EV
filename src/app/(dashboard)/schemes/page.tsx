@@ -1,4 +1,5 @@
 "use client";
+import { ROLE_SHORT } from "@/components/ui/kit";
 import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
@@ -101,7 +102,7 @@ export default function SchemesListPage() {
                     <TableCell className="text-xs">
                       {s.applicableRoles?.map((r: string) => (
                         <Badge key={r} variant="outline" className="mr-1 text-[10px]">
-                          {r}
+                          {ROLE_SHORT[r] || r}
                         </Badge>
                       ))}
                     </TableCell>

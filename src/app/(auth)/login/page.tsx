@@ -20,7 +20,7 @@ const DEMO_ACCOUNTS = [
   { role: "MANAGING_PARTNER", name: "Joydeb Kali Sarkar", login: "mp@joykaliev.in", blurb: "Final approver — orders, payroll, credit" },
   { role: "BUSINESS_HEAD", name: "Ananya Bhattacharya", login: "bh@joykaliev.in", blurb: "First approver; warehouse & dispatch" },
   { role: "ASM", name: "Moumita Banerjee", login: "asm.kolkata@joykaliev.in", blurb: "Kolkata team & leaderboard" },
-  { role: "FEC", name: "Arnab Chatterjee", login: "fec5@joykaliev.in", blurb: "Books sales, tracks incentives" },
+  { role: "FEC", name: "Arnab Chatterjee", login: "fse5@joykaliev.in", blurb: "Books sales, tracks incentives" },
   { role: "HR_MANAGER", name: "Rupa Sen", login: "hr@joykaliev.in", blurb: "Attendance, leave, documents, exits" },
   { role: "ACCOUNTANT", name: "Nabanita Dutta", login: "accounts@joykaliev.in", blurb: "Cash & bank books, expenses, P&L" },
   { role: "STORE_MANAGER", name: "Bapi Mahato", login: "store@joykaliev.in", blurb: "Siliguri warehouse, stock transfers" },
@@ -83,7 +83,7 @@ export default function LoginPage() {
           </h1>
           <p className="mt-4 max-w-md text-sm leading-relaxed text-slate-300 sm:text-base">
             One place for Joykali&apos;s vehicle stock, dealer allocations, field sales, incentive schemes and payroll —
-            with the right view for every role from FEC to Admin.
+            with the right view for every role from FSE to Admin.
           </p>
 
           {/* Signature visual: the "charge" stack */}
@@ -113,7 +113,7 @@ export default function LoginPage() {
       <section className="relative -mt-6 rounded-t-[28px] bg-background px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-8 sm:px-10 lg:mt-0 lg:flex lg:items-center lg:justify-center lg:rounded-none lg:py-12">
         <div className="mx-auto w-full max-w-md">
           <h2 className="font-display text-2xl font-bold tracking-tight text-slate-900">Sign in</h2>
-          <p className="mt-1 text-sm text-slate-500">Use your employee code (e.g. JKE-FEC-0001) or work email.</p>
+          <p className="mt-1 text-sm text-slate-500">Use your employee code (e.g. JKE-FSE-0001) or work email.</p>
 
           <form
             className="mt-6 space-y-4"
@@ -138,7 +138,7 @@ export default function LoginPage() {
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="JKE-FEC-0001"
+                  placeholder="JKE-FSE-0001"
                   className="h-11 pl-9"
                 />
               </div>

@@ -286,7 +286,7 @@ function AsmDashboard({ data, header }: { data: any; header: React.ReactNode }) 
         <StatCard label="Team deliveries" value={k.units} trend={k.unitsTrend != null ? { value: k.unitsTrend } : null} sub="vs same days last month" icon={Bike} tone="brand" />
         <StatCard label="Team revenue" value={formatRupeesShort(k.revenue)} trend={k.revenueTrend != null ? { value: k.revenueTrend } : null} sub="vs same days last month" icon={BadgeIndianRupee} tone="emerald" />
         <StatCard label="My override earnings" value={formatRupees(k.incentive)} sub="this month, auto-calculated" icon={Trophy} tone="amber" />
-        <StatCard label="Active sellers" value={`${k.active}/${k.teamSize}`} sub="FECs with a delivery this month" icon={Users} tone="volt">
+        <StatCard label="Active sellers" value={`${k.active}/${k.teamSize}`} sub="FSEs with a delivery this month" icon={Users} tone="volt">
           <ChargeBar value={k.active} max={Math.max(1, k.teamSize)} segments={Math.max(1, k.teamSize)} className="mt-3" tone="brand" animated={false} />
         </StatCard>
       </div>
@@ -304,7 +304,7 @@ function AsmDashboard({ data, header }: { data: any; header: React.ReactNode }) 
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>Team deliveries, last 6 months</CardTitle>
-            <CardDescription>Units delivered by you and your FECs</CardDescription>
+            <CardDescription>Units delivered by you and your FSEs</CardDescription>
           </CardHeader>
           <CardContent>
             <MonthlyBars data={data.trend} dataKey="units" label="Units" format={(v) => `${v}`} height={240} />
@@ -346,7 +346,7 @@ function AsmDashboard({ data, header }: { data: any; header: React.ReactNode }) 
 }
 
 /* ================================================================== */
-/* Field Executive                                                     */
+/* Field Sales Executive                                                    */
 /* ================================================================== */
 function FecDashboard({ data, header }: { data: any; header: React.ReactNode }) {
   const k = data.kpis;

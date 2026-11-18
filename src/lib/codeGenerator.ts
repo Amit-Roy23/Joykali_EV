@@ -41,7 +41,7 @@ export async function getNextSequence(key: string, session?: any): Promise<numbe
 }
 
 const ROLE_PREFIX_MAP: Record<UserRole, string> = {
-  FEC: "FEC",
+  FEC: "FSE",
   ASM: "ASM",
   BUSINESS_HEAD: "BH",
   MANAGING_PARTNER: "MP",
@@ -57,7 +57,7 @@ const ROLE_PREFIX_MAP: Record<UserRole, string> = {
 };
 
 /**
- * Generate Employee Code: JKE-FEC-0001, JKE-ASM-0001, etc.
+ * Generate Employee Code: JKE-FSE-0001, JKE-ASM-0001, etc.
  */
 export async function generateEmployeeCode(
   role: UserRole,
@@ -113,7 +113,7 @@ export function generatePayrollRunCode(year: number, month: number): string {
 }
 
 /**
- * Generate Payslip Code: PS/2026-11/JKE-FEC-0001
+ * Generate Payslip Code: PS/2026-11/JKE-FSE-0001
  */
 export function generatePayslipCode(
   year: number,
@@ -171,6 +171,7 @@ export const FY_SERIES = {
   WAREHOUSE_TRANSFER: "JKWT",
   EXPENSE: "JKEX",
   VOUCHER: "JKV",
+  PAYMENT_ADVICE: "JKPA",
 } as const;
 
 export async function generateFyCode(

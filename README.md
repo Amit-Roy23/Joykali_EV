@@ -27,18 +27,18 @@ A production-grade, full-stack enterprise resource and business management appli
 ## 2. Roles, Hierarchy & Permissions
 
 ### Role Hierarchy (Low → High):
-$$\text{FEC} < \text{ASM} < \text{BUSINESS\_HEAD} < \text{MANAGING\_PARTNER} < \text{ADMIN}$$
+$$\text{FSE} < \text{ASM} < \text{BUSINESS\_HEAD} < \text{MANAGING\_PARTNER} < \text{ADMIN}$$
 
-- **FEC (Field Executive Consultant)**: Creates sales, views own sales and personal incentive progress, views/downloads own payslips.
-- **ASM (Area Sales Manager)**: Oversees a team of FECs, views team sales & leaderboard, receives team override incentives, views team payslips.
+- **FSE (Field Sales Executive)**: Creates sales, views own sales and personal incentive progress, views/downloads own payslips.
+- **ASM (Area Sales Manager)**: Oversees a team of FSEs, views team sales & leaderboard, receives team override incentives, views team payslips.
 - **BUSINESS_HEAD**: Oversees ASMs, monitors multi-district sales and purchases, manages dealers and subordinates, creates incentive scheme drafts, initiates payroll drafts.
 - **MANAGING_PARTNER**: Full business visibility, approves incentive schemes, locks payroll runs, cancels sales with audit logs.
 - **ADMIN**: Unrestricted system control, settings management, user administration, role-permission matrix configuration, and security audit log.
 
 ### Server-Side Data Scoping (`getScopeFilter`)
 Every query enforces data isolation on the server:
-- An FEC can only view sales they personally closed.
-- An ASM automatically sees their direct sales plus all sales closed by FECs in their downline.
+- An FSE can only view sales they personally closed.
+- An ASM automatically sees their direct sales plus all sales closed by FSEs in their downline.
 - Mid-month reassignment preserves historical attribution: `sale.asmAtSale` records the manager at the exact sale timestamp so past commissions are never retroactively corrupted.
 - A user can never create or modify a user of equal or higher hierarchy rank (`canManageRole`).
 
@@ -93,12 +93,12 @@ Every query enforces data isolation on the server:
 
 ### 4.1 Concurrency-Safe Atomic Code Generation
 All business identifiers are generated atomically using MongoDB `findOneAndUpdate` with `$inc`:
-- **Employees**: `JKE-FEC-0001`, `JKE-ASM-0001`, `JKE-BH-0001`, `JKE-MP-0001`, `JKE-ADM-0001`
+- **Employees**: `JKE-FSE-0001`, `JKE-ASM-0001`, `JKE-BH-0001`, `JKE-MP-0001`, `JKE-ADM-0001`
 - **Dealers**: `JKD-0001`
 - **Sales Invoices**: `JKS/2026-27/0001` (resets every Indian Financial Year 1 Apr – 31 Mar)
 - **Purchases**: `JKP/2026-27/0001`
 - **Payroll Runs**: `PR-2026-11`
-- **Payslips**: `PS/2026-11/JKE-FEC-0001`
+- **Payslips**: `PS/2026-11/JKE-FSE-0001`
 
 ### 4.2 Multi-Model Incentive Calculation Engine
 The engine (`src/services/incentiveEngine.ts`) supports 5 rule architectures:
@@ -106,7 +106,7 @@ The engine (`src/services/incentiveEngine.ts`) supports 5 rule architectures:
 2. **SLAB**: Volume-tiered payouts (e.g. 1–3 units: ₹500/unit, 4–6 units: ₹800/unit, 7+: ₹1200/unit) supporting both **ALL_UNITS** and **INCREMENTAL** modes.
 3. **TARGET_BONUS**: Lump-sum bonus upon crossing unit or revenue thresholds.
 4. **PERCENTAGE**: Commission % calculated on ex-showroom (ex-GST) sale value.
-5. **TEAM_OVERRIDE**: Overrides awarded to Area Sales Managers based on sales closed by their direct reporting FECs.
+5. **TEAM_OVERRIDE**: Overrides awarded to Area Sales Managers based on sales closed by their direct reporting FSEs.
 
 ### 4.3 Automated Payroll & Payslips
 - BH or Admin initiates a draft payroll run for a month/year.
@@ -139,6 +139,9 @@ The engine (`src/services/incentiveEngine.ts`) supports 5 rule architectures:
 | **Warehouses (phase 6)** | Several warehouses, each with a Store Manager login. Purchases, delivery orders and showroom transfers choose the warehouse. **Warehouse → warehouse transfers** travel on a delivery challan with an e-way bill above ₹50,000 (and a branch-transfer tax invoice when the two warehouses are in different states); the receiving warehouse checks every chassis, the sender cannot confirm receipt, short units are flagged missing, and the sender can call a transfer back before receipt. Stock board per warehouse: free / on a DO, value at purchase cost, age in stock, minimum-stock alerts. |
 | **Accounts (phase 6)** | Accounts login. **Cash book and bank book** built from every receipt and payment in the system (retail sales, partner payments, deposits, supplier payments, expenses, salaries, advances, F&F, vouchers) with opening, running and closing balance, day-wise view and Excel. **Company expenses** with bill, GST input and cost centre — bills of ₹10,000 or more need BH + MP before Accounts pays. Payments desk for approved expenses, locked payrolls, advances, settlements and supplier invoices (part payments allowed). Receipt / payment / contra vouchers. **Profit & loss** (accrual, before GST, cost of each vehicle sold), **outstanding** with ageing, **budget vs actual**. |
 | **Salary structure & PF/ESI (phase 6)** | The salary-sheet columns are editable: add, delete, rename, re-order; each column is % of gross, % of basic, a fixed amount or the balance, flagged as PF wage or not and cut for loss of pay or not; deduction columns too (e.g. welfare fund). PF (employee, employer split into EPS/EPF, EDLI, admin, wage ceiling on/off), ESI (on wages paid, ₹21,000 limit) and professional tax options live in the same structure. Changes need BH + MP and apply from a chosen month; past payslips keep their columns. Each payroll run gives the EPFO **ECR** upload file, the **ESIC** sheet and challan totals. |
+| **Dealer tracking & notifications** | A bell on every login. Dealers and distributors are told when their order is approved, when the delivery order is raised, when the invoice / challan is ready, and when the truck leaves (number, driver, phone, e-way bill). Their order page shows each shipment step by step with the invoice PDF, and the company is told the moment a GRN is recorded. Partner-to-partner orders and shipments notify the same way. |
+| **Goods receipt (GRN)** | A GRN menu for partners and staff: shipments on the road (late after 3 days), every receipt with GRN number, who received it, short / damaged units and credit notes, and a GRN note PDF. Partner-to-partner receipts get a GRN number too. |
+| **Dealer payments** | Receipts record how the money came (NEFT, RTGS, IMPS, UPI, cheque, cash), the UTR / cheque number, the payer's bank and the company account it went into; the same UTR can never be counted twice. Dealers report a payment from their portal with a screenshot; Accounts checks the bank and confirms (receipt posted, dealer notified) or rejects with a reason. Receipts register with Excel, receipt PDF, and **bank matching**: tick receipts seen on the statement, see what the statement should show and the difference. |
 | **Automatic salary** | Enter a monthly gross or annual CTC; basic/HRA/conveyance/special allowance, PF (₹15k ceiling), ESI, WB professional tax, employer cost and take-home are calculated. Revisions are effective-dated and need BH + MP approval; a daily job drafts last month's payroll on the 1st. |
 
 ## Deploying
@@ -200,11 +203,12 @@ Password for every account: **`Joykali@123`** (login with email or employee code
 | Business Head | `bh@joykaliev.in` | `JKE-BH-0001` | Generate this month's payroll, dealers, stock |
 | ASM — Kolkata | `asm.kolkata@joykaliev.in` | `JKE-ASM-0002` | Team leaderboard, override earnings |
 | ASM — North / South | `asm.north@…`, `asm.south@…` | `JKE-ASM-0001/3` | |
-| FEC (top seller) | `fec5@joykaliev.in` | `JKE-FEC-0005` | Record a sale on a phone, watch incentive update |
-| FEC 1–12 | `fec1@joykaliev.in` … `fec12@…` | `JKE-FEC-0001…` | |
+| FSE (top seller) | `fse5@joykaliev.in` | `JKE-FSE-0005` | Record a sale on a phone, watch incentive update |
+| FSE 1–12 | `fse1@joykaliev.in` … `fse12@…` | `JKE-FSE-0001…` | |
 | HR Manager | `hr@joykaliev.in` | `JKE-HR-0001` | Setup, register Excel, compute a final settlement, salary columns |
 | Accounts | `accounts@joykaliev.in` | `JKE-ACC-0001` | Cash & bank books, pay approved bills, P&L, budget |
 | Store Manager (Siliguri) | `store@joykaliev.in` | `JKE-STR-0001` | Receive a transfer, send stock back, petty expense |
+| Dealer (company, Howrah) | `dealer.howrah@joykaliev.in` | `JKDL-HWH` | Truck on the road → record the GRN, report a payment |
 | Showroom (Salt Lake) | `showroom@joykaliev.in` | `JKE-OUT-0001` | Counter bill, receive a transfer, day closing |
 | Super distributor | `sd1@joykaliev.in` | `JKSD-0001` | Network view, its Bolpur distributor |
 | Distributor | `dist1@joykaliev.in` | `JKDB-0001` | Accept Memari's order, supply it, set targets |
@@ -212,9 +216,9 @@ Password for every account: **`Joykali@123`** (login with email or employee code
 | Sub dealer | `subdealer1@joykaliev.in` | `JKSB-0001` | Buys from Memari, retail bill |
 
 ### Suggested 5-minute client demo
-1. **FEC on a phone** — sign in as Arnab (FEC), tap **+**, pick an E-Rickshaw, fill the customer, confirm. The
+1. **FSE on a phone** — sign in as Arnab (FSE), tap **+**, pick an E-Rickshaw, fill the customer, confirm. The
    dashboard's incentive and "next milestone" charge bar update immediately.
-2. **Managing Partner** — Dashboard → "1 incentive scheme awaiting approval" → approve *Commercial EV Push*. Every FEC
+2. **Managing Partner** — Dashboard → "1 incentive scheme awaiting approval" → approve *Commercial EV Push*. Every FSE
    who sold a commercial vehicle this month gets the per-unit bonus, and any open payroll draft re-prices on its own.
 3. **Business Head** — Payroll Runs → run this month's draft → adjust LOP for one person.
 4. **Managing Partner** — approve, then lock. Payslips are released; employees see them under **Payslips**.

@@ -1,5 +1,6 @@
 "use client";
 
+import { ROLE_SHORT } from "@/components/ui/kit";
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -221,7 +222,7 @@ export default function SchemeBuilderPage() {
                         : "bg-white text-slate-700 border-slate-300 hover:border-slate-400"
                     }`}
                   >
-                    {r}
+                    {ROLE_SHORT[r] || r}
                   </button>
                 ))}
               </div>
@@ -432,7 +433,7 @@ export default function SchemeBuilderPage() {
                     className="mt-1 w-64"
                   />
                   <p className="text-[11px] text-slate-500 mt-1">
-                    Credited to the Area Sales Manager for each vehicle delivered by their reporting FEC team.
+                    Credited to the Area Sales Manager for each vehicle delivered by their reporting FSE team.
                   </p>
                 </div>
               )}

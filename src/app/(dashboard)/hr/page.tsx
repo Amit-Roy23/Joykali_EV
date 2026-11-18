@@ -631,7 +631,7 @@ function Setup() {
           <p className="mb-2 text-xs text-slate-500">
             Paste the machine&apos;s export: one punch per line, <span className="font-mono">EMPLOYEE_CODE, YYYY-MM-DD HH:MM</span> (IST). Punches alternate in/out each day; duplicates are ignored. A machine can also push directly to /api/hr/biometric with its device key.
           </p>
-          <textarea id="bio-csv" className="field h-28 py-2 font-mono text-xs" value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={"JKE-FEC-0001, 2026-11-14 09:28\nJKE-FEC-0001, 2026-11-14 18:41"} />
+          <textarea id="bio-csv" className="field h-28 py-2 font-mono text-xs" value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={"JKE-FSE-0001, 2026-11-14 09:28\nJKE-FSE-0001, 2026-11-14 18:41"} />
           <Button
             className="mt-2"
             disabled={busy || !csv.trim()}

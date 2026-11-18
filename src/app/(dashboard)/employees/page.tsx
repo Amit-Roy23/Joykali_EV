@@ -7,7 +7,7 @@ import { Users, PlusCircle, Search, GitBranch, Eye, Shield } from "lucide-react"
 import { Button, cn } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
-import { Avatar, EmptyState, PageHeader, RoleBadge, Skeleton } from "@/components/ui/kit";
+import { Avatar, EmptyState, PageHeader, RoleBadge, Skeleton, ROLE_SOLID } from "@/components/ui/kit";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
@@ -28,7 +28,7 @@ export default function EmployeesListPage() {
     phone: "",
     role: "FEC",
     reportsTo: "",
-    designation: "Field Executive Consultant",
+    designation: "Field Sales Executive",
     joiningDate: new Date().toISOString().split("T")[0],
     salary: {
       basic: 18000,
@@ -95,11 +95,15 @@ export default function EmployeesListPage() {
 
   const ROLES = [
     { id: "", label: "Everyone" },
-    { id: "FEC", label: "FEC" },
+    { id: "FEC", label: "FSE" },
     { id: "ASM", label: "ASM" },
     { id: "BUSINESS_HEAD", label: "BH" },
     { id: "MANAGING_PARTNER", label: "MP" },
     { id: "ADMIN", label: "Admin" },
+    { id: "HR_MANAGER", label: "HR" },
+    { id: "ACCOUNTANT", label: "Accounts" },
+    { id: "STORE_MANAGER", label: "Store" },
+    { id: "OUTLET", label: "Showroom" },
   ];
 
   return (
@@ -142,7 +146,7 @@ export default function EmployeesListPage() {
               onClick={() => setRole(r.id)}
               className={cn(
                 "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
-                role === r.id ? "border-ink-900 bg-ink-900 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                role === r.id ? cn(ROLE_SOLID[r.id] || ROLE_SOLID[""], "shadow-sm") : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
               )}
             >
               {r.label}
@@ -278,10 +282,13 @@ export default function EmployeesListPage() {
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
               >
-                <option value="FEC">FEC (Field Executive)</option>
+                <option value="FEC">FSE (Field Sales Executive)</option>
                 <option value="ASM">ASM (Area Sales Manager)</option>
                 <option value="BUSINESS_HEAD">Business Head</option>
                 <option value="MANAGING_PARTNER">Managing Partner</option>
+                <option value="HR_MANAGER">HR Manager</option>
+                <option value="ACCOUNTANT">Accounts</option>
+                <option value="STORE_MANAGER">Store Manager</option>
               </select>
             </div>
             <div>

@@ -47,7 +47,7 @@ export interface IPartnerSale extends Document {
   paymentMode?: "CASH" | "UPI" | "BANK" | "FINANCE" | "CREDIT";
   status: "IN_TRANSIT" | "RECEIVED" | "COMPLETED" | "CANCELLED";
   saleDate: Date;
-  received?: { at: Date; byName: string; remarks?: string } | null;
+  received?: { at: Date; byName: string; remarks?: string; grnNo?: string; shortChassis?: string[] } | null;
   cancelledReason?: string;
   createdBy: mongoose.Types.ObjectId;
   createdByName: string;
@@ -104,7 +104,7 @@ const PartnerSaleSchema = new Schema<IPartnerSale>(
     status: { type: String, enum: ["IN_TRANSIT", "RECEIVED", "COMPLETED", "CANCELLED"], required: true, index: true },
     saleDate: { type: Date, required: true, index: true },
     received: {
-      type: new Schema({ at: Date, byName: String, remarks: String }, { _id: false }),
+      type: new Schema({ at: Date, byName: String, remarks: String, grnNo: String, shortChassis: [String] }, { _id: false }),
       default: null,
     },
     cancelledReason: { type: String },

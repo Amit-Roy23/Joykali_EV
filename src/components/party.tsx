@@ -1,5 +1,6 @@
 "use client";
 
+import { ReceiptForm } from "@/components/payments";
 import React, { useCallback, useEffect, useState } from "react";
 import { BookOpen, IndianRupee, Loader2, Pencil } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -219,46 +220,7 @@ export function LedgerCard({ partyType, partyId, title = "Account ledger" }: { p
           </TableBody>
         </Table>
       )}
-      <Modal isOpen={open} onClose={() => setOpen(false)} title="Record a payment received" description="Reduces the outstanding balance and frees credit." maxWidth="md">
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Amount (₹)</Label>
-              <Input inputMode="decimal" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value.replace(/[^\d.]/g, "") })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Mode</Label>
-              <select className="field" value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
-                <option value="BANK">Bank transfer (NEFT/RTGS)</option>
-                <option value="UPI">UPI</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="CASH">Cash</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>UTR / cheque no.</Label>
-              <Input value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Date received</Label>
-              <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Narration</Label>
-            <Input value={form.narration} onChange={(e) => setForm({ ...form, narration: e.target.value })} placeholder="e.g. against JKI/2026-27/0001" />
-          </div>
-          {formError && <Notice>{formError}</Notice>}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button disabled={busy || !Number(form.amount)} onClick={save}>
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Record payment
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <ReceiptForm open={open} onClose={() => setOpen(false)} onSaved={load} party={{ type: partyType === "dealer" ? "DEALER" : "DISTRIBUTOR", id: partyId, name: "" }} />
     </Card>
   );
 }

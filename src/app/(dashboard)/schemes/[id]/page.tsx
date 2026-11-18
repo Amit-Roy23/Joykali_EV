@@ -1,5 +1,6 @@
 "use client";
 
+import { ROLE_SHORT } from "@/components/ui/kit";
 import { ApprovalPanel } from "@/components/workflow";
 import { StatusBadge } from "@/components/ui/badge";
 import React, { useEffect, useState, use } from "react";
@@ -73,7 +74,7 @@ export default function SchemeDetailPage({
             <div className="flex gap-2">
               {scheme.applicableRoles?.map((r: string) => (
                 <Badge key={r} variant="outline">
-                  {r}
+                  {ROLE_SHORT[r] || r}
                 </Badge>
               ))}
             </div>

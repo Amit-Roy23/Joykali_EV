@@ -45,3 +45,5 @@ export * from "./Warehouse";
 export * from "./WarehouseTransfer";
 export * from "./Accounts";
 export * from "./SalaryTemplate";
+export * from "./Notification";
+export * from "./PaymentAdvice";

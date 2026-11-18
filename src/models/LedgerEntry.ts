@@ -24,7 +24,16 @@ export interface ILedgerEntry extends Document {
   narration?: string;
   deliveryOrder?: mongoose.Types.ObjectId | null;
   partnerSale?: mongoose.Types.ObjectId | null;
-  paymentMode?: "CASH" | "UPI" | "BANK" | "CHEQUE";
+  paymentMode?: "CASH" | "UPI" | "NEFT" | "RTGS" | "IMPS" | "BANK" | "CHEQUE";
+  /** Company cash / bank account the money went into. */
+  account?: mongoose.Types.ObjectId | null;
+  /** UTR / UPI reference / cheque number — must be unique across receipts. */
+  utr?: string;
+  payerBank?: string;
+  /** The partner's payment advice this receipt confirms. */
+  advice?: mongoose.Types.ObjectId | null;
+  /** Bank reconciliation: seen on the bank statement. */
+  cleared?: { at: Date; statementDate: string; byName: string } | null;
   createdBy?: mongoose.Types.ObjectId;
   createdAt: Date;
 }
@@ -43,7 +52,12 @@ const LedgerEntrySchema = new Schema<ILedgerEntry>(
     narration: { type: String },
     deliveryOrder: { type: Schema.Types.ObjectId, ref: "DeliveryOrder", default: null },
     partnerSale: { type: Schema.Types.ObjectId, ref: "PartnerSale", default: null },
-    paymentMode: { type: String, enum: ["CASH", "UPI", "BANK", "CHEQUE"] },
+    paymentMode: { type: String, enum: ["CASH", "UPI", "NEFT", "RTGS", "IMPS", "BANK", "CHEQUE"] },
+    account: { type: Schema.Types.ObjectId, ref: "MoneyAccount", default: null },
+    utr: { type: String, trim: true, uppercase: true, index: true },
+    payerBank: { type: String, trim: true },
+    advice: { type: Schema.Types.ObjectId, ref: "PaymentAdvice", default: null },
+    cleared: { type: new Schema({ at: Date, statementDate: String, byName: String }, { _id: false }), default: null },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: { createdAt: true, updatedAt: false } }

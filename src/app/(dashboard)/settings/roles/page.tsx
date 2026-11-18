@@ -1,5 +1,6 @@
 "use client";
 
+import { ROLE_LABEL } from "@/components/ui/kit";
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck, Check, Save } from "lucide-react";
@@ -172,7 +173,7 @@ export default function RolesPermissionsPage() {
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            {r.replace(/_/g, " ")}
+            {ROLE_LABEL[r] || r.replace(/_/g, " ")}
           </button>
         ))}
       </div>
