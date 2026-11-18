@@ -198,7 +198,8 @@ export async function creditSummary(
     }
   }
 
-  const exposure = Math.max(0, ledgerBalance) + openOrders + pipeline + consignment;
+  // An advance (credit balance) counts: money paid ahead funds new orders.
+  const exposure = ledgerBalance + openOrders + pipeline + consignment;
   const available = party.creditLimit - exposure;
   let holdReason: string | null = null;
   if (party.status && party.status !== "ACTIVE") holdReason = `Account is ${String(party.status).toLowerCase().replace("_", " ")}`;
@@ -251,7 +252,7 @@ async function networkCreditSummary(
       ),
     0
   );
-  const exposure = Math.max(0, ledgerBalance) + openOrders;
+  const exposure = ledgerBalance + openOrders;
   let holdReason: string | null = null;
   if (party.status && party.status !== "ACTIVE") holdReason = `Account is ${String(party.status).toLowerCase().replace("_", " ")}`;
   else if (overdue > 0) holdReason = "Overdue invoices — clear dues to release new orders";
