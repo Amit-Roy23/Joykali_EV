@@ -7,6 +7,7 @@ import { PartyDocument } from "@/models/PartyDocument";
 import { User } from "@/models/User";
 import { AttendancePunch, EmployeeDocument, ExpenseClaim } from "@/models/Hr";
 import { Expense } from "@/models/Accounts";
+import { PaymentAdvice } from "@/models/PaymentAdvice";
 import { authenticateAndAuthorize, errorResponse, failure, isValidId } from "@/lib/apiHelper";
 import { hasPermission } from "@/lib/rbac";
 import { JWTPayload } from "@/types";
@@ -21,6 +22,8 @@ import { teamScope } from "@/services/hrService";
 async function canOpen(user: JWTPayload, fileId: mongoose.Types.ObjectId, uploadedBy: any) {
   if (String(uploadedBy) === user.userId) return true;
   if (await FleetVehicle.exists({ "documents.file": fileId })) return hasPermission(user.role, "fleet.view");
+  const advice: any = await PaymentAdvice.findOne({ proof: fileId }).select("partyType party").lean();
+  if (advice) return (await hasPermission(user.role, "accounts.view")) || ((await hasPermission(user.role, "ledger.view")) && (await canActOnParty(user, advice.partyType, advice.party)).ok);
   if (await Expense.exists({ bill: fileId })) return (await hasPermission(user.role, "accounts.view")) || (await hasPermission(user.role, "approvals.sign"));
   const kyc: any = await PartyDocument.findOne({ file: fileId }).select("partyType party").lean();
   if (kyc) return (await canActOnParty(user, kyc.partyType, kyc.party)).ok;

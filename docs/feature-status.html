@@ -81,7 +81,7 @@ ul.items li{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:12px;
   </div>
 
   <div id="list" style="display:grid;gap:28px"></div>
-  <p class="foot">Status as of 17 Nov 2026 after phase 6, branch claude/great-ramanujan-89l6bi.</p>
+  <p class="foot">Status as of 19 Nov 2026 after phase 6, branch claude/great-ramanujan-89l6bi.</p>
 </div>
 
 <script>
@@ -111,7 +111,7 @@ const S=[
 ["Accounts login","N","",1,9],
 ["HR Manager login","D","Attendance, leave, documents, joining and exits; no money approvals.",1],
 ["Service Engineer login","N","",1,8],
-["Staff / Employee login","D","FEC, ASM, Business Head and Managing Partner, each with own payslips and incentives.",1]]],
+["Staff / Employee login","D","FSE, ASM, Business Head and Managing Partner, each with own payslips and incentives.",1]]],
 ["2. Admin panel",[
 ["Complete company dashboard","D","",0],
 ["Total sales report","D","Sales register in Excel.",0],
@@ -130,7 +130,7 @@ const S=[
 ["Target and achievement report","D","Monthly partner targets with achievement and ranking.",0],
 ["Daily, weekly, monthly and yearly reports","P","Monthly views only.",0,10],
 ["All branch management","N","",0,10],
-["Notification and announcement system","N","",0,10],
+["Notification and announcement system","P","In-app bell: orders, invoices, dispatch, GRN and payments notify the right people; announcements, SMS and email come later.",0,10],
 ["Audit log and activity tracking","D","",0],
 ["Complete business analytics","P","Dashboard charts; deeper analytics come with later phases.",0,10],
 ["Multi-level approval (orders, credit, claims, expenses)","D","Orders, credit, schemes, payroll, salary, partner commission, advances, expense claims and final settlements all need Business Head then Managing Partner. Warranty claims will follow the same rule.",1],
@@ -188,7 +188,7 @@ const S=[
 ["Sub dealer registration","D","",0],["KYC verification","D","",0],["Dealer appointment","D","",0],["Product booking","D","",0],
 ["Product stock management","D","",0],["Sales management","D","",0],["Customer management","P","Customers are captured on every bill; a customer list comes with phase 6.",0,8],["Payment collection","D","",0],
 ["Outstanding management","D","",0],["Warranty registration","N","",0,8],["Service request","N","",0,8],["Sales report","D","",0],
-["Order tracking and invoice download","D","",1],["Credit limit management","D","The supplying partner sets its buyers' limits.",1],["Target and incentive","D","",1],
+["Order tracking and invoice download","D","Step-by-step shipment view: delivery order, loading, invoice / challan PDF, truck, driver, e-way bill, GRN; notification at each step.",1],["Credit limit management","D","The supplying partner sets its buyers' limits.",1],["Target and incentive","D","",1],
 ["Complaint registration","N","",1,8],["Ledger and account statement","D","",1]]],
 ["10. Dealer management",[
 ["Dealer registration","D","",0],["Dealer ID and password","D","",0],["Product catalogue","D","Every model at the dealer's buying price.",0],
@@ -210,15 +210,15 @@ const S=[
 ["12. Delivery and logistics",[
 ["Delivery order","D","",0],["Delivery challan","D","",0],["Transport management","D","",0],["Vehicle management","D","Documents tracked; vehicle locks when one lapses.",0],
 ["Driver management","P","Driver name, licence and phone per trip; no driver master.",0,10],["Dispatch management","D","",0],["Delivery tracking","D","",0],
-["Delivery confirmation","D","GRN by receiver.",0],["Delivery photo upload","N","",0,10],["Customer signature","N","",0,10],["Pending delivery report","P","Board view; no export.",0,10],
+["Delivery confirmation","D","GRN by the receiver from the GRN menu, with GRN note PDF; the company is notified.",0],["Delivery photo upload","N","",0,10],["Customer signature","N","",0,10],["Pending delivery report","D","GRN register: shipments on the road with days in transit, late ones flagged.",0],
 ["Serial number scan at loading","D","",1],["Route and trip planning","N","",1,10],["Freight and transport cost record","N","",1,9],["Transporter ledger","N","",1,9],
 ["Return / replacement pickup management","N","",1,10]]],
 ["13. Accounts and finance",[
 ["Cash book","D","Opening, receipts, payments, running and closing balance; day-wise view; Excel.",0],["Bank book","D","One book per bank account, same as the cash book.",0],["Customer ledger","N","",0,9],["Dealer ledger","D","",0],["Distributor ledger","D","",0],
 ["Supplier ledger","P","Supplier payments (full or part) from Accounts with payables ageing; a statement view comes in phase 9.",0,9],["Purchase accounts","P","",0,9],["Sales accounts","P","",0,9],["Expense management","D","",0],
-["Payment receipt","D","Numbered receipts.",0],["Payment due reminder","P","Overdue shown; no reminders sent.",0,9],["Credit and debit management","P","",0,9],
+["Payment receipt","D","Numbered receipt PDF with mode, UTR / cheque, payer's bank and the account credited.",0],["Payment due reminder","P","Overdue shown; no reminders sent.",0,9],["Credit and debit management","P","",0,9],
 ["GST reports","N","",0,9],["Profit and loss account","D","",0],["Balance sheet","N","",0,9],["Cash flow report","N","",0,9],
-["Journal and contra voucher","P","Receipt, payment and contra vouchers; journal entries come with double-entry books in phase 9.",1,9],["Trial balance","N","",1,9],["Bank reconciliation","N","",1,9],["Cheque and post-dated cheque management","N","",1,9],
+["Journal and contra voucher","P","Receipt, payment and contra vouchers; journal entries come with double-entry books in phase 9.",1,9],["Trial balance","N","",1,9],["Bank reconciliation","P","Partner receipts are ticked off against the bank statement with the expected statement balance and difference; full statement import comes in phase 9.",1,9],["Cheque and post-dated cheque management","N","",1,9],
 ["Outstanding ageing analysis","D","Ageing buckets with payments set against the oldest bills.",1],["TDS / TCS record","N","",1,9],["Commission and incentive payout","D","Incentives flow into payroll.",1],
 ["Branch / outlet-wise accounts","P","Expenses carry a cost centre (warehouse / showroom); branch P&L in phase 9.",1,9],["Fixed asset register","N","",1,9],["Outlet daily cash closing","P","Day summary of bills and collections by mode; cash count sign-off in phase 7.",1,9]]],
 ["14. HR and employee management",[

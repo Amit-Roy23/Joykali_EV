@@ -217,6 +217,7 @@ export function CreditMeter({ credit, compact = false }: { credit: any; compact?
     { k: "Open orders", v: credit.openOrders },
     { k: "On delivery orders", v: credit.pipeline },
     ...(credit.partyType === "DEALER" ? [{ k: "Consignment stock", v: credit.consignment }] : []),
+    ...((credit.ledgerBalance || 0) < 0 ? [{ k: "Less: advance paid", v: credit.ledgerBalance }] : []),
   ];
   return (
     <div>

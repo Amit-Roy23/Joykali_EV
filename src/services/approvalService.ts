@@ -18,6 +18,7 @@ import { AdvanceLoan, ExpenseClaim, Resignation } from "@/models/Hr";
 import { Expense } from "@/models/Accounts";
 import { SalaryTemplate } from "@/models/SalaryTemplate";
 import { activateAdvance, closeSettlement } from "./hrMoneyService";
+import { notifyParty } from "./notificationService";
 import { assertCredit } from "./creditService";
 import { recalculateForScheme } from "./incentiveService";
 
@@ -82,6 +83,22 @@ export async function signApproval(
     order.approvals = result.signatures;
     await order.save();
     summary = `${order.orderCode} · ${order.partyName} · ${rupees(order.totalValue)}`;
+    await notifyParty(order.partyType, order.party, {
+      kind: "ORDER",
+      title:
+        result.status === "APPROVED"
+          ? `Order ${order.orderCode} approved`
+          : result.status === "REJECTED"
+            ? `Order ${order.orderCode} rejected`
+            : `Order ${order.orderCode}: approved by the ${LEVEL_LABEL[user.role as keyof typeof LEVEL_LABEL] || "Business Head"}`,
+      body:
+        result.status === "APPROVED"
+          ? "Both approvals done — the warehouse will raise the delivery order."
+          : result.status === "REJECTED"
+            ? note || "Contact your area manager."
+            : "Waiting for the Managing Partner.",
+      href: `/orders/${order._id}`,
+    });
   } else if (kind === "scheme") {
     const scheme = await IncentiveScheme.findById(id);
     if (!scheme) throw new ApprovalError("Scheme not found", 404);
@@ -330,7 +347,7 @@ export async function listPending(user: JWTPayload): Promise<PendingItem[]> {
       kindLabel: KIND_LABEL.scheme,
       id: String(s._id),
       title: s.name,
-      subtitle: `${(s.applicableRoles || []).join(", ")} · ${s.rules.map((r) => r.ruleType).join(" + ")}`,
+      subtitle: `${(s.applicableRoles || []).map((r: string) => (r === "FEC" ? "FSE" : r.replace(/_/g, " "))).join(", ")} · ${s.rules.map((r) => r.ruleType).join(" + ")}`,
       submittedAt: (s as any).createdAt,
       waitingFor: waitingLabel(s.approvals),
       canSign: mine(s.approvals),

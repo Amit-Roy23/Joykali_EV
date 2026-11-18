@@ -211,7 +211,7 @@ export const ROLE_LABEL: Record<string, string> = {
   MANAGING_PARTNER: "Managing Partner",
   BUSINESS_HEAD: "Business Head",
   ASM: "Area Sales Manager",
-  FEC: "Field Executive",
+  FEC: "Field Sales Executive",
   OUTLET: "Showroom",
   HR_MANAGER: "HR Manager",
   ACCOUNTANT: "Accounts",
@@ -226,7 +226,7 @@ export const ROLE_SHORT: Record<string, string> = {
   MANAGING_PARTNER: "MP",
   BUSINESS_HEAD: "BH",
   ASM: "ASM",
-  FEC: "FEC",
+  FEC: "FSE",
   OUTLET: "SHOWROOM",
   HR_MANAGER: "HR",
   ACCOUNTANT: "ACCTS",
@@ -237,19 +237,32 @@ export const ROLE_SHORT: Record<string, string> = {
   SUB_DEALER: "SUB",
 };
 const roleTone: Record<string, string> = {
-  ADMIN: "bg-ink-900 text-volt-300 ring-ink-700",
-  MANAGING_PARTNER: "bg-brand-700 text-white ring-brand-800",
-  BUSINESS_HEAD: "bg-brand-100 text-brand-800 ring-brand-200",
+  ADMIN: "bg-rose-50 text-rose-700 ring-rose-200",
+  MANAGING_PARTNER: "bg-amber-50 text-amber-800 ring-amber-200",
+  BUSINESS_HEAD: "bg-violet-50 text-violet-700 ring-violet-200",
   ASM: "bg-sky-50 text-sky-800 ring-sky-200",
-  FEC: "bg-volt-100 text-volt-800 ring-volt-200",
+  FEC: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   OUTLET: "bg-teal-50 text-teal-800 ring-teal-200",
   HR_MANAGER: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200",
-  ACCOUNTANT: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  STORE_MANAGER: "bg-stone-100 text-stone-800 ring-stone-300",
+  ACCOUNTANT: "bg-indigo-50 text-indigo-800 ring-indigo-200",
+  STORE_MANAGER: "bg-orange-50 text-orange-800 ring-orange-200",
   SUPER_DISTRIBUTOR: "bg-orange-50 text-orange-800 ring-orange-200",
   DISTRIBUTOR: "bg-amber-50 text-amber-800 ring-amber-200",
   DEALER: "bg-lime-50 text-lime-800 ring-lime-200",
   SUB_DEALER: "bg-yellow-50 text-yellow-800 ring-yellow-200",
+};
+/** Solid colour of a role when its filter tab is selected (same hue as its badge). */
+export const ROLE_SOLID: Record<string, string> = {
+  "": "border-brand-800 bg-brand-800 text-white",
+  ADMIN: "border-rose-600 bg-rose-600 text-white",
+  MANAGING_PARTNER: "border-amber-500 bg-amber-500 text-white",
+  BUSINESS_HEAD: "border-violet-600 bg-violet-600 text-white",
+  ASM: "border-sky-600 bg-sky-600 text-white",
+  FEC: "border-emerald-600 bg-emerald-600 text-white",
+  OUTLET: "border-teal-600 bg-teal-600 text-white",
+  HR_MANAGER: "border-fuchsia-600 bg-fuchsia-600 text-white",
+  ACCOUNTANT: "border-indigo-600 bg-indigo-600 text-white",
+  STORE_MANAGER: "border-orange-600 bg-orange-600 text-white",
 };
 export function RoleBadge({ role, short, className }: { role?: string; short?: boolean; className?: string }) {
   if (!role) return null;

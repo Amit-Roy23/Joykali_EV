@@ -133,7 +133,7 @@ export const SaleCreateSchema = z.object({
   }),
   vehicleId: z.string().min(1, "Vehicle selection is required"),
   dealerId: z.string().optional().nullable(),
-  soldBy: z.string().min(1, "Salesperson (FEC) is required"),
+  soldBy: z.string().min(1, "Salesperson (FSE) is required"),
   priceBreakdown: z.object({
     exShowroom: z.number().min(0),
     discount: z.number().min(0).default(0),

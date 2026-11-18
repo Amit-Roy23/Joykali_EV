@@ -200,36 +200,27 @@ export async function requestCreditChange(
 }
 
 /** Record money received from a dealer/distributor (credit entry on their ledger). */
+/**
+ * Record a payment received from a company-supplied party. Kept for older callers; the full
+ * rules (modes, unique UTR, bank account, bank matching) live in paymentService.recordReceipt.
+ */
 export async function recordPayment(
-  input: { partyType: PartyType; partyId: string; amountRupees: number; mode: "CASH" | "UPI" | "BANK" | "CHEQUE"; reference: string; date?: string; narration?: string },
+  input: { partyType: PartyType; partyId: string; amountRupees: number; mode: string; reference: string; date?: string; narration?: string; accountId?: string; payerBank?: string },
   user: JWTPayload
 ) {
-  const party = await getParty(input.partyType, input.partyId);
-  if (!party) throw new OrderError("Party not found", 404);
-  if (supplierRef(input.partyType, party)) {
-    throw new OrderError(`${party.name} pays its own supplier, not the company. Their supplier records the payment.`);
-  }
-  const amount = rupeesToPaise(Number(input.amountRupees));
-  if (!Number.isFinite(amount) || amount <= 0) throw new OrderError("Enter a valid amount");
-  if (!["CASH", "UPI", "BANK", "CHEQUE"].includes(input.mode)) throw new OrderError("Choose a payment mode");
-  if (!input.reference?.trim() && input.mode !== "CASH") throw new OrderError("Enter the UTR / cheque / transaction reference");
-  const date = input.date ? new Date(input.date) : new Date();
-  if (Number.isNaN(+date) || date > new Date(Date.now() + 86400000)) throw new OrderError("Payment date cannot be in the future");
-  const receiptNo = await generateFyCode("RECEIPT", date);
-  const entry = await LedgerEntry.create({
+  const { recordReceipt } = await import("./paymentService");
+  const mode = input.mode === "BANK" ? "NEFT" : input.mode;
+  return recordReceipt(user, {
     partyType: input.partyType,
-    party: new mongoose.Types.ObjectId(input.partyId),
-    date,
-    type: "PAYMENT",
-    reference: receiptNo,
-    debit: 0,
-    credit: amount,
-    paymentMode: input.mode,
-    narration: [input.mode, input.reference?.trim(), input.narration?.trim()].filter(Boolean).join(" · "),
-    createdBy: new mongoose.Types.ObjectId(user.userId),
+    partyId: input.partyId,
+    amountRupees: input.amountRupees,
+    mode,
+    utr: input.reference,
+    date: input.date ? String(input.date).slice(0, 10) : undefined,
+    accountId: input.accountId,
+    payerBank: input.payerBank,
+    narration: input.narration,
   });
-  await logAudit({ user, action: "PAYMENT", resource: "LEDGER", resourceId: String(entry._id), after: { party: party.name, amount, receiptNo } });
-  return entry;
 }
 
 /** Ledger with running balance (oldest first). */
@@ -246,7 +237,10 @@ export async function orderDetail(orderId: string) {
   const order = await ChannelOrder.findById(orderId).lean();
   if (!order) return null;
   const [dos, credit] = await Promise.all([
-    DeliveryOrder.find({ order: order._id }).select("doCode status lines vehicles.chassisNumber document.number createdAt").sort({ createdAt: 1 }).lean(),
+    DeliveryOrder.find({ order: order._id })
+      .select("doCode status lines vehicles.chassisNumber vehicles.modelName document warehouseName loading.registrationNo loading.driverName loading.driverPhone ewayBill.ewbNo ewayBill.validUpto ewayBill.required dispatch grn.grnNo grn.at grn.receivedByName grn.items grn.creditNoteNo timeline createdAt")
+      .sort({ createdAt: 1 })
+      .lean(),
     creditSummary(order.partyType, order.party).catch(() => null),
   ]);
   return { order, deliveryOrders: dos, credit };

@@ -212,7 +212,7 @@ export default function DealerDetailPage({
                 <TableHead>Invoice #</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Customer</TableHead>
-                <TableHead>Attributed FEC</TableHead>
+                <TableHead>Attributed FSE</TableHead>
                 <TableHead className="text-right">Total Amount</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>

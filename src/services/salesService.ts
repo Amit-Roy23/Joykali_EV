@@ -72,7 +72,7 @@ export async function createSale(
     if (String(input.soldBy) !== String(user.userId)) {
       const fec = await User.findById(input.soldBy).select("outlet role").lean();
       if (!fec || !sellerOutlet || String((fec as any).outlet) !== sellerOutlet) {
-        throw new Error("You can only bill under your own name or an FEC posted at this showroom");
+        throw new Error("You can only bill under your own name or an FSE posted at this showroom");
       }
     }
   } else if (user.role === "ASM" && String(input.soldBy) !== String(user.userId)) {
@@ -124,7 +124,7 @@ export async function createSale(
     const saleCode = await generateSaleCode(saleDateObj, session);
 
     if (salesperson.status !== "ACTIVE" || !["FEC", "ASM", "OUTLET"].includes(salesperson.role)) {
-      throw new Error("Sales can only be attributed to an active FEC, ASM or showroom login");
+      throw new Error("Sales can only be attributed to an active FSE, ASM or showroom login");
     }
 
     // Convert all amounts to integer paise

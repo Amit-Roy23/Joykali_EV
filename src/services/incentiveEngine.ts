@@ -374,7 +374,7 @@ export function computeIncentives(
           qualifyingUnits: teamUnits,
           qualifyingRevenue: teamRevenue,
           earnedAmount: earned,
-          description: `Team override on ${teamUnits} FEC team sales`,
+          description: `Team override on ${teamUnits} FSE team sales`,
           qualifyingSaleCodes: teamSales.map((s) => s.saleCode),
         });
       }

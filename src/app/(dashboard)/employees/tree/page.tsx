@@ -90,7 +90,7 @@ export default function OrgTreePage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900">Organizational Hierarchy Tree</h1>
           <p className="text-xs text-slate-500">
-            Interactive reporting tree from Business Heads & Area Managers down to Field Executives
+            Interactive reporting tree from Business Heads & Area Managers down to Field Sales Executives
           </p>
         </div>
       </div>

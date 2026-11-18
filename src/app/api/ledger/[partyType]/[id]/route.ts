@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ par
     if (!type || !isValidId(id)) return errorResponse("Not found", 404);
     const b = await req.json();
     const entry = await recordPayment(
-      { partyType: type, partyId: id, amountRupees: b.amount, mode: b.mode, reference: b.reference, date: b.date, narration: b.narration },
+      { partyType: type, partyId: id, amountRupees: b.amount, mode: b.mode, reference: b.reference, date: b.date, narration: b.narration, accountId: b.accountId, payerBank: b.payerBank },
       auth.user
     );
     return jsonResponse(entry, undefined, 201);

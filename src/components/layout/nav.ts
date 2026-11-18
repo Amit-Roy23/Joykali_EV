@@ -44,6 +44,8 @@ import {
   Scale,
   PieChart,
   SlidersHorizontal,
+  ClipboardCheck,
+  IndianRupee,
 } from "lucide-react";
 import { isPartnerRole } from "@/types";
 
@@ -80,6 +82,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Buy Stock", href: "/partner/buy", icon: ShoppingCart, permission: "order.create", audience: "partner" },
       { title: "My Orders", href: "/partner/orders", icon: ClipboardList, permission: "order.view", audience: "partner" },
       { title: "Stock & Deliveries", href: "/partner/stock", icon: PackageCheck, permission: "portal.access", audience: "partner" },
+      { title: "Goods Receipt (GRN)", href: "/grn", icon: ClipboardCheck, permission: ["dispatch.view", "grn.record"], audience: "partner" },
+      { title: "Payments", href: "/partner/payments", icon: IndianRupee, permission: "portal.access", audience: "partner" },
       { title: "Sell", href: "/partner/sell", icon: HandCoins, permission: "partner.sell", audience: "partner" },
       { title: "My Sales", href: "/partner/sales", icon: ReceiptText, permission: "partner.sell", audience: "partner" },
       { title: "My Network", href: "/partner/network", icon: GitFork, permission: "partner.appoint", audience: "partner" },
@@ -94,6 +98,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Place an Order", href: "/orders/new", icon: ShoppingBag, permission: "order.create", audience: "staff" },
       { title: "Orders", href: "/orders", icon: ClipboardList, permission: "order.view", audience: "staff" },
       { title: "Delivery Orders", href: "/dispatch", icon: Truck, permission: "dispatch.view", audience: "staff" },
+      { title: "Goods Receipts (GRN)", href: "/grn", icon: ClipboardCheck, permission: ["dispatch.view", "grn.record"], audience: "staff" },
+      { title: "Dealer Payments", href: "/payments", icon: IndianRupee, permission: ["ledger.view", "accounts.view"], audience: "staff" },
       { title: "Business Network", href: "/network", icon: GitFork, permission: "network.view", audience: "staff" },
       { title: "Distributors", href: "/distributors", icon: Building2, permission: "distributor.view", audience: "staff" },
       { title: "Partner Targets", href: "/targets", icon: Target, permission: ["portal.access", "network.view"], audience: "staff" },

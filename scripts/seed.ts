@@ -89,6 +89,7 @@ import { accountBalances, createExpense, createVoucher, ensureAccounts, recordPa
 import { proposeTemplate } from "../src/services/salaryTemplateService";
 import { DEFAULT_STATUTORY } from "../src/services/salaryTemplateEngine";
 import { MoneyAccount } from "../src/models/Accounts";
+import { recordReceipt, rejectAdvice, setCleared, submitAdvice, verifyAdvice } from "../src/services/paymentService";
 
 export const DEMO_PASSWORD = "Joykali@123";
 
@@ -318,8 +319,8 @@ async function main() {
     const user = await makeUser(
       "FEC",
       f.name,
-      `fec${i + 1}@joykaliev.in`,
-      "Field Executive Consultant",
+      `fse${i + 1}@joykaliev.in`,
+      "Field Sales Executive",
       f.asm,
       { basic: 9000 + (i % 3) * 500, hra: 3600, conveyance: 1600, other: 1800, esi: true },
       { dealer: dealers[f.dealer]._id }
@@ -412,7 +413,7 @@ async function main() {
     approvedAt: months[3].start,
   });
   await IncentiveScheme.create({
-    name: "FEC Target Champion",
+    name: "FSE Target Champion",
     description: "₹5,000 bonus for 6+ deliveries in a month.",
     status: "ACTIVE",
     validFrom: months[3].start,
@@ -620,7 +621,7 @@ async function main() {
       }
     }
     if (mi === 2) {
-      const star = entries.find((e: any) => (e.employee as any).email === "fec5@joykaliev.in");
+      const star = entries.find((e: any) => (e.employee as any).email === "fse5@joykaliev.in");
       if (star) {
         await adjustPayrollEntry(String(star._id), { adjustment: { amount: 2500, reason: "Best showroom conduct award" } }, bhPayload);
       }
@@ -703,6 +704,7 @@ async function main() {
     { reg: "WB19J7710", type: "MINI_TRUCK", mm: "Ashok Leyland Dost+", fuel: "DIESEL", cap: 6, own: "OWNED", over: { INSURANCE: inDays(9) } },
     { reg: "WB11C3302", type: "TRUCK", mm: "Eicher Pro 2049", fuel: "DIESEL", cap: 12, own: "HIRED", over: { PUC: inDays(-4) } },
     { reg: "WB02AB9001", type: "EV_LOADER", mm: "Joykali CargoLoader (in-house)", fuel: "ELECTRIC", cap: 3, own: "OWNED", over: {} },
+    { reg: "WB04G2210", type: "MINI_TRUCK", mm: "Tata Ace Gold (local deliveries)", fuel: "DIESEL", cap: 3, own: "OWNED", over: {} },
   ];
   const fleet: Record<string, any> = {};
   for (const f of fleetSpecs) {
@@ -767,10 +769,27 @@ async function main() {
 
   // (c) Howrah dealer stock order by the ASM → approved → DO submitted, waiting to be loaded.
   const howrah = dealers[2];
+  // The Howrah dealer gets its own login: it follows its orders, invoices and trucks, records the GRN and reports payments.
+  const howrahUserDoc = await User.create({
+    employeeCode: "JKDL-HWH", name: "Sk. Imran Hossain", email: "dealer.howrah@joykaliev.in", phone: "9830011223", role: "DEALER", dealer: howrah._id,
+    designation: "Dealer — Howrah E-Mobility Hub", joiningDate: joined, status: "ACTIVE", passwordHash, mustChangePassword: false,
+  });
+  const howrahUser = asPayload(howrahUserDoc);
   const oC = await placeOrder({ partyType: "DEALER", partyId: String(howrah._id), lines: [{ modelId: M("STORM"), quantity: 4 }], notes: "Weekend demand" }, asmKolkataPayload);
   await approveBoth("order", String(oC._id));
   const doC = await createDeliveryOrder(String(oC._id), [{ modelId: M("STORM"), quantity: 4 }], bhPayload);
   await submitDO(String(doC._id), bhPayload);
+  // (g) Howrah dealer orders on its portal → approved → challan made → dispatched on the EV loader, waiting for the dealer's GRN.
+  const oG = await placeOrder({ partyType: "DEALER", partyId: String(howrah._id), lines: [{ modelId: M("ZIPPY"), quantity: 2 }], notes: "Ordered from the dealer portal" }, howrahUser);
+  await approveBoth("order", String(oG._id));
+  const doG = await createDeliveryOrder(String(oG._id), [{ modelId: M("ZIPPY"), quantity: 2 }], bhPayload);
+  await submitDO(String(doG._id), bhPayload);
+  await startLoading(String(doG._id), { fleetVehicleId: String(fleet.WB04G2210._id), driverName: "Sanjib Mondal", driverPhone: "9874512360", driverLicence: "WB0220200011223" }, bhPayload);
+  await autoPick(String(doG._id), bhPayload);
+  await completeLoading(String(doG._id), { physicalInspection: true, chassisVerified: true, batteryChargerKeys: true, securedForTransit: true }, bhPayload);
+  await generateDocument(String(doG._id), bhPayload);
+  await recordEwayBill(String(doG._id), { distanceKm: 30, ewbNo: `3810${between(10000000, 99999999)}` }, bhPayload);
+  await dispatchDO(String(doG._id), mpPayload);
 
   // (d) Malda: placed by the ASM, waiting for the Business Head.
   await placeOrder({ partyType: "DISTRIBUTOR", partyId: String(malda._id), lines: [{ modelId: M("FALCON"), quantity: 3 }, { modelId: M("ZIPPY"), quantity: 2 }] }, asPayload(asmNorth));
@@ -1038,6 +1057,7 @@ async function main() {
       const late = rand() < 0.18 ? between(12, 45) : between(-20, 8);
       const inMin = start + late;
       const isToday = date === todayStr;
+      if (isToday && at(date, inMin).getTime() > Date.now()) continue; // shift not started yet
       punchDocs.push({ employee: u._id, at: at(date, inMin), date, type: "IN", source: u.attendanceMode === "OFFICE" ? "WEB" : "MOBILE", location: { lat: 22.57 + rand() * 0.2, lng: 88.36 + rand() * 0.15, accuracy: between(8, 40) } });
       if (isToday) continue; // still at work
       const stay = rand() < 0.15 ? between(60, 150) : between(-25, 25);
@@ -1253,6 +1273,22 @@ async function main() {
   // Surplus showroom cash deposited in the bank.
   const cashNow = (await accountBalances(todayYmd)).find((a: any) => a.kind === "CASH")!.balance;
   if (cashNow > rupeesToPaise(60000)) await createVoucher(accountsPayload, { type: "CONTRA", date: todayYmd, accountId: String(cashAcc!._id), toAccountId: String(bankAcc!._id), amountRupees: Math.floor((cashNow - rupeesToPaise(50000)) / 100), head: "Cash deposited in bank", narration: "Cash deposited at SBI Barasat" });
+  // Dealer payments: receipts with UTR into the right bank account, partner payment advices at every stage, bank matching.
+  console.log("• Dealer payments, advices, bank matching");
+  const bankId = String(bankAcc!._id);
+  await recordReceipt(accountsPayload, { partyType: "DISTRIBUTOR", partyId: String(bihar._id), amountRupees: 300000, mode: "RTGS", utr: `SBINR5202611${between(1000000, 9999999)}`, payerBank: "SBI Patna Main", accountId: bankId, narration: "Advance against JKI shipment" });
+  await recordReceipt(accountsPayload, { partyType: "DEALER", partyId: String(howrah._id), amountRupees: 45000, mode: "CASH", narration: "Cash at Barasat counter" });
+  await recordReceipt(accountsPayload, { partyType: "DEALER", partyId: String(howrah._id), amountRupees: 60000, mode: "CHEQUE", utr: String(between(100000, 999999)), payerBank: "Bank of India, Shibpur", accountId: bankId });
+  const adv1 = await submitAdvice(bardhamanUser, { amountRupees: 250000, date: todayYmd, mode: "NEFT", utr: `HDFCN5202611${between(1000000, 9999999)}`, payerBank: "HDFC Bank Bardhaman", note: "Against JKI/2026-27/0001", proof: PNG });
+  void adv1;
+  const adv2 = await submitAdvice(howrahUser, { amountRupees: 40000, date: todayYmd, mode: "UPI", utr: `UPI${between(100000000, 999999999)}`, payerBank: "PhonePe", proof: PNG });
+  await verifyAdvice(accountsPayload, String(adv2._id), { accountId: bankId });
+  const adv3 = await submitAdvice(biharUser, { amountRupees: 150000, date: todayYmd, mode: "IMPS", utr: `IMPS${between(10000000, 99999999)}`, payerBank: "Axis Bank Patna", proof: PNG });
+  await rejectAdvice(accountsPayload, String(adv3._id), "Not seen in our SBI account yet — please check the UTR");
+  // Older receipts already matched with the bank statement.
+  const older = await LedgerEntryModel.find({ type: "PAYMENT", book: null, paymentMode: { $ne: "CASH" } }).sort({ date: 1 }).lean();
+  if (older.length > 1) await setCleared(accountsPayload, older.slice(0, older.length - 2).map((e: any) => String(e._id)), todayYmd);
+
   // Budgets for this month and last month.
   for (const p of months.slice(-2)) {
     await setBudget(accountsPayload, p.period, [
@@ -1279,7 +1315,7 @@ async function main() {
   for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR", "SUPER_DISTRIBUTOR", "DEALER", "SUB_DEALER", "OUTLET", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER"] } }).sort({ role: 1 }).lean()) {
     console.log(`  ${u.role.padEnd(17)} ${u.employeeCode.padEnd(13)} ${u.email}`);
   }
-  console.log(`  FEC               JKE-FEC-0001  fec1@joykaliev.in (… fec12)`);
+  console.log(`  FSE               JKE-FSE-0001  fse1@joykaliev.in (… fse12)`);
   console.log(`  DISTRIBUTOR       JKDB-0001     dist1@joykaliev.in  (Bardhaman)`);
   console.log(`  DISTRIBUTOR       JKDB-0003     dist3@joykaliev.in  (Patna, Bihar — inter-state)`);
   console.log(`  SUPER_DISTRIBUTOR JKSD-0001     sd1@joykaliev.in    (Rarh Bengal, Birbhum)`);
@@ -1288,6 +1324,7 @@ async function main() {
   console.log(`  OUTLET            showroom@joykaliev.in (Salt Lake showroom counter)`);
   console.log(`  HR_MANAGER        hr@joykaliev.in      (attendance, leave, exits)`);
   console.log(`  ACCOUNTANT        accounts@joykaliev.in (cash & bank books, expenses, P&L)`);
+  console.log(`  DEALER (company)  dealer.howrah@joykaliev.in (orders, truck tracking, GRN, payments)`);
   console.log(`  STORE_MANAGER     store@joykaliev.in    (Siliguri warehouse)`);
   await mongoose.disconnect();
 }

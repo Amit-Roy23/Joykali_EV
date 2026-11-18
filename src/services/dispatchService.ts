@@ -15,6 +15,7 @@ import { documentTotals, ewbValidUpto, isEwbNumber } from "@/lib/gstDocs";
 import { logAudit } from "@/lib/audit";
 import { assertCredit, getParty, lineValue } from "./creditService";
 import { refreshOrderStatus } from "./orderService";
+import { notifyParty, notifyUsers, partyStaffIds } from "./notificationService";
 import { canOperate, freeStockFilter, mainWarehouse, resolveWarehouse } from "./warehouseService";
 
 export class DispatchError extends Error {
@@ -237,6 +238,12 @@ export async function createDeliveryOrder(
     resource: "DELIVERY_ORDER",
     resourceId: String(d._id),
     after: { doCode: d.doCode, order: order.orderCode },
+  });
+  await notifyParty(order.partyType, order.party, {
+    kind: "DISPATCH",
+    title: `Order ${order.orderCode}: delivery order raised`,
+    body: `${doLines.reduce((t, l) => t + l.quantity, 0)} vehicle(s) will be loaded at ${warehouse.name} (${d.doCode}).`,
+    href: `/orders/${order._id}`,
   });
   return d;
 }
@@ -559,6 +566,12 @@ export async function generateDocument(id: string, user: JWTPayload) {
     `${kind === "TAX_INVOICE" ? "Tax invoice" : "Delivery challan"} ${d.document.number}`,
   );
   await d.save();
+  await notifyParty(d.partyType, d.party, {
+    kind: "INVOICE",
+    title: `${kind === "TAX_INVOICE" ? "Tax invoice" : "Delivery challan"} ${d.document.number} is ready`,
+    body: `${d.orderCode} · ${d.lines.reduce((t, l) => t + l.quantity, 0)} vehicle(s) · ₹${(d.document.totalValue / 100).toLocaleString("en-IN")} — download it from the order.`,
+    href: `/orders/${d.order}`,
+  });
   return d;
 }
 
@@ -717,6 +730,12 @@ export async function dispatchDO(id: string, user: JWTPayload) {
     resource: "DELIVERY_ORDER",
     resourceId: id,
     after: { document: d.document.number, ewb: d.ewayBill.ewbNo },
+  });
+  await notifyParty(d.partyType, d.party, {
+    kind: "DISPATCH",
+    title: `Dispatched: ${d.vehicles.length} vehicle(s) on ${d.loading!.registrationNo}`,
+    body: `${d.document!.number} · driver ${d.loading!.driverName} (${d.loading!.driverPhone})${d.ewayBill.ewbNo ? ` · e-way bill ${d.ewayBill.ewbNo}` : ""}. Confirm the goods receipt (GRN) when it arrives.`,
+    href: `/dispatch/${d._id}`,
   });
   return d;
 }
@@ -880,6 +899,18 @@ export async function recordGRN(
     resourceId: id,
     after: { grn: d.grn.grnNo, issues },
   });
+  const shortN = items.filter((i) => i.condition === "SHORT").length;
+  const damagedN = items.filter((i) => i.condition === "DAMAGED").length;
+  await notifyUsers(
+    [...(await partyStaffIds(d.partyType, d.party)), String(d.createdBy || ""), String(d.dispatch?.by || "")],
+    {
+      kind: "GRN",
+      title: `${d.partySnapshot.name} received ${d.document?.number || d.doCode}`,
+      body: `GRN ${d.grn.grnNo}: ${items.length - shortN} received${shortN ? `, ${shortN} short` : ""}${damagedN ? `, ${damagedN} damaged` : ""}${creditNoteNo ? ` · credit note ${creditNoteNo}` : ""}.`,
+      href: `/grn`,
+    },
+    user.userId
+  );
   return d;
 }
 
@@ -939,6 +970,12 @@ export async function cancelDO(id: string, reason: string, user: JWTPayload) {
     resource: "DELIVERY_ORDER",
     resourceId: id,
     after: { reason },
+  });
+  await notifyParty(d.partyType, d.party, {
+    kind: "DISPATCH",
+    title: `Delivery order ${d.doCode} cancelled`,
+    body: `${reason.trim()} — the quantities are back on order ${d.orderCode}.`,
+    href: `/orders/${d.order}`,
   });
   return d;
 }

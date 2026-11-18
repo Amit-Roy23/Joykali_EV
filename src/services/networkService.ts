@@ -7,6 +7,7 @@ import { Vehicle } from "@/models/Vehicle";
 import { VehicleModel } from "@/models/VehicleModel";
 import { LedgerEntry } from "@/models/LedgerEntry";
 import { StockMovement } from "@/models/StockMovement";
+import { notifyParty } from "./notificationService";
 import { NetworkOrder, INetworkOrder } from "@/models/NetworkOrder";
 import { PartnerSale } from "@/models/PartnerSale";
 import { Territory } from "@/models/Territory";
@@ -519,6 +520,7 @@ export async function placeNetworkOrder(
     placedByName: user.name,
   });
   await logAudit({ user, action: "CREATE", resource: "ORDER", resourceId: String(order._id), after: { orderCode: order.orderCode, to: seller.name, total: totals.total } });
+  await notifyParty(sup.type, sup.id, { kind: "NETWORK", title: `New order ${order.orderCode} from ${me.doc.name}`, body: `${lines.reduce((t: number, l: any) => t + l.quantity, 0)} vehicle(s) · ${rupees(totals.total)} — accept or reject it.`, href: `/partner/orders/${order._id}` }, user.userId);
   return order;
 }
 
@@ -558,6 +560,7 @@ export async function decideNetworkOrder(user: JWTPayload, id: string, decision:
   order.decisionNote = note?.trim();
   await order.save();
   await logAudit({ user, action: decision === "ACCEPT" ? "APPROVE" : "REJECT", resource: "ORDER", resourceId: id, after: { status: order.status, note } });
+  await notifyParty(order.buyerType, order.buyer, { kind: "NETWORK", title: `Order ${order.orderCode} ${order.status === "ACCEPTED" ? "accepted" : "rejected"} by ${order.sellerName}`, body: order.status === "ACCEPTED" ? "It will be supplied from their stock." : note?.trim(), href: `/partner/orders/${order._id}` }, user.userId);
   return order;
 }
 
@@ -794,6 +797,14 @@ export async function createPartnerSale(user: JWTPayload, input: PartnerSaleInpu
     resourceId: String(sale._id),
     after: { saleCode: sale.saleCode, to: sale.buyerName, units: lines.length, total: sale.totalValue },
   });
+  if (input.buyerKind !== "CUSTOMER") {
+    await notifyParty(input.buyerKind as "DEALER" | "DISTRIBUTOR", buyer._id, {
+      kind: "INVOICE",
+      title: `Invoice ${sale.saleCode} from ${me.doc.name}: ${lines.length} vehicle(s) on the way`,
+      body: `${rupees(sale.totalValue)} — confirm the goods receipt (GRN) when they arrive.`,
+      href: `/partner/sales/${sale._id}`,
+    }, user.userId);
+  }
   return sale;
 }
 
@@ -881,10 +892,22 @@ export async function receivePartnerSale(
       { session, ordered: true }
     );
     sale.status = "RECEIVED";
-    sale.received = { at: new Date(), byName: user.name, remarks: input.remarks?.trim() };
+    sale.received = {
+      at: new Date(),
+      byName: user.name,
+      remarks: input.remarks?.trim(),
+      grnNo: await generateFyCode("GRN", new Date(), session),
+      shortChassis: sale.lines.filter((l) => short.has(String(l.vehicle))).map((l) => l.chassisNumber),
+    };
     await sale.save({ session });
   });
   await logAudit({ user, action: "RECEIVE", resource: "PARTNER_SALE", resourceId: id, after: { short: [...short] } });
+  await notifyParty(sale.sellerType, sale.seller, {
+    kind: "GRN",
+    title: `${sale.buyerName} received ${sale.saleCode}`,
+    body: short.size ? `${short.size} vehicle(s) reported short — credited back automatically.` : "Everything received in full.",
+    href: `/partner/sales/${sale._id}`,
+  }, user.userId);
   return sale;
 }
 

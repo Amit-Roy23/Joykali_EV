@@ -53,7 +53,7 @@ export async function downline(
 
 /**
  * Which dealers/distributors a user may see and act for:
- *  - Admin, Managing Partner, Business Head: all
+ *  - Admin, Managing Partner, Business Head, Accounts, Store Manager: all
  *  - ASM: dealers and distributors assigned to them
  *  - Partner logins: only their own record (their downline is reached through the network APIs)
  *  - FEC: none
@@ -62,7 +62,8 @@ export async function downline(
 export async function partyScope(
   user: JWTPayload
 ): Promise<null | { DEALER: mongoose.Types.ObjectId[]; DISTRIBUTOR: mongoose.Types.ObjectId[] }> {
-  if (["ADMIN", "MANAGING_PARTNER", "BUSINESS_HEAD"].includes(user.role)) return null;
+  // Accounts (receipts, ledgers) and the store (loading delivery orders) work across every partner.
+  if (["ADMIN", "MANAGING_PARTNER", "BUSINESS_HEAD", "ACCOUNTANT", "STORE_MANAGER"].includes(user.role)) return null;
   if (isPartnerRole(user.role)) {
     const me = await myParty(user);
     return { DEALER: me?.type === "DEALER" ? [me.id] : [], DISTRIBUTOR: me?.type === "DISTRIBUTOR" ? [me.id] : [] };

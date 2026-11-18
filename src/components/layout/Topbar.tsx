@@ -7,6 +7,7 @@ import { ChevronDown, KeyRound, LogOut, Menu, Plus } from "lucide-react";
 import { Avatar, RoleBadge, ROLE_LABEL } from "@/components/ui/kit";
 import { BrandLogo } from "./BrandMark";
 import { routeFor } from "./nav";
+import { NotificationBell } from "./NotificationBell";
 
 export function Topbar({
   user,
@@ -72,6 +73,8 @@ export function Topbar({
             <Plus className="h-4 w-4 text-volt-300" /> New Sale
           </Link>
         )}
+
+        <NotificationBell />
 
         <div className="relative" ref={ref}>
           <button

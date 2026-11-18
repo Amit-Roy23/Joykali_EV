@@ -1,5 +1,6 @@
 "use client";
 
+import { ShipmentTracker } from "@/components/shipmentTracker";
 import { WarehousePicker } from "@/components/warehousePicker";
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -18,6 +19,7 @@ export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { can, user } = useSession();
+  const isPartner = ["SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"].includes(user?.role);
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -128,8 +130,8 @@ export default function OrderDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Delivery orders</CardTitle>
-              <CardDescription>Warehouse loading, dispatch and receipt for this order</CardDescription>
+              <CardTitle>Shipments</CardTitle>
+              <CardDescription>Each delivery against this order: loading, invoice, dispatch with truck and driver, and your goods receipt (GRN)</CardDescription>
             </CardHeader>
             <CardContent>
               {data.deliveryOrders.length === 0 ? (
@@ -137,21 +139,11 @@ export default function OrderDetailPage() {
                   {["APPROVED", "PARTIALLY_DISPATCHED"].includes(o.status) ? "Approved — waiting for the warehouse to raise a delivery order." : "None yet."}
                 </p>
               ) : (
-                <ul className="divide-y divide-slate-100">
+                <div className="space-y-4">
                   {data.deliveryOrders.map((d: any) => (
-                    <li key={d._id}>
-                      <Link href={`/dispatch/${d._id}`} className="flex items-center justify-between gap-3 py-2.5 hover:text-brand-700">
-                        <div>
-                          <p className="font-mono text-sm font-semibold">{d.doCode}</p>
-                          <p className="text-xs text-slate-500">
-                            {d.lines.reduce((s: number, l: any) => s + l.quantity, 0)} vehicles{d.document?.number ? ` · ${d.document.number}` : ""} · {dt(d.createdAt)}
-                          </p>
-                        </div>
-                        <StatusBadge status={d.status} />
-                      </Link>
-                    </li>
+                    <ShipmentTracker key={d._id} d={d} canReceive={isPartner} />
                   ))}
-                </ul>
+                </div>
               )}
             </CardContent>
           </Card>

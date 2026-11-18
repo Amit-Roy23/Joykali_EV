@@ -193,7 +193,7 @@ export default function SaleDetailPage({
             </div>
 
             <div className="pt-3 border-t border-slate-100">
-              <p className="text-slate-400">Salesperson (FEC)</p>
+              <p className="text-slate-400">Salesperson (FSE)</p>
               <p className="font-medium text-slate-800 mt-0.5">
                 {sale.soldBy?.name} ({sale.soldBy?.employeeCode})
               </p>
