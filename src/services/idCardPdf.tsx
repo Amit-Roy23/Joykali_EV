@@ -1,5 +1,6 @@
 import React from "react";
 import { Document, Image, Page, StyleSheet, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { LOGO_WHITE_PNG_DATA_URI } from "@/lib/brandLogo";
 
 /** CR80 card (85.6 × 54 mm) in points: front and back on two pages. */
 const W = 243;
@@ -37,9 +38,8 @@ function Card({ company, emp, photo, qrPng, validTill }: IdCardProps) {
     <Document title={`ID card ${emp.employeeCode}`}>
       <Page size={[W, H]} style={s.page}>
         <View style={s.band}>
-          <Text style={s.brand}>
-            Joykali <Text style={s.ev}>EV</Text>
-          </Text>
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          <Image src={LOGO_WHITE_PNG_DATA_URI} style={{ width: 117, height: 26 }} />
           <Text style={s.small}>EMPLOYEE IDENTITY CARD</Text>
         </View>
         <View style={s.body}>
