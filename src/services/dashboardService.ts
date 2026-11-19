@@ -149,6 +149,10 @@ export async function getDashboardData(user: JWTPayload) {
   // External partners: only their own account and their own downline — never company figures.
   if (isPartnerRole(user.role)) return partnerDashboard(user, cur);
 
+  // ------------------------------------------------------------------- STAFF
+  // General staff see only their own HR (the page sends them to My HR) — never company figures.
+  if (user.role === "STAFF") return { role: "STAFF", period: cur.period };
+
   // ------------------------------------------------------------------ OUTLET
   if (user.role === "OUTLET") return outletDashboard(user, cur, periods);
 

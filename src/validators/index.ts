@@ -31,10 +31,14 @@ export const EmployeeCreateSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   phone: z.string().regex(/^[0-9]{10}$/, "Phone must be a valid 10-digit number"),
-  role: z.enum(["FEC", "ASM", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"]),
+  /** Pick a post (preferred): its access level becomes the role. Or give the role directly. */
+  postId: z.string().optional().nullable(),
+  role: z.enum(["FEC", "ASM", "OUTLET", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "STAFF", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"]).optional(),
+  outletId: z.string().optional().nullable(),
+  warehouseId: z.string().optional().nullable(),
   reportsTo: z.string().optional().nullable(),
   dealer: z.string().optional().nullable(),
-  designation: z.string().min(2, "Designation is required"),
+  designation: z.string().optional(),
   joiningDate: z.string().or(z.date()),
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
   salary: z.object({

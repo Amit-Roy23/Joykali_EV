@@ -23,6 +23,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
+import { RoleBadge, ROLE_LABEL } from "@/components/ui/kit";
+import { BriefcaseBusiness } from "lucide-react";
+import { api, Notice } from "@/components/workflow";
 import { Input, Label } from "@/components/ui/input";
 import { formatINR } from "@/lib/money";
 
@@ -43,6 +46,7 @@ export default function EmployeeDetailPage({
   const [newManagerId, setNewManagerId] = useState("");
   const [reassignReason, setReassignReason] = useState("");
   const [savingReassignment, setSavingReassignment] = useState(false);
+  const [postOpen, setPostOpen] = useState(false);
 
   const fetchProfile = () => {
     setLoading(true);
@@ -114,26 +118,31 @@ export default function EmployeeDetailPage({
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-bold text-slate-900">{user.name}</h1>
-              <Badge variant="outline">{user.role.replace(/_/g, " ")}</Badge>
+              <RoleBadge role={user.role} />
               <Badge variant={user.status === "ACTIVE" ? "success" : "secondary"}>
                 {user.status}
               </Badge>
             </div>
             <p className="text-xs text-slate-500">
               Code: <span className="font-mono font-bold">{user.employeeCode}</span> •{" "}
-              {user.designation}
+              {user.post?.name || user.designation}
+              {user.post?.name && user.designation && user.designation !== user.post.name ? ` (${user.designation})` : ""}
+              {user.outlet?.name ? ` • ${user.outlet.name}` : ""}
+              {user.warehouse?.name ? ` • ${user.warehouse.name}` : ""}
             </p>
           </div>
         </div>
 
-        {can("employee.manage") && <Button
-          size="sm"
-          variant="outline"
-          onClick={() => setIsReassignModalOpen(true)}
-          className="text-slate-700"
-        >
-          <GitBranch className="w-4 h-4" /> Reassign Manager
-        </Button>}
+        {can("employee.manage") && (
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => setPostOpen(true)} className="text-slate-700">
+              <BriefcaseBusiness className="w-4 h-4" /> Change post
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setIsReassignModalOpen(true)} className="text-slate-700">
+              <GitBranch className="w-4 h-4" /> Reassign Manager
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -166,7 +175,7 @@ export default function EmployeeDetailPage({
               <>
                 <p className="font-bold text-slate-800 text-sm">{user.reportsTo.name}</p>
                 <p className="font-mono text-brand-700">{user.reportsTo.employeeCode}</p>
-                <p className="text-slate-500">{user.reportsTo.role}</p>
+                <RoleBadge role={user.reportsTo.role} short />
               </>
             ) : (
               <p className="text-slate-500 italic">Top Level / No Manager</p>
@@ -284,6 +293,7 @@ export default function EmployeeDetailPage({
       </Card>
 
       {/* Reassign Manager Modal */}
+      {postOpen && <ChangePost user={user} onClose={() => setPostOpen(false)} onSaved={fetchProfile} />}
       <Modal
         isOpen={isReassignModalOpen}
         onClose={() => setIsReassignModalOpen(false)}
@@ -338,3 +348,89 @@ export default function EmployeeDetailPage({
   );
 }
 
+
+/** Promotion / transfer: move the person to another post. Their employee ID stays the same. */
+function ChangePost({ user, onClose, onSaved }: { user: any; onClose: () => void; onSaved: () => void }) {
+  const [d, setD] = useState<any>(null);
+  const [v, setV] = useState({ postId: "", outletId: "", warehouseId: "" });
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api<any>("/api/posts").then(setD).catch((e) => setErr(e.message));
+  }, []);
+  const post = d?.posts.find((p: any) => p._id === v.postId);
+  const level = post && d.levels.find((l: any) => l.role === post.accessRole);
+  const save = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await api(`/api/employees/${user._id}`, { method: "PUT", json: v });
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal isOpen onClose={onClose} title={`Change post — ${user.name}`} description={`Now: ${user.post?.name || user.designation}. The employee ID ${user.employeeCode} stays the same; access changes to the new post's level at once.`}>
+      {!d ? (
+        <p className="text-sm text-slate-500">Loading…</p>
+      ) : (
+        <div className="space-y-3">
+          <div>
+            <Label>New post</Label>
+            <select className="field mt-1" value={v.postId} onChange={(e) => setV({ postId: e.target.value, outletId: "", warehouseId: "" })}>
+              <option value="">Choose…</option>
+              {d.posts
+                .filter((p: any) => p.active && String(p._id) !== String(user.post?._id) && d.levels.some((l: any) => l.role === p.accessRole && l.allowed))
+                .map((p: any) => (
+                  <option key={p._id} value={p._id}>
+                    {p.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+          {level && <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">Access: {level.means}</p>}
+          {post?.accessRole === "OUTLET" && (
+            <div>
+              <Label>Showroom</Label>
+              <select className="field mt-1" value={v.outletId} onChange={(e) => setV({ ...v, outletId: e.target.value })}>
+                <option value="">Choose…</option>
+                {d.outlets.map((o: any) => (
+                  <option key={o._id} value={o._id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {post?.accessRole === "STORE_MANAGER" && (
+            <div>
+              <Label>Warehouse</Label>
+              <select className="field mt-1" value={v.warehouseId} onChange={(e) => setV({ ...v, warehouseId: e.target.value })}>
+                <option value="">Choose…</option>
+                {d.warehouses.map((w: any) => (
+                  <option key={w._id} value={w._id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {post && post.accessRole !== user.role && <Notice tone="warning">Access changes from {(ROLE_LABEL[user.role] || user.role).toLowerCase()} to {level?.label.toLowerCase()}. Check who they report to after the move.</Notice>}
+          {err && <Notice>{err}</Notice>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button disabled={busy || !v.postId} onClick={save}>
+              Move to new post
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}

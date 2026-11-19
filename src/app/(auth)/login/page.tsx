@@ -24,6 +24,7 @@ const DEMO_ACCOUNTS = [
   { role: "HR_MANAGER", name: "Rupa Sen", login: "hr@joykaliev.in", blurb: "Attendance, leave, documents, exits" },
   { role: "ACCOUNTANT", name: "Nabanita Dutta", login: "accounts@joykaliev.in", blurb: "Cash & bank books, expenses, P&L" },
   { role: "STORE_MANAGER", name: "Bapi Mahato", login: "store@joykaliev.in", blurb: "Siliguri warehouse, stock transfers" },
+  { role: "STAFF", name: "Laxmi Mahato", login: "clerk@joykaliev.in", blurb: "Clerk — own attendance, leave, payslips" },
   { role: "OUTLET", name: "Salt Lake Showroom", login: "showroom@joykaliev.in", blurb: "Counter billing, showroom stock, day closing" },
   { role: "SUPER_DISTRIBUTOR", name: "Rarh Bengal EV Super Distributors", login: "sd1@joykaliev.in", blurb: "Supplies distributors in its districts" },
   { role: "DISTRIBUTOR", name: "Bardhaman Auto Distributors", login: "dist1@joykaliev.in", blurb: "Buys from Joykali, runs its dealer network" },

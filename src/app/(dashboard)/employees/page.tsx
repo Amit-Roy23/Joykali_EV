@@ -7,7 +7,7 @@ import { Users, PlusCircle, Search, GitBranch, Eye, Shield } from "lucide-react"
 import { Button, cn } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { StatusBadge } from "@/components/ui/badge";
-import { Avatar, EmptyState, PageHeader, RoleBadge, Skeleton, ROLE_SOLID } from "@/components/ui/kit";
+import { Avatar, EmptyState, PageHeader, RoleBadge, Skeleton, ROLE_SOLID, ROLE_SHORT } from "@/components/ui/kit";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
@@ -27,6 +27,9 @@ export default function EmployeesListPage() {
     email: "",
     phone: "",
     role: "FEC",
+    postId: "",
+    outletId: "",
+    warehouseId: "",
     reportsTo: "",
     designation: "Field Sales Executive",
     joiningDate: new Date().toISOString().split("T")[0],
@@ -49,10 +52,19 @@ export default function EmployeesListPage() {
     },
   });
   const [submitting, setSubmitting] = useState(false);
+  const [postData, setPostData] = useState<any>(null);
+  useEffect(() => {
+    fetch("/api/posts")
+      .then((r) => r.json())
+      .then((r) => r.success && setPostData(r.data))
+      .catch(() => {});
+  }, []);
+  const chosenPost = postData?.posts.find((p: any) => p._id === form.postId);
 
   const fetchEmployees = () => {
     setLoading(true);
-    fetch(`/api/employees?limit=100&search=${encodeURIComponent(search)}&role=${role}`)
+    const postFilter = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("post") || "" : "";
+    fetch(`/api/employees?limit=100&search=${encodeURIComponent(search)}&role=${role}${postFilter ? `&post=${postFilter}` : ""}`)
       .then((res) => res.json())
       .then((res) => {
         if (res.success) setEmployees(res.data);
@@ -104,6 +116,7 @@ export default function EmployeesListPage() {
     { id: "ACCOUNTANT", label: "Accounts" },
     { id: "STORE_MANAGER", label: "Store" },
     { id: "OUTLET", label: "Showroom" },
+    { id: "STAFF", label: "Staff" },
   ];
 
   return (
@@ -276,20 +289,27 @@ export default function EmployeesListPage() {
               />
             </div>
             <div>
-              <Label>Role *</Label>
+              <Label>Post *</Label>
               <select
                 className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm focus:ring-2 focus:ring-brand-500 font-semibold"
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                value={form.postId}
+                onChange={(e) => {
+                  const p = postData?.posts.find((x: any) => x._id === e.target.value);
+                  setForm({ ...form, postId: e.target.value, role: p?.accessRole || form.role, designation: p?.name || form.designation, outletId: "", warehouseId: "" });
+                }}
               >
-                <option value="FEC">FSE (Field Sales Executive)</option>
-                <option value="ASM">ASM (Area Sales Manager)</option>
-                <option value="BUSINESS_HEAD">Business Head</option>
-                <option value="MANAGING_PARTNER">Managing Partner</option>
-                <option value="HR_MANAGER">HR Manager</option>
-                <option value="ACCOUNTANT">Accounts</option>
-                <option value="STORE_MANAGER">Store Manager</option>
+                <option value="">Choose…</option>
+                {(postData?.posts || [])
+                  .filter((p: any) => p.active && postData.levels.some((l: any) => l.role === p.accessRole && l.allowed))
+                  .map((p: any) => (
+                    <option key={p._id} value={p._id}>
+                      {p.name} (JKE-{p.code}-…)
+                    </option>
+                  ))}
               </select>
+              <Link href="/employees/posts" className="mt-1 inline-block text-[11px] font-semibold text-brand-700">
+                + New post
+              </Link>
             </div>
             <div>
               <Label>Designation *</Label>
@@ -302,6 +322,38 @@ export default function EmployeesListPage() {
             </div>
           </div>
 
+          {chosenPost && (
+            <p className="-mt-1 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              <b>Access:</b> {postData.levels.find((l: any) => l.role === chosenPost.accessRole)?.means}
+            </p>
+          )}
+          {form.role === "OUTLET" && chosenPost && (
+            <div>
+              <Label>Showroom *</Label>
+              <select className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm" value={form.outletId} onChange={(e) => setForm({ ...form, outletId: e.target.value })}>
+                <option value="">Choose the showroom…</option>
+                {postData.outlets.map((o: any) => (
+                  <option key={o._id} value={o._id}>
+                    {o.name}, {o.city}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {form.role === "STORE_MANAGER" && chosenPost && (
+            <div>
+              <Label>Warehouse *</Label>
+              <select className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm" value={form.warehouseId} onChange={(e) => setForm({ ...form, warehouseId: e.target.value })}>
+                <option value="">Choose the warehouse…</option>
+                {postData.warehouses.map((w: any) => (
+                  <option key={w._id} value={w._id}>
+                    {w.name}, {w.city}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Reports To (Manager)</Label>
@@ -313,7 +365,7 @@ export default function EmployeesListPage() {
                 <option value="">-- No Direct Manager --</option>
                 {managers.map((m) => (
                   <option key={m._id} value={m._id}>
-                    {m.name} ({m.employeeCode}) • {m.role}
+                    {m.name} ({m.employeeCode}) • {m.designation || ROLE_SHORT[m.role] || m.role}
                   </option>
                 ))}
               </select>

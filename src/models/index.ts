@@ -47,3 +47,4 @@ export * from "./Accounts";
 export * from "./SalaryTemplate";
 export * from "./Notification";
 export * from "./PaymentAdvice";
+export * from "./Post";

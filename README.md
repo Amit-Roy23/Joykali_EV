@@ -142,6 +142,7 @@ The engine (`src/services/incentiveEngine.ts`) supports 5 rule architectures:
 | **Dealer tracking & notifications** | A bell on every login. Dealers and distributors are told when their order is approved, when the delivery order is raised, when the invoice / challan is ready, and when the truck leaves (number, driver, phone, e-way bill). Their order page shows each shipment step by step with the invoice PDF, and the company is told the moment a GRN is recorded. Partner-to-partner orders and shipments notify the same way. |
 | **Goods receipt (GRN)** | A GRN menu for partners and staff: shipments on the road (late after 3 days), every receipt with GRN number, who received it, short / damaged units and credit notes, and a GRN note PDF. Partner-to-partner receipts get a GRN number too. |
 | **Dealer payments** | Receipts record how the money came (NEFT, RTGS, IMPS, UPI, cheque, cash), the UTR / cheque number, the payer's bank and the company account it went into; the same UTR can never be counted twice. Dealers report a payment from their portal with a screenshot; Accounts checks the bank and confirms (receipt posted, dealer notified) or rejects with a reason. Receipts register with Excel, receipt PDF, and **bank matching**: tick receipts seen on the statement, see what the statement should show and the difference. |
+| **Posts & designations** | People → Posts & Designations: create any new post (Showroom Manager, Regional Manager, Clerk, Personal Assistant …). Each post has an access level (general staff, field sales, showroom, warehouse, team manager, accounts, HR, senior management) and its own employee-ID prefix (Regional Manager → JKE-RM-0001). Add employee picks a post; showroom and warehouse posts ask which one. Change post = promotion / transfer, the ID stays. Nobody can create or fill a post at or above their own level; a post's access is locked while people hold it; used posts are switched off, not deleted. |
 | **Automatic salary** | Enter a monthly gross or annual CTC; basic/HRA/conveyance/special allowance, PF (₹15k ceiling), ESI, WB professional tax, employer cost and take-home are calculated. Revisions are effective-dated and need BH + MP approval; a daily job drafts last month's payroll on the 1st. |
 
 ## Deploying
@@ -208,6 +209,7 @@ Password for every account: **`Joykali@123`** (login with email or employee code
 | HR Manager | `hr@joykaliev.in` | `JKE-HR-0001` | Setup, register Excel, compute a final settlement, salary columns |
 | Accounts | `accounts@joykaliev.in` | `JKE-ACC-0001` | Cash & bank books, pay approved bills, P&L, budget |
 | Store Manager (Siliguri) | `store@joykaliev.in` | `JKE-STR-0001` | Receive a transfer, send stock back, petty expense |
+| Clerk (general staff) | `clerk@joykaliev.in` | `JKE-CLK-0001` | Own attendance, leave, payslips only |
 | Dealer (company, Howrah) | `dealer.howrah@joykaliev.in` | `JKDL-HWH` | Truck on the road → record the GRN, report a payment |
 | Showroom (Salt Lake) | `showroom@joykaliev.in` | `JKE-OUT-0001` | Counter bill, receive a transfer, day closing |
 | Super distributor | `sd1@joykaliev.in` | `JKSD-0001` | Network view, its Bolpur distributor |

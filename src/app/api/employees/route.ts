@@ -1,3 +1,7 @@
+import { isValidObjectId } from "mongoose";
+import { Outlet } from "@/models/Outlet";
+import { Warehouse } from "@/models/Warehouse";
+import { resolvePost } from "@/services/postService";
 import { EMPLOYEE_ROLES } from "@/types";
 import { NextRequest } from "next/server";
 import { periodOf } from "@/lib/period";
@@ -45,12 +49,15 @@ export async function GET(req: NextRequest) {
       ];
     }
     if (role && role !== "DISTRIBUTOR") query.$and.push({ role });
+    const post = searchParams.get("post");
+    if (post && /^[a-f0-9]{24}$/i.test(post)) query.$and.push({ post: new (await import("mongoose")).Types.ObjectId(post) });
     if (status) query.status = status;
 
     const total = await User.countDocuments(query);
     const employees = await User.find(query)
       .populate("reportsTo", "name employeeCode role")
       .populate("dealer", "name dealerCode")
+      .populate("post", "name code accessRole")
       .select("-passwordHash")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
@@ -80,7 +87,30 @@ export async function POST(req: NextRequest) {
       return errorResponse(parseResult.error.errors[0].message, 400);
     }
 
-    const data = parseResult.data;
+    const data: any = parseResult.data;
+    // The post decides the access level, the designation and the employee-ID prefix.
+    let post: any = null;
+    if (data.postId) {
+      post = await resolvePost(data.postId).catch((e: any) => {
+        throw Object.assign(new Error(e.message), { status: e.status || 400 });
+      });
+      data.role = post.accessRole;
+      data.designation = data.designation?.trim() || post.name;
+    }
+    if (!data.role) return errorResponse("Choose the post", 400);
+    if (!data.designation?.trim() || data.designation.trim().length < 2) return errorResponse("Designation is required", 400);
+    let outlet: any = null;
+    let warehouse: any = null;
+    if (data.role === "OUTLET") {
+      if (!data.outletId || !isValidObjectId(data.outletId)) return errorResponse("Choose the showroom this person works at", 400);
+      outlet = await Outlet.findById(data.outletId).select("_id status").lean();
+      if (!outlet || outlet.status !== "ACTIVE") return errorResponse("Showroom not found or closed", 400);
+    }
+    if (data.role === "STORE_MANAGER") {
+      if (!data.warehouseId || !isValidObjectId(data.warehouseId)) return errorResponse("Choose the warehouse this person runs", 400);
+      warehouse = await Warehouse.findById(data.warehouseId).select("_id status").lean();
+      if (!warehouse || warehouse.status !== "ACTIVE") return errorResponse("Warehouse not found or closed", 400);
+    }
 
     // Hierarchy rule check
     if (!canManageRole(auth.user.role, data.role)) {
@@ -100,7 +130,7 @@ export async function POST(req: NextRequest) {
     const passwordHash = await hashPassword(defaultPassword);
 
     const result = await withTransaction(async (session) => {
-      const employeeCode = await generateEmployeeCode(data.role, session);
+      const employeeCode = await generateEmployeeCode(data.role, session, post?.code);
 
       const userDocs = await User.create(
         [
@@ -113,6 +143,10 @@ export async function POST(req: NextRequest) {
             reportsTo: data.reportsTo ? new mongoose.Types.ObjectId(data.reportsTo) : null,
             dealer: data.dealer ? new mongoose.Types.ObjectId(data.dealer) : null,
             designation: data.designation.trim(),
+            post: post?._id || null,
+            outlet: outlet?._id || null,
+            warehouse: warehouse?._id || null,
+            department: post?.department || null,
             joiningDate: new Date(data.joiningDate),
             status: "ACTIVE",
             passwordHash,
@@ -165,7 +199,7 @@ export async function POST(req: NextRequest) {
 
     return jsonResponse(result, undefined, 201);
   } catch (error: any) {
-    return errorResponse(error.message || "Failed to create employee", 500);
+    return errorResponse(error.message || "Failed to create employee", typeof error?.status === "number" ? error.status : 500);
   }
 }
 

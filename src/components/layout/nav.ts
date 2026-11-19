@@ -46,6 +46,7 @@ import {
   SlidersHorizontal,
   ClipboardCheck,
   IndianRupee,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { isPartnerRole } from "@/types";
 
@@ -124,6 +125,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Dealers", href: "/dealers", icon: Store, permission: "dealer.view" },
       { title: "Employees", href: "/employees", icon: Users, permission: "employee.view" },
       { title: "Org Chart", href: "/employees/tree", icon: Network, permission: "employee.view" },
+      { title: "Posts & Designations", href: "/employees/posts", icon: BriefcaseBusiness, permission: "employee.view", audience: "staff" },
     ],
   },
   {
