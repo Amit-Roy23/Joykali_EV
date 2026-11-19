@@ -91,6 +91,7 @@ export default function DashboardPage() {
     </div>
   );
 
+  if (data.role === "STAFF") return <StaffHome />;
   if (data.role === "PARTNER") return <PartnerDashboard data={data} header={header} />;
   if (data.role === "OUTLET") return <OutletDashboard data={data} header={header} />;
   if (data.role === "FEC") return <FecDashboard data={data} header={header} />;
@@ -483,3 +484,11 @@ function FecDashboard({ data, header }: { data: any; header: React.ReactNode }) 
   );
 }
 
+
+/** General staff: their home is My HR. */
+function StaffHome() {
+  useEffect(() => {
+    window.location.replace("/me");
+  }, []);
+  return <PageSkeleton />;
+}

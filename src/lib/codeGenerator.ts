@@ -54,6 +54,7 @@ const ROLE_PREFIX_MAP: Record<UserRole, string> = {
   HR_MANAGER: "HR",
   ACCOUNTANT: "ACC",
   STORE_MANAGER: "STR",
+  STAFF: "STF",
 };
 
 /**
@@ -61,9 +62,11 @@ const ROLE_PREFIX_MAP: Record<UserRole, string> = {
  */
 export async function generateEmployeeCode(
   role: UserRole,
-  session?: any
+  session?: any,
+  /** A post's own prefix (e.g. RM for Regional Manager) wins over the role's. */
+  prefix?: string
 ): Promise<string> {
-  const rolePrefix = ROLE_PREFIX_MAP[role] || "EMP";
+  const rolePrefix = (prefix && /^[A-Z]{2,4}$/.test(prefix) ? prefix : null) || ROLE_PREFIX_MAP[role] || "EMP";
   const key = `EMPLOYEE_${rolePrefix}`;
   const seq = await getNextSequence(key, session);
   return `JKE-${rolePrefix}-${String(seq).padStart(4, "0")}`;

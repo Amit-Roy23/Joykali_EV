@@ -136,6 +136,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "outlet.view",
     "expense.create",
   ],
+  // General staff — clerk, personal assistant, driver, office boy: their own HR only.
+  STAFF: ["hr.self", "payslip.view.own", "payslip.download"],
   // Showroom counter login: sells from its own outlet's stock and receives transfers.
   OUTLET: uniq([...FEC_BASE, "outlet.view"]),
   // Channel partner logins see only their own business and their own downline.
@@ -275,6 +277,10 @@ export async function getScopeFilter(
   }
 
   if (resource === "employees") {
+    // People who add employees, run HR or prepare payroll work with the whole staff list.
+    if ((await hasPermission(user.role, "employee.manage")) || (await hasPermission(user.role, "hr.manage")) || (await hasPermission(user.role, "payslip.view.all"))) {
+      return {};
+    }
     if (user.role === "BUSINESS_HEAD") {
       const teamIds = await getTeamUserIds(userObjectId);
       return { _id: { $in: [userObjectId, ...teamIds] } };

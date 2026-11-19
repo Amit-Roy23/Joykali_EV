@@ -216,6 +216,7 @@ export const ROLE_LABEL: Record<string, string> = {
   HR_MANAGER: "HR Manager",
   ACCOUNTANT: "Accounts",
   STORE_MANAGER: "Store Manager",
+  STAFF: "Staff",
   SUPER_DISTRIBUTOR: "Super Distributor",
   DISTRIBUTOR: "Distributor",
   DEALER: "Dealer",
@@ -231,6 +232,7 @@ export const ROLE_SHORT: Record<string, string> = {
   HR_MANAGER: "HR",
   ACCOUNTANT: "ACCTS",
   STORE_MANAGER: "STORE",
+  STAFF: "STAFF",
   SUPER_DISTRIBUTOR: "SUPER",
   DISTRIBUTOR: "DIST",
   DEALER: "DEALER",
@@ -246,6 +248,7 @@ const roleTone: Record<string, string> = {
   HR_MANAGER: "bg-fuchsia-50 text-fuchsia-800 ring-fuchsia-200",
   ACCOUNTANT: "bg-indigo-50 text-indigo-800 ring-indigo-200",
   STORE_MANAGER: "bg-orange-50 text-orange-800 ring-orange-200",
+  STAFF: "bg-slate-100 text-slate-700 ring-slate-300",
   SUPER_DISTRIBUTOR: "bg-orange-50 text-orange-800 ring-orange-200",
   DISTRIBUTOR: "bg-amber-50 text-amber-800 ring-amber-200",
   DEALER: "bg-lime-50 text-lime-800 ring-lime-200",
@@ -263,6 +266,7 @@ export const ROLE_SOLID: Record<string, string> = {
   HR_MANAGER: "border-fuchsia-600 bg-fuchsia-600 text-white",
   ACCOUNTANT: "border-indigo-600 bg-indigo-600 text-white",
   STORE_MANAGER: "border-orange-600 bg-orange-600 text-white",
+  STAFF: "border-slate-600 bg-slate-600 text-white",
 };
 export function RoleBadge({ role, short, className }: { role?: string; short?: boolean; className?: string }) {
   if (!role) return null;

@@ -10,13 +10,15 @@ export type UserRole =
   | "HR_MANAGER"
   | "ACCOUNTANT"
   | "STORE_MANAGER"
+  /** General staff (clerk, assistant, driver…): own attendance, leave and payslips only. */
+  | "STAFF"
   /** External channel partners — outside the employee hierarchy. */
   | "SUPER_DISTRIBUTOR"
   | "DISTRIBUTOR"
   | "DEALER"
   | "SUB_DEALER";
 
-export const EMPLOYEE_ROLES = ["FEC", "OUTLET", "ASM", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
+export const EMPLOYEE_ROLES = ["FEC", "OUTLET", "ASM", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "STAFF", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] as const;
 export const PARTNER_ROLES = ["SUPER_DISTRIBUTOR", "DISTRIBUTOR", "DEALER", "SUB_DEALER"] as const;
 export const ALL_ROLES = [...EMPLOYEE_ROLES, ...PARTNER_ROLES] as const;
 export type PartnerRole = (typeof PARTNER_ROLES)[number];
@@ -46,6 +48,7 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   HR_MANAGER: 2.5,
   ACCOUNTANT: 2.5,
   STORE_MANAGER: 1.5,
+  STAFF: 1,
   SUPER_DISTRIBUTOR: 0,
   DISTRIBUTOR: 0,
   DEALER: 0,

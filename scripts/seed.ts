@@ -89,6 +89,8 @@ import { accountBalances, createExpense, createVoucher, ensureAccounts, recordPa
 import { proposeTemplate } from "../src/services/salaryTemplateService";
 import { DEFAULT_STATUTORY } from "../src/services/salaryTemplateEngine";
 import { MoneyAccount } from "../src/models/Accounts";
+import { Post } from "../src/models/Post";
+import { ensurePosts } from "../src/services/postService";
 import { recordReceipt, rejectAdvice, setCleared, submitAdvice, verifyAdvice } from "../src/services/paymentService";
 
 export const DEMO_PASSWORD = "Joykali@123";
@@ -222,7 +224,9 @@ async function main() {
     salary: { basic: number; hra: number; conveyance: number; other: number; esi?: boolean },
     extra: Record<string, any> = {}
   ) {
-    const employeeCode = await generateEmployeeCode(role);
+    const { codePrefix, ...rest } = extra;
+    extra = rest;
+    const employeeCode = await generateEmployeeCode(role, undefined, codePrefix);
     const user = await User.create({
       employeeCode,
       name,
@@ -1031,6 +1035,11 @@ async function main() {
     { code: "LOP", name: "Unpaid leave", annualQuota: 0, paid: false, halfDayAllowed: true },
   ]);
   const hrUser = await makeUser("HR_MANAGER", "Rupa Sen", "hr@joykaliev.in", "HR Manager", bh, { basic: 22000, hra: 8800, conveyance: 1600, other: 5600 }, { department: depHr._id, attendanceMode: "OFFICE" });
+  // Posts: the defaults (one per access level, plus Showroom Manager, Regional Manager, Clerk, Personal Assistant).
+  await ensurePosts();
+  const postOf = async (name: string) => (await Post.findOne({ name }).lean())!._id;
+  await makeUser("STAFF", "Laxmi Mahato", "clerk@joykaliev.in", "Clerk", hrUser, { basic: 7000, hra: 2800, conveyance: 1600, other: 600, esi: true }, { department: depHr._id, attendanceMode: "OFFICE", post: await postOf("Clerk"), codePrefix: "CLK" });
+  await makeUser("STAFF", "Priyanka Dutta", "pa@joykaliev.in", "Personal Assistant", mp, { basic: 11000, hra: 4400, conveyance: 1600, other: 3000, esi: true }, { attendanceMode: "OFFICE", post: await postOf("Personal Assistant"), codePrefix: "PA" });
   const hrPayload = asPayload(hrUser);
   await User.updateMany({ role: { $in: ["FEC", "ASM"] } }, { $set: { department: depSales._id, attendanceMode: "FIELD" } });
   await User.updateMany({ role: { $in: ["BUSINESS_HEAD", "MANAGING_PARTNER"] } }, { $set: { department: depSales._id, attendanceMode: "OFFICE" } });
@@ -1303,6 +1312,7 @@ async function main() {
     ]);
   }
 
+  await ensurePosts(); // links staff created after the posts to the post of their role
   // A light audit trail so the Audit screen isn't empty.
   for (const u of [admin, mp, bh, asmNorth, fecs[0].user]) {
     await logAudit({ user: asPayload(u), action: "LOGIN", resource: "AUTH", resourceId: String(u._id), ipAddress: "103.42.18.7" });
@@ -1312,7 +1322,7 @@ async function main() {
   const vehicles = await Vehicle.countDocuments();
   console.log(`\nSeed complete: ${saleIds.length} sales, ${vehicles} vehicles, ${runs} payroll runs.`);
   console.log(`\nDemo accounts (password: ${DEMO_PASSWORD})`);
-  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR", "SUPER_DISTRIBUTOR", "DEALER", "SUB_DEALER", "OUTLET", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER"] } }).sort({ role: 1 }).lean()) {
+  for (const u of await User.find({ role: { $nin: ["FEC", "DISTRIBUTOR", "SUPER_DISTRIBUTOR", "DEALER", "SUB_DEALER", "OUTLET", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "STAFF"] } }).sort({ role: 1 }).lean()) {
     console.log(`  ${u.role.padEnd(17)} ${u.employeeCode.padEnd(13)} ${u.email}`);
   }
   console.log(`  FSE               JKE-FSE-0001  fse1@joykaliev.in (… fse12)`);
@@ -1326,6 +1336,7 @@ async function main() {
   console.log(`  ACCOUNTANT        accounts@joykaliev.in (cash & bank books, expenses, P&L)`);
   console.log(`  DEALER (company)  dealer.howrah@joykaliev.in (orders, truck tracking, GRN, payments)`);
   console.log(`  STORE_MANAGER     store@joykaliev.in    (Siliguri warehouse)`);
+  console.log(`  STAFF             clerk@joykaliev.in    (Clerk, JKE-CLK-0001) · pa@joykaliev.in (Personal Assistant, JKE-PA-0001)`);
   await mongoose.disconnect();
 }
 
