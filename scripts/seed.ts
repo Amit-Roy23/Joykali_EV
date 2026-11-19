@@ -1178,7 +1178,7 @@ async function main() {
   await setMinStock(asPayload(admin), String(mainWh._id), [{ modelId: M("AUTO"), qty: 2 }, { modelId: M("CARGO"), qty: 3 }]);
 
   // PF / ESI numbers for everyone on payroll.
-  for (const u of await User.find({ role: { $in: ["FEC", "OUTLET", "ASM", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] } }).select("_id").lean()) {
+  for (const u of await User.find({ role: { $in: ["FEC", "OUTLET", "ASM", "HR_MANAGER", "ACCOUNTANT", "STORE_MANAGER", "STAFF", "BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"] } }).select("_id").lean()) {
     const ss: any = await SalaryStructure.findOne({ employee: u._id }).lean();
     await User.updateOne({ _id: u._id }, { $set: { uan: `1009${between(10000000, 99999999)}`, esiNumber: ss?.fixedDeductions?.esi ? `31${between(10000000, 99999999)}` : "" } });
   }
