@@ -102,7 +102,7 @@ const s = StyleSheet.create({
   line: { fontSize: 8.6, marginTop: 1.5, textAlign: "center" },
   titleRow: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 3, position: "relative" },
   title: { fontSize: 12, fontFamily: "Helvetica-Bold", letterSpacing: 1 },
-  copy: { position: "absolute", right: 6, fontSize: 7, color: "#4b5563" },
+  copy: { position: "absolute", right: 6, top: 5, width: 150, textAlign: "right", fontSize: 7, color: "#4b5563" },
   gstinRow: { textAlign: "center", paddingVertical: 2.5, borderBottomWidth: 1, borderColor: BORDER, fontFamily: "Helvetica-Bold", fontSize: 8.6 },
   partyRow: { flexDirection: "row", borderBottomWidth: 1, borderColor: BORDER },
   partyL: { flex: 1.25, padding: 6, borderRightWidth: 1, borderColor: BORDER },
@@ -110,6 +110,7 @@ const s = StyleSheet.create({
   bold: { fontFamily: "Helvetica-Bold" },
   metaRow: { flexDirection: "row", marginBottom: 1.5 },
   metaK: { width: 78 },
+  metaV: { flex: 1 },
   th: { flexDirection: "row", borderBottomWidth: 1, borderColor: BORDER, backgroundColor: "#eef2f7" },
   thC: { paddingVertical: 3.5, paddingHorizontal: 3, fontFamily: "Helvetica-Bold", fontSize: 8.4 },
   body: { flexDirection: "row", flexGrow: 1, minHeight: 230, borderBottomWidth: 1, borderColor: BORDER },
@@ -196,7 +197,7 @@ function GstInvoice({ d }: { d: GstInvoiceData }) {
               {d.meta.map(([k, v], i) => (
                 <View key={i} style={s.metaRow}>
                   <Text style={s.metaK}>{k}</Text>
-                  <Text style={i === 0 ? s.bold : undefined}>: {v}</Text>
+                  <Text style={i === 0 ? [s.metaV, s.bold] : s.metaV}>: {v}</Text>
                 </View>
               ))}
             </View>
