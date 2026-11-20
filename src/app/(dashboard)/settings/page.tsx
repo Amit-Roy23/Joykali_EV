@@ -152,6 +152,43 @@ export default function SettingsPage() {
                 className="mt-1"
               />
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Website (printed on invoices)</Label>
+                <Input value={settings.website || ""} onChange={(e) => setSettings({ ...settings, website: e.target.value })} className="mt-1" />
+              </div>
+              <div>
+                <Label>Invoice terms &amp; conditions (one per line)</Label>
+                <textarea
+                  className="field mt-1 min-h-[72px] text-sm"
+                  value={(settings.invoiceTerms || []).join("\n")}
+                  onChange={(e) => setSettings({ ...settings, invoiceTerms: e.target.value.split("\n") })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Bank details printed on invoices</Label>
+              <p className="text-[11px] text-slate-500">Leave blank to use the default bank account from Accounts.</p>
+              <div className="mt-1 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                {[
+                  ["bankName", "Bank name"],
+                  ["branch", "Branch"],
+                  ["accountName", "Account name"],
+                  ["accountNo", "A/c no."],
+                  ["ifsc", "IFSC"],
+                ].map(([k, label]) => (
+                  <Input
+                    key={k}
+                    aria-label={label}
+                    placeholder={label}
+                    value={settings.invoiceBank?.[k] || ""}
+                    onChange={(e) => setSettings({ ...settings, invoiceBank: { ...(settings.invoiceBank || {}), [k]: k === "ifsc" ? e.target.value.toUpperCase() : e.target.value } })}
+                  />
+                ))}
+              </div>
+            </div>
           </CardContent>
         </Card>
 

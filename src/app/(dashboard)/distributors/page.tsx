@@ -1,5 +1,6 @@
 "use client";
 
+import { RecruiterSelect } from "@/components/recruiterSelect";
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Building2, Loader2, MapPin, PlusCircle, Search } from "lucide-react";
@@ -12,7 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { useSession } from "@/components/layout/session";
 import { api, CreditMeter, Notice, rupees } from "@/components/workflow";
 
-const EMPTY = { name: "", ownerName: "", phone: "", email: "", address: "", city: "", pincode: "", gstin: "", state: "West Bengal", creditDays: "30", requestedCreditLimit: "", loginPassword: "" };
+const EMPTY = { name: "", ownerName: "", phone: "", email: "", address: "", city: "", pincode: "", gstin: "", state: "West Bengal", creditDays: "30", requestedCreditLimit: "", loginPassword: "", recruitedBy: "" };
 
 export default function DistributorsPage() {
   const { can } = useSession();
@@ -135,6 +136,10 @@ export default function DistributorsPage() {
           {F("requestedCreditLimit", "Requested credit limit (₹)", { inputMode: "numeric" })}
           {F("creditDays", "Credit days", { inputMode: "numeric" })}
           <div className="sm:col-span-2">{F("loginPassword", "Portal password (leave blank to skip the login)", { type: "password" })}</div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="dist-recruiter">Appointed by (FSE / ASM)</Label>
+            <RecruiterSelect id="dist-recruiter" value={form.recruitedBy} onChange={(v) => setForm({ ...form, recruitedBy: v })} />
+          </div>
         </div>
         <p className="mt-2 text-xs text-slate-500">The GST state code is taken from the GSTIN: invoices to another state carry IGST, within West Bengal CGST + SGST.</p>
         {formError && <Notice className="mt-3">{formError}</Notice>}

@@ -24,6 +24,8 @@ export interface IDistributor extends Document {
   creditLimit: number;
   creditDays: number;
   assignedASM?: mongoose.Types.ObjectId | null;
+  /** Employee (FSE / ASM) who appointed this partner — counted for recruitment incentives. */
+  recruitedBy?: mongoose.Types.ObjectId | null;
   /** PENDING = appointed by a partner, waiting for company KYC verification. */
   status: "PENDING" | "ACTIVE" | "INACTIVE" | "ON_HOLD";
   onboardingDate: Date;
@@ -51,6 +53,7 @@ const DistributorSchema = new Schema<IDistributor>(
     creditLimit: { type: Number, required: true, default: 0 },
     creditDays: { type: Number, required: true, default: 30 },
     assignedASM: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    recruitedBy: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     status: { type: String, enum: ["PENDING", "ACTIVE", "INACTIVE", "ON_HOLD"], default: "ACTIVE", index: true },
     onboardingDate: { type: Date, required: true, default: Date.now },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },

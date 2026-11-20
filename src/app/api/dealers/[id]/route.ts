@@ -15,6 +15,7 @@ import {
 } from "@/lib/apiHelper";
 import { logAudit } from "@/lib/audit";
 import mongoose from "mongoose";
+import { resolveRecruiter, recalcRecruitment } from "@/services/incentiveService";
 
 export async function GET(
   req: NextRequest,
@@ -30,6 +31,7 @@ export async function GET(
     const scope = await getScopeFilter(auth.user, "dealers");
     const dealer = await Dealer.findOne({ $and: [{ _id: id }, scope] })
       .populate("assignedASM", "name employeeCode")
+      .populate("recruitedBy", "name employeeCode role")
       .lean();
 
     if (!dealer) return errorResponse("Dealer not found", 404);
@@ -106,9 +108,15 @@ export async function PUT(
     if (body.assignedASM !== undefined) {
       dealer.assignedASM = body.assignedASM ? new mongoose.Types.ObjectId(body.assignedASM) : null;
     }
+    const prevRecruiter = dealer.recruitedBy ? String(dealer.recruitedBy) : null;
+    if (body.recruitedBy !== undefined) dealer.recruitedBy = await resolveRecruiter(body.recruitedBy);
     dealer.updatedBy = new mongoose.Types.ObjectId(auth.user.userId);
 
     await dealer.save();
+    // Appointment credit or status changed: re-run the recruitment incentive for old and new recruiter.
+    if (body.recruitedBy !== undefined || body.status) {
+      await recalcRecruitment([prevRecruiter, dealer.recruitedBy], dealer.onboardingDate);
+    }
 
     await logAudit({
       user: auth.user,
@@ -121,7 +129,7 @@ export async function PUT(
 
     return jsonResponse(dealer);
   } catch (error: any) {
-    return errorResponse(error.message || "Failed to update dealer", 500);
+    return errorResponse(error.message || "Failed to update dealer", error.status || 500);
   }
 }
 

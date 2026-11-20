@@ -22,6 +22,8 @@ export interface IDealer extends Document {
   state: string;
   gstin: string;
   assignedASM?: mongoose.Types.ObjectId | null;
+  /** Employee (FSE / ASM) who appointed this partner — counted for recruitment incentives. */
+  recruitedBy?: mongoose.Types.ObjectId | null;
   /** Approved credit limit in paise — covers consignment stock + open orders. Changes need BH + MP. */
   creditLimit: number;
   creditDays: number;
@@ -51,6 +53,7 @@ const DealerSchema = new Schema<IDealer>(
     state: { type: String, required: true, trim: true },
     gstin: { type: String, required: true, uppercase: true, trim: true },
     assignedASM: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
+    recruitedBy: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
     creditLimit: { type: Number, required: true, default: 0 },
     creditDays: { type: Number, required: true, default: 30 },
     stateCode: { type: String, required: true, default: "19" },

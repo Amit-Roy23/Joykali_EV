@@ -15,6 +15,8 @@ export interface ISetting extends Document {
   email: string;
   website?: string;
   invoiceTerms: string[];
+  /** Bank account printed on invoices (blank = the default bank account in Accounts). */
+  invoiceBank?: { bankName?: string; branch?: string; accountName?: string; accountNo?: string; ifsc?: string };
   codePrefixes: {
     employee: string;
     dealer: string;
@@ -91,6 +93,10 @@ const SettingSchema = new Schema<ISetting>(
     phone: { type: String, required: true, default: "+91 98765 43210" },
     email: { type: String, required: true, default: "contact@joykaliev.in" },
     website: { type: String, default: "https://joykaliev.in" },
+    invoiceBank: {
+      type: new Schema({ bankName: String, branch: String, accountName: String, accountNo: String, ifsc: String }, { _id: false }),
+      default: () => ({}),
+    },
     invoiceTerms: [
       {
         type: String,

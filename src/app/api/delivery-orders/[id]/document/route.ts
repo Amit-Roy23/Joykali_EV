@@ -5,6 +5,9 @@ import { Setting } from "@/models/Setting";
 import { authenticateAndAuthorize, errorResponse, failure, isValidId } from "@/lib/apiHelper";
 import { canAccessParty, distributorOf } from "@/lib/partyAccess";
 import { generateChannelDocPDF } from "@/services/channelDocPdf";
+import { loadCompany } from "@/services/invoicePdf";
+import { Dealer } from "@/models/Dealer";
+import { Distributor } from "@/models/Distributor";
 
 export const maxDuration = 60;
 
@@ -35,6 +38,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         email: s?.email,
       },
       d,
+      profile: await loadCompany(),
+      dueDays: (((d.partyType === "DISTRIBUTOR"
+        ? await Distributor.findById(d.party).select("creditDays").lean()
+        : await Dealer.findById(d.party).select("creditDays").lean()) as any)?.creditDays ?? undefined),
     });
     return new NextResponse(new Uint8Array(pdf), {
       headers: {

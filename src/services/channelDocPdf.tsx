@@ -3,6 +3,8 @@ import { Document, Image, Page, Text, View, StyleSheet, renderToBuffer } from "@
 import { LOGO_PNG_DATA_URI } from "@/lib/brandLogo";
 import { numberToWordsINR } from "@/lib/money";
 import { documentTotals } from "@/lib/gstDocs";
+import { VehicleModel } from "@/models/VehicleModel";
+import { CompanyProfile, channelInvoiceData, generateGstInvoicePDF } from "./invoicePdf";
 
 // Helvetica has no ₹ glyph, so amounts are printed as "Rs." in PDFs.
 const money = (paise: number) =>
@@ -40,114 +42,24 @@ export interface ChannelDocProps {
   d: any; // lean DeliveryOrder
 }
 
-function ChannelDoc({ company, d }: ChannelDocProps) {
-  const isInvoice = d.document.kind === "TAX_INVOICE";
-  const t = documentTotals(d.lines, company.stateCode, d.partySnapshot.stateCode);
-  return (
-    <Document title={`${d.document.number}`}>
-      <Page size="A4" style={s.page}>
-        <View style={s.top}>
-          <View>
-            {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            <Image src={LOGO_PNG_DATA_URI} style={s.logo} />
-            <Text style={s.muted}>{company.address}, {company.city}, {company.state} - {company.pincode}</Text>
-            <Text style={s.muted}>GSTIN {company.gstin} · PAN {company.pan} · State code {company.stateCode}</Text>
-          </View>
-          <View>
-            <Text style={s.title}>{isInvoice ? "TAX INVOICE" : "DELIVERY CHALLAN"}</Text>
-            <Text style={[s.muted, s.right]}>{isInvoice ? "Original for recipient" : "Stock transfer to dealer on consignment — not a sale"}</Text>
-          </View>
-        </View>
-
-        <View style={[s.row, { gap: 8 }]}>
-          <View style={[s.box, s.half]}>
-            <Text style={s.h}>{isInvoice ? "Billed & shipped to" : "Consignee (dealer)"}</Text>
-            <Text style={s.bold}>{d.partySnapshot.name} ({d.partySnapshot.code})</Text>
-            <Text>{d.partySnapshot.address}, {d.partySnapshot.city} - {d.partySnapshot.pincode}</Text>
-            <Text>GSTIN {d.partySnapshot.gstin || "—"} · State code {d.partySnapshot.stateCode}</Text>
-            <Text>Place of supply: {t.interState ? `Inter-state (${d.partySnapshot.stateCode})` : `West Bengal (${company.stateCode})`}</Text>
-          </View>
-          <View style={[s.box, s.half]}>
-            <Text style={s.h}>Document</Text>
-            <Text>{isInvoice ? "Invoice" : "Challan"} no: <Text style={s.bold}>{d.document.number}</Text></Text>
-            <Text>Date: {date(d.document.date)}</Text>
-            <Text>Order: {d.orderCode} · DO: {d.doCode}</Text>
-            <Text>E-way bill: {d.ewayBill?.ewbNo ? `${d.ewayBill.ewbNo} (valid till ${dateTime(d.ewayBill.validUpto)})` : d.ewayBill?.required ? "pending" : "not required"}</Text>
-            <Text>Vehicle: {d.loading?.registrationNo || "—"} · Driver: {d.loading?.driverName || "—"} ({d.loading?.driverPhone || ""})</Text>
-          </View>
-        </View>
-
-        <View style={s.th}>
-          <Text style={[s.c, { width: 20 }]}>#</Text>
-          <Text style={[s.c, { flex: 1 }]}>Description</Text>
-          <Text style={[s.c, { width: 48 }]}>HSN</Text>
-          <Text style={[s.c, { width: 28 }, s.right]}>Qty</Text>
-          <Text style={[s.c, { width: 72 }, s.right]}>Rate</Text>
-          <Text style={[s.c, { width: 80 }, s.right]}>Taxable</Text>
-          <Text style={[s.c, { width: 34 }, s.right]}>GST%</Text>
-          <Text style={[s.c, { width: 72 }, s.right]}>Tax</Text>
-        </View>
-        {t.rows.map((r, i) => (
-          <View key={i} style={s.tr} wrap={false}>
-            <Text style={[s.c, { width: 20 }]}>{i + 1}</Text>
-            <View style={[s.c, { flex: 1 }]}>
-              <Text style={s.bold}>{r.modelName} — Electric vehicle</Text>
-              <Text style={s.muted}>
-                Chassis: {d.vehicles.filter((v: any) => String(v.model) === String((d.lines[i] as any).model)).map((v: any) => v.chassisNumber).join(", ")}
-              </Text>
-            </View>
-            <Text style={[s.c, { width: 48 }]}>{r.hsnCode}</Text>
-            <Text style={[s.c, { width: 28 }, s.right]}>{r.quantity}</Text>
-            <Text style={[s.c, { width: 72 }, s.right]}>{money(r.unitPrice)}</Text>
-            <Text style={[s.c, { width: 80 }, s.right]}>{money(r.taxable)}</Text>
-            <Text style={[s.c, { width: 34 }, s.right]}>{r.gstRate}%</Text>
-            <Text style={[s.c, { width: 72 }, s.right]}>{money(r.tax)}</Text>
-          </View>
-        ))}
-
-        <View style={s.totals}>
-          <View style={s.tline}><Text>Taxable value</Text><Text>{money(t.taxableValue)}</Text></View>
-          {t.interState ? (
-            <View style={s.tline}><Text>IGST</Text><Text>{money(t.igst)}</Text></View>
-          ) : (
-            <>
-              <View style={s.tline}><Text>CGST</Text><Text>{money(t.cgst)}</Text></View>
-              <View style={s.tline}><Text>SGST</Text><Text>{money(t.sgst)}</Text></View>
-            </>
-          )}
-          <View style={s.grand}><Text style={s.bold}>{isInvoice ? "Invoice total" : "Consignment value"}</Text><Text style={s.bold}>{money(t.totalValue)}</Text></View>
-        </View>
-        <Text style={{ marginTop: 6 }}>Amount in words: <Text style={s.bold}>{numberToWordsINR(t.totalValue)}</Text></Text>
-
-        <View style={[s.box, { marginTop: 10 }]}>
-          <Text style={s.h}>Vehicle particulars</Text>
-          {d.vehicles.map((v: any) => (
-            <Text key={v.chassisNumber}>
-              {v.modelName} · {v.color} · Chassis {v.chassisNumber} · Motor {v.motorNumber} · Battery {v.batteryNumber}
-            </Text>
-          ))}
-        </View>
-
-        <View style={s.sign}>
-          <View>
-            <Text style={s.muted}>Received the above vehicles in good condition</Text>
-            <Text style={{ marginTop: 22 }}>Receiver's signature & stamp</Text>
-          </View>
-          <View>
-            <Text style={[s.right, s.bold]}>For {company.name}</Text>
-            <Text style={{ marginTop: 22, textAlign: "right" }}>Authorised signatory</Text>
-          </View>
-        </View>
-        <Text style={s.foot} fixed>
-          {isInvoice ? "Subject to Kolkata jurisdiction. Goods once sold will not be taken back without authorisation." : "Delivery challan under Rule 55, CGST Rules — movement of goods other than by way of supply."} · Computer-generated document.
-        </Text>
-      </Page>
-    </Document>
+/**
+ * Dealer / distributor tax invoice or consignment challan (and partner-to-partner invoices),
+ * printed in the company's GST invoice layout.
+ */
+export async function generateChannelDocPDF(props: ChannelDocProps & { profile?: CompanyProfile; dueDays?: number }): Promise<Buffer> {
+  const profile: CompanyProfile = props.profile || {
+    ...props.company,
+    phone: props.company.phone || "",
+    email: props.company.email || "",
+    terms: ["Goods once sold will not be taken back.", "Interest @ 18% p.a. on payments beyond the due date.", "Subject to local jurisdiction."],
+    bank: null,
+  };
+  const t = documentTotals(props.d.lines, profile.stateCode, props.d.partySnapshot.stateCode);
+  const ids = [...new Set((props.d.lines || []).map((l: any) => String(l.model)).filter(Boolean))];
+  const models = new Map(
+    ((await VehicleModel.find({ _id: { $in: ids } }).select("rangeKm batteryType").lean()) as any[]).map((m) => [String(m._id), m])
   );
-}
-
-export async function generateChannelDocPDF(props: ChannelDocProps): Promise<Buffer> {
-  return renderToBuffer(<ChannelDoc {...props} />);
+  return generateGstInvoicePDF(channelInvoiceData(profile, props.d, t, { models, dueDays: props.dueDays }));
 }
 
 /* ------------------------------------------------------------------ */

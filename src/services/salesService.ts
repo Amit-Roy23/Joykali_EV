@@ -11,6 +11,9 @@ import { withTransaction } from "@/lib/db";
 import { JWTPayload } from "@/types";
 import mongoose from "mongoose";
 import { getTeamUserIds } from "@/lib/rbac";
+import { Setting } from "@/models/Setting";
+import { batteryItemFor, LineInput, moveLines, moveStock, priceLines } from "./itemService";
+import { mainWarehouse } from "./warehouseService";
 
 export interface CreateSaleInput {
   saleDate: Date | string;
@@ -21,8 +24,16 @@ export interface CreateSaleInput {
     address: string;
     idProofType?: string;
     idProofNumber?: string;
+    gstin?: string;
   };
   vehicleId: string;
+  /** Accessories / parts on the same invoice, taken from `itemsWarehouseId` (default: the vehicle's warehouse). */
+  items?: LineInput[];
+  itemsWarehouseId?: string;
+  /** Sell the vehicle without its battery: the battery goes into stock at `batteryWarehouseId`. */
+  withoutBattery?: boolean;
+  batteryItemId?: string;
+  batteryWarehouseId?: string;
   dealerId?: string | null;
   soldBy: string; // FEC id
   priceBreakdown: {
@@ -141,7 +152,17 @@ export async function createSale(
     const insurance = rupeesToPaise(input.priceBreakdown.insurance || 0);
     const accessories = rupeesToPaise(input.priceBreakdown.accessories || 0);
 
-    const totalAmount = exShowroom - discount + gst + registration + insurance + accessories;
+    // Accessories / parts billed on the same invoice.
+    const defaultWh = vehicle.warehouse || (await mainWarehouse(session))._id;
+    const itemLines = input.items?.length ? await priceLines(session, input.items, input.itemsWarehouseId || defaultWh) : [];
+    const itemsTotal = itemLines.reduce((t, l) => t + l.amount, 0);
+
+    const totalAmount = exShowroom - discount + gst + registration + insurance + accessories + itemsTotal;
+
+    // Customer GST details (business buyers): state code from the GSTIN, else the company's state.
+    const gstin = String(input.customer.gstin || "").trim().toUpperCase();
+    if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][A-Z\d]Z[A-Z\d]$/.test(gstin)) throw new Error("Customer GSTIN is not valid");
+    const companyState = ((await Setting.findOne().select("stateCode").lean()) as any)?.stateCode || "19";
 
     const payments = [];
     if (input.initialPayment && input.initialPayment.amount > 0) {
@@ -169,7 +190,7 @@ export async function createSale(
         {
           saleCode,
           saleDate: saleDateObj,
-          customer: input.customer,
+          customer: { ...input.customer, gstin: gstin || undefined, stateCode: gstin ? gstin.slice(0, 2) : companyState },
           vehicle: vehicle._id,
           // A vehicle sitting at a dealer is always that dealer's sale.
           dealer:
@@ -191,11 +212,43 @@ export async function createSale(
           financierDetails,
           payments,
           status: "DELIVERED",
+          items: itemLines.length ? itemLines : undefined,
+          withoutBattery: !!input.withoutBattery,
         },
       ],
       { session }
     );
     const sale = saleDocs[0];
+
+    // Accessories / parts leave warehouse stock with this invoice.
+    if (itemLines.length) await moveLines(session, user, itemLines, "OUT", saleCode, input.customer.name, saleDateObj);
+
+    // Sold without battery: the vehicle's battery goes back into stock as a sellable battery.
+    if (input.withoutBattery) {
+      if (vehicle.batteryRemoved) throw new Error("This vehicle's battery is already off");
+      const batteryItem = await batteryItemFor(vehicle.model, input.batteryItemId, session);
+      const wh = input.batteryWarehouseId || defaultWh;
+      const serialNo = batteryItem.serialTracked ? String(vehicle.batteryNumber || "").toUpperCase() : "";
+      if (batteryItem.serialTracked && !serialNo) throw new Error("This vehicle has no battery number to put into stock");
+      await moveStock(session, user, {
+        item: batteryItem,
+        warehouse: wh,
+        qty: 1,
+        serials: serialNo ? [serialNo] : [],
+        type: "BATTERY_FROM_VEHICLE",
+        reference: saleCode,
+        party: `Vehicle ${vehicle.chassisNumber}`,
+        unitCost: batteryItem.purchasePrice || 0,
+        notes: "Vehicle sold without battery",
+        at: saleDateObj,
+        source: "VEHICLE",
+        vehicle: vehicle._id,
+        allowReturning: true,
+      });
+      sale.batteryReturn = { item: batteryItem._id as any, serialNo: serialNo || undefined, warehouse: new mongoose.Types.ObjectId(String(wh)), unitCost: batteryItem.purchasePrice || 0 };
+      await sale.save({ session });
+      vehicle.batteryRemoved = true;
+    }
 
     // 4. Update Vehicle status
     const previousLocation =
@@ -263,8 +316,35 @@ export async function cancelSale(
     sale.cancelledAt = new Date();
     await sale.save({ session });
 
+    // Accessories / parts on the invoice go back into stock.
+    if (sale.items?.length) await moveLines(session, user, sale.items, "IN", sale.saleCode, sale.customer.name);
+
     // Revert Vehicle status
     const vehicle = await Vehicle.findById(sale.vehicle).session(session ?? null);
+    if (vehicle && sale.withoutBattery && sale.batteryReturn) {
+      // The battery that went into stock goes back on the vehicle — it must still be in stock.
+      const { Item } = await import("@/models/Item");
+      const batteryItem = await Item.findById(sale.batteryReturn.item).session(session ?? null);
+      if (batteryItem) {
+        try {
+          await moveStock(session, user, {
+            item: batteryItem,
+            warehouse: sale.batteryReturn.warehouse,
+            qty: -1,
+            serials: sale.batteryReturn.serialNo ? [sale.batteryReturn.serialNo] : [],
+            type: "BATTERY_TO_VEHICLE",
+            reference: sale.saleCode,
+            party: `Vehicle ${vehicle.chassisNumber}`,
+            unitCost: sale.batteryReturn.unitCost,
+            notes: "Sale cancelled — battery refitted",
+            outStatus: "FITTED",
+          });
+        } catch (e: any) {
+          throw new Error(`The battery taken off this vehicle is no longer in stock (${e.message}). Put a battery back on the vehicle before cancelling.`);
+        }
+      }
+      vehicle.batteryRemoved = false;
+    }
     if (vehicle) {
       vehicle.status = vehicle.currentLocationDealer
         ? "ALLOCATED_TO_DEALER"

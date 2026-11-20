@@ -1,4 +1,5 @@
 "use client";
+import { RecruiterSelect } from "@/components/recruiterSelect";
 import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
@@ -29,6 +30,7 @@ export default function DealersListPage() {
     state: "West Bengal",
     gstin: "",
     assignedASM: "",
+    recruitedBy: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -275,6 +277,12 @@ export default function DealersListPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <Label>Appointed by (FSE / ASM)</Label>
+            <RecruiterSelect className="mt-1 w-full h-9 rounded-md border border-slate-300 bg-white px-3 text-sm" value={form.recruitedBy} onChange={(v) => setForm({ ...form, recruitedBy: v })} />
+            <p className="mt-1 text-[11px] text-slate-500">Counts towards their dealer-recruitment incentive for this month.</p>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

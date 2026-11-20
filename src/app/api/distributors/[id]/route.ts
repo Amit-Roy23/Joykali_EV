@@ -1,4 +1,5 @@
 import { isPartnerRole } from "@/types";
+import { resolveRecruiter, recalcRecruitment } from "@/services/incentiveService";
 import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { Distributor } from "@/models/Distributor";
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       (isPartnerRole(auth.user.role) || (await hasPermission(auth.user.role, "distributor.view"))) &&
       (await canAccessParty(auth.user, "DISTRIBUTOR", id));
     if (!allowed) return errorResponse("Distributor not found", 404);
-    const distributor = await Distributor.findById(id).populate("assignedASM", "name employeeCode").lean();
+    const distributor = await Distributor.findById(id).populate("assignedASM", "name employeeCode").populate("recruitedBy", "name employeeCode role").lean();
     if (!distributor) return errorResponse("Distributor not found", 404);
     const [credit, orders, deliveries, logins, creditChanges] = await Promise.all([
       creditSummary("DISTRIBUTOR", id),
@@ -56,11 +57,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const update: Record<string, any> = {};
     for (const k of allowed) if (b[k] !== undefined) update[k] = typeof b[k] === "string" ? b[k].trim() : b[k];
     if (update.status && !["ACTIVE", "INACTIVE", "ON_HOLD"].includes(update.status)) return errorResponse("Invalid status", 400);
+    if (b.recruitedBy !== undefined) update.recruitedBy = await resolveRecruiter(b.recruitedBy);
     const before = await Distributor.findById(id).lean();
     if (!before) return errorResponse("Distributor not found", 404);
     const after = await Distributor.findByIdAndUpdate(id, { $set: update }, { new: true }).lean();
     // Deactivating a distributor also blocks its portal logins.
     if (update.status === "INACTIVE") await User.updateMany({ distributor: id }, { $set: { status: "INACTIVE" } });
+    if (b.recruitedBy !== undefined || update.status) {
+      await recalcRecruitment([(before as any).recruitedBy, (after as any)?.recruitedBy], (before as any).onboardingDate);
+    }
     await logAudit({ user: auth.user, action: "UPDATE", resource: "DISTRIBUTOR", resourceId: id, before, after });
     return jsonResponse(after);
   } catch (e) {

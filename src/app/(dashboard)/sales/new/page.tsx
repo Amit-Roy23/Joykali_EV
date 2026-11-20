@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState, PageHeader, RoleBadge, Skeleton } from "@/components/ui/kit";
 import { cn } from "@/components/ui/button";
 import { formatRupees } from "@/lib/money";
+import { WarehousePicker } from "@/components/warehousePicker";
+import { LineDraft, LinesEditor, lineTotals, useItemsAt } from "@/components/items";
 
 type PayMode = "CASH" | "UPI" | "BANK" | "FINANCE";
 const PAY_MODES: Array<{ id: PayMode; label: string }> = [
@@ -37,7 +39,15 @@ export default function NewSalePage() {
   const [me, setMe] = useState<any>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  const [customer, setCustomer] = useState({ name: "", phone: "", email: "", address: "", idProofType: "Aadhaar", idProofNumber: "" });
+  const [customer, setCustomer] = useState({ name: "", phone: "", email: "", address: "", idProofType: "Aadhaar", idProofNumber: "", gstin: "" });
+  // Accessories / parts on the same invoice, and "sold without battery".
+  const [itemsWh, setItemsWh] = useState("");
+  const shelf = useItemsAt(itemsWh);
+  const [lines, setLines] = useState<LineDraft[]>([]);
+  const [noBattery, setNoBattery] = useState(false);
+  const [batteryItemId, setBatteryItemId] = useState("");
+  const [batteryWh, setBatteryWh] = useState("");
+  const [batteries, setBatteries] = useState<any[]>([]);
   const [modelFilter, setModelFilter] = useState<string>("ALL");
   const [q, setQ] = useState("");
   const [vehicleId, setVehicleId] = useState<string>("");
@@ -66,6 +76,12 @@ export default function NewSalePage() {
   }, []);
 
   const vehicle = opts?.vehicles.find((v) => v._id === vehicleId);
+  useEffect(() => {
+    fetch("/api/items?category=BATTERY&active=1")
+      .then((r) => r.json())
+      .then((r) => r.success && setBatteries(r.data))
+      .catch(() => {});
+  }, []);
   const models = useMemo(() => {
     const m = new Map<string, { id: string; name: string; count: number }>();
     for (const v of opts?.vehicles || []) {
@@ -87,12 +103,26 @@ export default function NewSalePage() {
     const commercial = ["E_RICKSHAW", "LOADER", "3W"].includes(v.model?.category);
     setPrice((p) => ({ ...p, exShowroom: (v.model?.sellingPrice || 0) / 100, discount: 0, registration: commercial ? 4500 : 1200, insurance: commercial ? 8000 : 3500 }));
     setDealerId(v.currentLocationDealer?._id || "");
+    if (v.warehouse?._id) {
+      setItemsWh(v.warehouse._id);
+      setBatteryWh(v.warehouse._id);
+    }
+    setNoBattery(false);
+    setBatteryItemId(v.model?.batteryItem ? String(v.model.batteryItem) : "");
+  };
+  const toggleNoBattery = (on: boolean) => {
+    setNoBattery(on);
+    const b = batteries.find((x) => x._id === batteryItemId);
+    const list = (vehicle?.model?.sellingPrice || 0) / 100;
+    // Suggest the price without the battery (the battery's selling rate off the ex-showroom); it can be edited.
+    setPrice((p) => ({ ...p, exShowroom: on && b ? Math.max(0, list - b.sellingPrice / 100) : list }));
   };
 
   const gstRate = vehicle?.model?.gstRate ?? 5;
   const taxable = Math.max(0, price.exShowroom - price.discount);
   const gst = Math.round((taxable * gstRate) / 100);
-  const total = taxable + gst + price.registration + price.insurance + price.accessories;
+  const itemT = lineTotals(lines, shelf);
+  const total = taxable + gst + price.registration + price.insurance + price.accessories + itemT.total / 100;
   const isSelfOnly = opts?.sellers.length === 1;
 
   const submit = async (e: React.FormEvent) => {
@@ -110,6 +140,13 @@ export default function NewSalePage() {
         dealerId: dealerId || null,
         soldBy,
         priceBreakdown: { ...price, gst },
+        items: lines
+          .filter((l) => l.itemId)
+          .map((l) => ({ itemId: l.itemId, qty: Number(l.qty), rateRupees: l.rateRupees === "" ? undefined : Number(l.rateRupees), discountRupees: Number(l.discountRupees || 0), serials: l.serials })),
+        itemsWarehouseId: itemsWh || undefined,
+        withoutBattery: noBattery,
+        batteryItemId: noBattery ? batteryItemId || undefined : undefined,
+        batteryWarehouseId: noBattery ? batteryWh || undefined : undefined,
         paymentMode,
         initialPayment: { amount: paid === "" ? (paymentMode === "FINANCE" ? financier.downPayment : total) : Number(paid), reference: reference || undefined },
       };
@@ -239,6 +276,9 @@ export default function NewSalePage() {
               <Field label="Address *" className="sm:col-span-2">
                 <Input required minLength={5} value={customer.address} onChange={(e) => setCustomer({ ...customer, address: e.target.value })} placeholder="House, street, town, PIN" />
               </Field>
+              <Field label="GSTIN (business customers)" hint="Another state's GSTIN makes the invoice IGST.">
+                <Input maxLength={15} value={customer.gstin} onChange={(e) => setCustomer({ ...customer, gstin: e.target.value.toUpperCase() })} placeholder="optional" />
+              </Field>
             </CardContent>
           </Card>
 
@@ -264,9 +304,46 @@ export default function NewSalePage() {
               <Field label="Insurance (₹)">
                 <Input type="number" min={0} inputMode="decimal" value={price.insurance || ""} onChange={(e) => setPrice({ ...price, insurance: num(e.target.value) })} placeholder="0" />
               </Field>
-              <Field label="Accessories (₹)">
-                <Input type="number" min={0} inputMode="decimal" value={price.accessories || ""} onChange={(e) => setPrice({ ...price, accessories: num(e.target.value) })} placeholder="0" />
-              </Field>
+              <label className="col-span-full flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <input type="checkbox" className="mt-0.5" checked={noBattery} disabled={!vehicle} onChange={(e) => toggleNoBattery(e.target.checked)} />
+                <span>
+                  <b>Sold without battery</b> — the vehicle&apos;s battery{vehicle?.batteryNumber ? ` (${vehicle.batteryNumber})` : ""} goes back into stock and can be sold separately. Adjust the ex-showroom price above.
+                </span>
+              </label>
+              {noBattery && (
+                <>
+                  <Field label="Battery item" className="sm:col-span-2">
+                    <select className="field" value={batteryItemId} onChange={(e) => setBatteryItemId(e.target.value)}>
+                      <option value="">— choose the battery type —</option>
+                      {batteries.map((b) => (
+                        <option key={b._id} value={b._id}>
+                          {b.name} · rate {formatRupees(b.sellingPrice / 100)}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Battery goes into">
+                    <WarehousePicker id="nb-wh" value={batteryWh} onChange={setBatteryWh} />
+                  </Field>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 3b. Accessories & parts */}
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+              <div>
+                <CardTitle>Accessories &amp; parts on this invoice</CardTitle>
+                <CardDescription>Helmet, guard, extra charger… taken out of warehouse stock. Rates come from the item master and can be changed.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <Label>From</Label>
+                <WarehousePicker id="acc-wh" className="field h-9 w-auto" value={itemsWh} onChange={(v) => { setItemsWh(v); setLines(lines.map((l) => ({ ...l, serials: [] }))); }} />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <LinesEditor lines={lines} setLines={setLines} warehouseId={itemsWh} items={shelf} categories={["ACCESSORY", "SPARE_PART", "CHARGER", "BATTERY"]} />
             </CardContent>
           </Card>
 
@@ -373,7 +450,8 @@ export default function NewSalePage() {
                 [`GST ${gstRate}%`, gst],
                 ["Registration", price.registration],
                 ["Insurance", price.insurance],
-                ["Accessories", price.accessories],
+                ...(price.accessories ? [["Accessories", price.accessories]] : []),
+                ...(itemT.total ? [["Accessories & parts (incl. GST)", itemT.total / 100]] : []),
               ].map(([k, v]) => (
                 <div key={k as string} className="flex justify-between text-slate-300">
                   <dt>{k}</dt>

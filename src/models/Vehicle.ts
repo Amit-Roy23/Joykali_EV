@@ -22,6 +22,8 @@ export interface IVehicle {
   deliveryOrder?: mongoose.Types.ObjectId | null;
   purchase?: mongoose.Types.ObjectId | null;
   sale?: mongoose.Types.ObjectId | null;
+  /** Battery taken off (vehicle sold without battery) — the battery is in item stock. */
+  batteryRemoved?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -55,6 +57,7 @@ const VehicleSchema = new Schema<IVehicle>(
     deliveryOrder: { type: Schema.Types.ObjectId, ref: "DeliveryOrder", default: null, index: true },
     purchase: { type: Schema.Types.ObjectId, ref: "Purchase", default: null },
     sale: { type: Schema.Types.ObjectId, ref: "Sale", default: null },
+    batteryRemoved: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

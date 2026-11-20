@@ -218,7 +218,7 @@ export async function monthAttendance(employeeId: any, period: string) {
       leaveCode: lv?.leaveCode || null,
       otApprovedMin: Math.min(d?.otApprovedMin || 0, res.otMin),
       shiftCode: sh?.code || "GEN",
-      punches: dayPunches.map((x: any) => ({ at: x.at, type: x.type, source: x.source, hasPhoto: !!x.photo, lat: x.location?.lat, lng: x.location?.lng })),
+      punches: dayPunches.map((x: any) => ({ at: x.at, type: x.type, source: x.source, hasPhoto: !!x.photo, lat: x.location?.lat, lng: x.location?.lng, place: x.place || null, distanceM: x.distanceM ?? null, note: x.note || "" })),
     } as DayRow;
   });
   const summary = summarizeMonth(rows, cfg.latesPerHalfDay);
@@ -261,7 +261,19 @@ export async function punch(
       throw new HrError(`You are ${distance} m from the office; office staff must punch within ${cfg.office.radiusM || 200} m`);
     }
   }
-  if (me.attendanceMode !== "OFFICE" && !input.photo) throw new HrError("Take a selfie: field staff punches need a photo");
+  const radius = cfg.office?.radiusM || 200;
+  // Where the punch happened: inside the office radius = office, anywhere else = field.
+  const place: "OFFICE" | "FIELD" = distance != null && distance <= radius ? "OFFICE" : me.attendanceMode === "OFFICE" && distance == null ? "OFFICE" : "FIELD";
+  // Hybrid staff (e.g. Business Head): office punch needs no selfie; a field punch does.
+  const needsPhoto = me.attendanceMode === "FIELD" || !me.attendanceMode || (me.attendanceMode === "HYBRID" && place === "FIELD");
+  if (needsPhoto && !input.photo) {
+    throw new HrError(
+      me.attendanceMode === "HYBRID"
+        ? `You are ${distance != null ? `${distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`} from the office` : "away from the office"} — this is a field-visit punch, take a selfie`
+        : "Take a selfie: field staff punches need a photo",
+      428
+    );
+  }
   if (input.photo) {
     if (input.photo.data.length > 2 * 1024 * 1024) throw new HrError("Photo larger than 2 MB");
     if (!/^image\/(jpeg|png|webp)$/.test(input.photo.type)) throw new HrError("The photo must be a JPG, PNG or WebP image");
@@ -282,6 +294,7 @@ export async function punch(
     source: input.photo ? "MOBILE" : "WEB",
     location: { lat: input.lat!, lng: input.lng!, accuracy: input.accuracy },
     distanceM: distance,
+    place,
     photo: photoId,
     device: String(input.device || "").slice(0, 160),
     note: input.note?.slice(0, 200),
@@ -603,7 +616,11 @@ export async function setEmployeeTarget(user: JWTPayload, input: { employeeId: s
   if (scope && !scope.some((s) => same(s, input.employeeId))) throw new HrError("Not in your team", 403);
   const units = Math.floor(Number(input.targetUnits));
   if (!Number.isFinite(units) || units < 0 || units > 1000) throw new HrError("Enter a valid target");
-  return EmployeeTarget.findOneAndUpdate({ employee: oid(input.employeeId), period: input.period }, { $set: { targetUnits: units, setByName: user.name } }, { upsert: true, new: true });
+  const saved = await EmployeeTarget.findOneAndUpdate({ employee: oid(input.employeeId), period: input.period }, { $set: { targetUnits: units, setByName: user.name } }, { upsert: true, new: true });
+  // A target-commission scheme pays against this target, so re-run the month's incentive.
+  const { recalculateIncentivesForPeriod } = await import("./incentiveService");
+  await recalculateIncentivesForPeriod([input.employeeId], new Date(`${input.period}-15T06:30:00Z`));
+  return saved;
 }
 
 /**

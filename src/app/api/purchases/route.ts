@@ -9,6 +9,7 @@ import {
 } from "@/lib/apiHelper";
 import { PurchaseCreateSchema } from "@/validators";
 import { logAudit } from "@/lib/audit";
+import { hasPermission } from "@/lib/rbac";
 
 // Heavy work (recalculation, PDFs, spreadsheets): allow up to 60s on Vercel.
 export const maxDuration = 60;
@@ -36,6 +37,8 @@ export async function GET(req: NextRequest) {
     const purchases = await Purchase.find(query)
       .populate("supplier", "name gstin")
       .populate("lineItems.model", "name variant category")
+      .populate("lineItems.item", "name code category unit")
+      .populate("warehouse", "name code")
       .populate("createdBy", "name employeeCode")
       .sort({ invoiceDate: -1 })
       .skip((page - 1) * limit)
@@ -56,8 +59,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
-    const auth = await authenticateAndAuthorize(req, "purchase.manage");
+    const auth = await authenticateAndAuthorize(req);
     if (auth.error) return auth.error;
+    if (!(await hasPermission(auth.user.role, "purchase.manage")) && !(await hasPermission(auth.user.role, "purchase.create"))) {
+      return errorResponse("You cannot enter purchases", 403);
+    }
 
     const body = await req.json();
     const parseResult = PurchaseCreateSchema.safeParse(body);
@@ -65,7 +71,7 @@ export async function POST(req: NextRequest) {
       return errorResponse(parseResult.error.errors[0].message, 400);
     }
 
-    const purchase = await createPurchase({ ...parseResult.data, warehouseId: typeof body.warehouseId === "string" ? body.warehouseId : null }, auth.user);
+    const purchase = await createPurchase({ ...(parseResult.data as any), warehouseId: typeof body.warehouseId === "string" ? body.warehouseId : null }, auth.user);
 
     await logAudit({
       user: auth.user,
@@ -81,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     return jsonResponse(purchase, undefined, 201);
   } catch (error: any) {
-    return errorResponse(error.message || "Failed to create purchase", 500);
+    return errorResponse(error.message || "Failed to create purchase", error.status || 500);
   }
 }
 

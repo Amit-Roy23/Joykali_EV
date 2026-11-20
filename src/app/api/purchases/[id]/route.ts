@@ -21,6 +21,9 @@ export async function GET(
     const purchase = await Purchase.findById(id)
       .populate("supplier")
       .populate("lineItems.model")
+      .populate("lineItems.item", "name code category unit serialTracked")
+      .populate("lineItems.warehouse", "name code")
+      .populate("warehouse", "name code")
       .populate("createdBy", "name employeeCode")
       .lean();
 

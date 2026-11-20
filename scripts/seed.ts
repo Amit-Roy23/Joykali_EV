@@ -30,6 +30,7 @@ import {
   VehicleModel,
   Vehicle,
   StockMovement,
+  Sale,
   IncentiveScheme,
   Setting,
   RolePermission,
@@ -92,6 +93,8 @@ import { MoneyAccount } from "../src/models/Accounts";
 import { Post } from "../src/models/Post";
 import { ensurePosts } from "../src/services/postService";
 import { recordReceipt, rejectAdvice, setCleared, submitAdvice, verifyAdvice } from "../src/services/paymentService";
+import { createItem, createPartsSale, receiveBattery, returnBattery, stockIn, stockOut, transferItems } from "../src/services/itemService";
+import { Item } from "../src/models/Item";
 
 export const DEMO_PASSWORD = "Joykali@123";
 
@@ -1042,13 +1045,15 @@ async function main() {
   await makeUser("STAFF", "Priyanka Dutta", "pa@joykaliev.in", "Personal Assistant", mp, { basic: 11000, hra: 4400, conveyance: 1600, other: 3000, esi: true }, { attendanceMode: "OFFICE", post: await postOf("Personal Assistant"), codePrefix: "PA" });
   const hrPayload = asPayload(hrUser);
   await User.updateMany({ role: { $in: ["FEC", "ASM"] } }, { $set: { department: depSales._id, attendanceMode: "FIELD" } });
-  await User.updateMany({ role: { $in: ["BUSINESS_HEAD", "MANAGING_PARTNER"] } }, { $set: { department: depSales._id, attendanceMode: "OFFICE" } });
+  await User.updateMany({ role: "MANAGING_PARTNER" }, { $set: { department: depSales._id, attendanceMode: "OFFICE" } });
+  // The Business Head works from the office some days and visits the field on others.
+  await User.updateMany({ role: "BUSINESS_HEAD" }, { $set: { department: depSales._id, attendanceMode: "HYBRID" } });
   await User.updateMany({ role: "ADMIN" }, { $set: { department: depAdmin._id, attendanceMode: "OFFICE" } });
   await User.updateOne({ _id: outletUser._id }, { $set: { department: depShowroom._id, shift: showroomShift._id, attendanceMode: "OFFICE" } });
   void depChannel;
 
   // This month's punches: mostly on time, some late, a few absences, overtime on busy days.
-  const staff = await User.find({ status: "ACTIVE", role: { $in: ["FEC", "ASM", "OUTLET", "HR_MANAGER"] } }).lean();
+  const staff = await User.find({ status: "ACTIVE", role: { $in: ["FEC", "ASM", "OUTLET", "HR_MANAGER", "BUSINESS_HEAD"] } }).lean();
   const at = (date: string, mins: number) => new Date(Date.parse(`${date}T00:00:00+05:30`) + mins * 60000);
   const holidaySet = new Set((await Holiday.find().lean()).map((h: any) => h.date));
   const punchDocs: any[] = [];
@@ -1067,10 +1072,12 @@ async function main() {
       const inMin = start + late;
       const isToday = date === todayStr;
       if (isToday && at(date, inMin).getTime() > Date.now()) continue; // shift not started yet
-      punchDocs.push({ employee: u._id, at: at(date, inMin), date, type: "IN", source: u.attendanceMode === "OFFICE" ? "WEB" : "MOBILE", location: { lat: 22.57 + rand() * 0.2, lng: 88.36 + rand() * 0.15, accuracy: between(8, 40) } });
+      // Hybrid staff (Business Head): every third working day is a field visit.
+      const place = u.attendanceMode === "OFFICE" ? "OFFICE" : u.attendanceMode === "HYBRID" ? (d % 3 === 0 ? "FIELD" : "OFFICE") : "FIELD";
+      punchDocs.push({ employee: u._id, at: at(date, inMin), date, type: "IN", place, source: u.attendanceMode === "OFFICE" ? "WEB" : "MOBILE", location: { lat: 22.57 + rand() * 0.2, lng: 88.36 + rand() * 0.15, accuracy: between(8, 40) } });
       if (isToday) continue; // still at work
       const stay = rand() < 0.15 ? between(60, 150) : between(-25, 25);
-      punchDocs.push({ employee: u._id, at: at(date, end + stay), date, type: "OUT", source: u.attendanceMode === "OFFICE" ? "WEB" : "MOBILE", location: { lat: 22.57 + rand() * 0.2, lng: 88.36 + rand() * 0.15, accuracy: between(8, 40) } });
+      punchDocs.push({ employee: u._id, at: at(date, end + stay), date, type: "OUT", place, source: u.attendanceMode === "OFFICE" ? "WEB" : "MOBILE", location: { lat: 22.57 + rand() * 0.2, lng: 88.36 + rand() * 0.15, accuracy: between(8, 40) } });
     }
   }
   await AttendancePunch.insertMany(punchDocs);
@@ -1311,6 +1318,142 @@ async function main() {
       { head: "Insurance", amountRupees: 10000 },
     ]);
   }
+
+
+  // ---------------------------------------------------------------- Phase 7
+  console.log("• Parts, accessories, batteries & chargers: item master, purchase, stock, counter sales, battery service");
+  const it = async (x: any) => createItem(asPayload(admin), x);
+  const bat60 = await it({ name: "Li-ion battery 60V 30Ah", category: "BATTERY", brand: "Exide Neo", partNo: "EXN-6030", unit: "PCS", hsnCode: "850760", gstRate: 18, purchaseRupees: 16500, sellingRupees: 21500, dealerRupees: 19800, serialTracked: true, minStock: 4, compatibleModels: [String(models.STORM._id), String(models.FALCON._id)] });
+  const bat48 = await it({ name: "Li-ion battery 48V 24Ah", category: "BATTERY", brand: "Exide Neo", partNo: "EXN-4824", unit: "PCS", hsnCode: "850760", gstRate: 18, purchaseRupees: 11200, sellingRupees: 14900, serialTracked: true, minStock: 3, compatibleModels: [String(models.ZIPPY._id)] });
+  const batLfp = await it({ name: "LFP battery pack 51V 105Ah", category: "BATTERY", brand: "Trontek", partNo: "TRN-51105", unit: "PCS", hsnCode: "850760", gstRate: 18, purchaseRupees: 52000, sellingRupees: 64000, serialTracked: true, minStock: 2, compatibleModels: [String(models.CITYRIDE._id), String(models.CARGO._id), String(models.AUTO._id)] });
+  const chg60 = await it({ name: "Smart charger 60V 5A", category: "CHARGER", brand: "Joykali", partNo: "JK-CH605", unit: "PCS", hsnCode: "850440", gstRate: 18, purchaseRupees: 2100, sellingRupees: 3200, serialTracked: true, minStock: 5 });
+  const brake = await it({ name: "Brake shoe set (front)", category: "SPARE_PART", partNo: "BS-F110", unit: "SET", hsnCode: "871410", gstRate: 28, purchaseRupees: 180, sellingRupees: 320, minStock: 20 });
+  const tyre = await it({ name: "Tubeless tyre 90/90-12", category: "SPARE_PART", brand: "TVS Eurogrip", unit: "PCS", hsnCode: "401140", gstRate: 28, purchaseRupees: 1150, sellingRupees: 1550, minStock: 10 });
+  const mirror = await it({ name: "Rear-view mirror (pair)", category: "SPARE_PART", unit: "PAIR", hsnCode: "871410", gstRate: 28, purchaseRupees: 140, sellingRupees: 260, minStock: 15 });
+  const throttle = await it({ name: "Throttle assembly 60V", category: "SPARE_PART", partNo: "TH-60", unit: "PCS", hsnCode: "871410", gstRate: 28, purchaseRupees: 420, sellingRupees: 690, minStock: 6 });
+  const helmet = await it({ name: "ISI helmet (half face)", category: "ACCESSORY", brand: "Steelbird", unit: "PCS", hsnCode: "650610", gstRate: 18, purchaseRupees: 620, sellingRupees: 990, minStock: 24 });
+  const holder = await it({ name: "Mobile holder with USB charger", category: "ACCESSORY", unit: "PCS", hsnCode: "851762", gstRate: 18, purchaseRupees: 210, sellingRupees: 449, minStock: 10 });
+  const cover = await it({ name: "Body cover (waterproof)", category: "ACCESSORY", unit: "PCS", hsnCode: "630790", gstRate: 12, purchaseRupees: 260, sellingRupees: 499, minStock: 10 });
+  // Default battery of each model (taken into stock when a vehicle is sold without its battery).
+  await VehicleModel.updateMany({ _id: { $in: [models.STORM._id, models.FALCON._id] } }, { $set: { batteryItem: bat60._id } });
+  await VehicleModel.updateOne({ _id: models.ZIPPY._id }, { $set: { batteryItem: bat48._id } });
+  await VehicleModel.updateMany({ _id: { $in: [models.CITYRIDE._id, models.CARGO._id, models.AUTO._id] } }, { $set: { batteryItem: batLfp._id } });
+
+  // One supplier invoice with parts for two warehouses (Barasat + Siliguri), entered by the accountant.
+  const serials = (prefix: string, n: number) => Array.from({ length: n }, (_, i) => `${prefix}${current.year % 100}${String(current.month).padStart(2, "0")}${String(i + 1).padStart(3, "0")}`);
+  const partsDate = ymd(current.year, current.month, Math.max(1, todayIst - 8));
+  await createPurchaseAgain(
+    {
+      supplier: String(supplierMain._id),
+      invoiceNumber: `VDM/${current.year}/SP/${between(100, 999)}`,
+      invoiceDate: partsDate,
+      notes: "Spares, accessories and batteries — 2 cases",
+      warehouseId: String(mainWh._id),
+      lineItems: [
+        { kind: "ITEM", itemId: String(bat60._id), quantity: 8, unitCost: 16500, gstRate: 18, serials: serials("EXN60A", 8) },
+        { kind: "ITEM", itemId: String(bat48._id), quantity: 4, unitCost: 11200, gstRate: 18, serials: serials("EXN48A", 4) },
+        { kind: "ITEM", itemId: String(chg60._id), quantity: 6, unitCost: 2100, gstRate: 18, serials: serials("CH60A", 6) },
+        { kind: "ITEM", itemId: String(helmet._id), quantity: 24, unitCost: 620, gstRate: 18 },
+        { kind: "ITEM", itemId: String(holder._id), quantity: 12, unitCost: 210, gstRate: 18 },
+        { kind: "ITEM", itemId: String(cover._id), quantity: 15, unitCost: 260, gstRate: 12 },
+        { kind: "ITEM", itemId: String(brake._id), quantity: 30, unitCost: 180, gstRate: 28 },
+        { kind: "ITEM", itemId: String(tyre._id), quantity: 12, unitCost: 1150, gstRate: 28 },
+        { kind: "ITEM", itemId: String(mirror._id), quantity: 20, unitCost: 140, gstRate: 28 },
+        { kind: "ITEM", itemId: String(throttle._id), quantity: 5, unitCost: 420, gstRate: 28 },
+        // Siliguri's share of the same invoice
+        { kind: "ITEM", itemId: String(helmet._id), quantity: 10, unitCost: 620, gstRate: 18, warehouseId: String(siliguri._id) },
+        { kind: "ITEM", itemId: String(brake._id), quantity: 10, unitCost: 180, gstRate: 28, warehouseId: String(siliguri._id) },
+        { kind: "ITEM", itemId: String(bat60._id), quantity: 2, unitCost: 16500, gstRate: 18, serials: serials("EXN60S", 2), warehouseId: String(siliguri._id) },
+      ],
+    },
+    accountsPayload
+  );
+  await createPurchaseAgain(
+    {
+      supplier: String(supplierCargo._id),
+      invoiceNumber: `ECW/${current.year}/SP/${between(100, 999)}`,
+      invoiceDate: partsDate,
+      notes: "LFP packs for the commercial range",
+      warehouseId: String(mainWh._id),
+      lineItems: [{ kind: "ITEM", itemId: String(batLfp._id), quantity: 3, unitCost: 52000, gstRate: 18, serials: serials("TRN51A", 3) }],
+    },
+    accountsPayload
+  );
+  // Opening stock counted at Siliguri, entered by the store manager; a damaged mirror written off.
+  await stockIn(storePayload, { itemId: String(mirror._id), warehouseId: String(siliguri._id), qty: 6, reason: "OPENING", notes: "Physical count" } as any);
+  await stockIn(storePayload, { itemId: String(holder._id), warehouseId: String(siliguri._id), qty: 4, reason: "OPENING", notes: "Physical count" } as any);
+  await stockOut(storePayload, { itemId: String(mirror._id), warehouseId: String(siliguri._id), qty: 1, reason: "DAMAGED", notes: "Glass cracked in transit" } as any);
+  await transferItems(bhPayload, { itemId: String(tyre._id), fromId: String(mainWh._id), toId: String(siliguri._id), qty: 4, notes: "North Bengal service stock" });
+
+  // Counter bills.
+  await createPartsSale(bhPayload, { saleDate: ymd(current.year, current.month, Math.max(1, todayIst - 5)), customer: { name: "Rakesh Mondal", phone: "9831200456", address: "Madhyamgram" }, warehouseId: String(mainWh._id), lines: [{ itemId: String(brake._id), qty: 2 }, { itemId: String(mirror._id), qty: 1 }], paymentMode: "CASH" });
+  await createPartsSale(bhPayload, { saleDate: ymd(current.year, current.month, Math.max(1, todayIst - 3)), customer: { name: "Sarkar Motors", phone: "9830077120", address: "Barasat, North 24 Pgs", gstin: "19ABCPS1234K1Z9" }, warehouseId: String(mainWh._id), lines: [{ itemId: String(tyre._id), qty: 4, rateRupees: 1500 }, { itemId: String(helmet._id), qty: 6, discountRupees: 300 }], paymentMode: "CREDIT", notes: "Monthly credit customer" });
+  await createPartsSale(storePayload, { saleDate: todayYmd, customer: { name: "Pinki Barman", phone: "9734011220", address: "Siliguri" }, warehouseId: String(siliguri._id), lines: [{ itemId: String(bat60._id), qty: 1, serials: [serials("EXN60S", 2)[0]] }], paymentMode: "UPI", reference: `UPI${between(100000000, 999999999)}`, notes: "Spare battery" });
+
+  // Vehicle sales: one with accessories on the same invoice, one sold without its battery.
+  const seller = fecs[0];
+  const sellerPayload = asPayload(seller.user);
+  const freshVehicles = await Vehicle.find({ status: "IN_STOCK", currentLocationType: "WAREHOUSE", warehouse: mainWh._id, model: { $in: [models.STORM._id, models.FALCON._id] } }).populate("model").limit(2).lean();
+  if (freshVehicles.length === 2) {
+    const [va, vb] = freshVehicles as any[];
+    const accLines = [{ itemId: String(helmet._id), qty: 2 }, { itemId: String(holder._id), qty: 1 }];
+    const accTotal = [{ r: 990, q: 2, g: 18 }, { r: 449, q: 1, g: 18 }].reduce((t, l) => t + Math.round(l.r * l.q * 100 * (1 + l.g / 100)) / 100, 0);
+    const exA = va.model.sellingPrice / 100;
+    const withAcc = await createSale(
+      { saleDate: todayYmd, customer: { name: "Debjani Pal", phone: "9748800123", address: "Dum Dum Park, Kolkata 700055", idProofType: "Aadhaar", idProofNumber: "XXXX-XXXX-4412" }, vehicleId: String(va._id), soldBy: String(seller.user._id), priceBreakdown: { exShowroom: exA, discount: 1000, gst: 0, registration: 1200, insurance: 3500 }, paymentMode: "UPI", initialPayment: { amount: Math.round((exA - 1000) * 1.05 + 1200 + 3500 + accTotal), reference: `UPI${between(100000000, 999999999)}` }, items: accLines, itemsWarehouseId: String(mainWh._id) } as any,
+      sellerPayload
+    );
+    // the customer paid the invoice to the paisa
+    await Sale.updateOne({ _id: withAcc._id }, { $set: { "payments.0.amount": withAcc.totalAmount } });
+    const exB = va.model._id.equals(vb.model._id) ? exA : vb.model.sellingPrice / 100;
+    const noBatPrice = exB - 21500;
+    await createSale(
+      { saleDate: todayYmd, customer: { name: "Arif Hossain", phone: "9903312345", address: "Rajarhat, New Town 700135" }, vehicleId: String(vb._id), soldBy: String(seller.user._id), priceBreakdown: { exShowroom: noBatPrice, discount: 0, gst: 0, registration: 1200, insurance: 3500 }, paymentMode: "CASH", initialPayment: { amount: Math.round(noBatPrice * 1.05 + 4700) }, withoutBattery: true, batteryWarehouseId: String(mainWh._id) } as any,
+      sellerPayload
+    );
+  }
+
+  // Battery service: one in for repair, one replaced under warranty, one repaired and returned.
+  await receiveBattery(bhPayload, { customer: { name: "Sujit Ghosh", phone: "9836022331" }, chassisNumber: "", itemId: String(bat60._id), serialNo: "EXN60OLD1187", warehouseId: String(mainWh._id), complaint: "Backup dropped to 35 km" });
+  await receiveBattery(bhPayload, {
+    customer: { name: "Mitali Das", phone: "9830455612" },
+    itemId: String(bat48._id),
+    serialNo: "EXN48OLD0921",
+    warehouseId: String(mainWh._id),
+    complaint: "Cell failure — not charging",
+    replaceNow: { itemId: String(bat48._id), serialNo: serials("EXN48A", 4)[0], warranty: true, resolution: "Replaced under 3-year warranty" },
+  });
+  const jobR: any = await receiveBattery(bhPayload, { customer: { name: "Tapas Kundu", phone: "9875012340" }, itemId: String(bat60._id), serialNo: "EXN60OLD0450", warehouseId: String(mainWh._id), complaint: "BMS error E04" });
+  await returnBattery(bhPayload, String(jobR._id), "BMS reset and cells balanced");
+  void Item;
+
+  // FSE recruitment: the top FSE appointed five dealers this month, another FSE two.
+  console.log("• FSE dealer recruitment + target commission scheme");
+  const newDealer = async (name: string, city: string, fse: any, day: number) => {
+    const code = await generateDealerCode();
+    return Dealer.create({
+      dealerCode: code, tier: "DEALER", name, ownerName: `${name.split(" ")[0]} Owner`, phone: `98${between(10000000, 99999999)}`, email: `${code.toLowerCase()}@dealers.joykaliev.in`,
+      address: `Main Road, ${city}`, city, state: "West Bengal", gstin: `19AAB${String.fromCharCode(65 + (day % 26))}D${between(1000, 9999)}K1Z${day % 10}`, stateCode: "19", pincode: "7000" + String(between(10, 99)),
+      creditLimit: 0, creditDays: 30, assignedASM: fse.user.reportsTo || null, recruitedBy: fse.user._id, status: "ACTIVE",
+      onboardingDate: new Date(`${ymd(current.year, current.month, Math.max(1, Math.min(todayIst, day)))}T11:00:00+05:30`), createdBy: bh._id,
+    });
+  };
+  for (const [i, [n, c]] of [["Maa Tara EV Point", "Habra"], ["Green Wheels", "Bongaon"], ["Joy Motors", "Basirhat"], ["E-Ride Hub", "Barrackpore"], ["Shakti Auto", "Naihati"]].entries()) await newDealer(n, c, fecs[0], 2 + i * 2);
+  for (const [i, [n, c]] of [["Sundarban EV", "Canning"], ["Riya Electric", "Diamond Harbour"]].entries()) await newDealer(n, c, fecs[1], 3 + i * 3);
+  const fseScheme = await IncentiveScheme.create({
+    name: "FSE dealer recruitment + target commission",
+    description: "₹1,000 per dealer appointed once 5 are appointed in the month; ₹500 per vehicle once the monthly target is met.",
+    status: "DRAFT",
+    validFrom: current.start,
+    validTo: current.end,
+    applicableRoles: ["FEC"],
+    rules: [
+      { ruleType: "DEALER_RECRUITMENT", minRecruits: 5, perRecruitAmount: rupeesToPaise(1000), perDistributorAmount: 0, countSubDealers: true },
+      { ruleType: "TARGET_COMMISSION", perUnitAmount: rupeesToPaise(500), targetUnits: 6, targetPayout: "ALL_WHEN_MET" },
+    ],
+  });
+  await signApproval("scheme", String(fseScheme._id), bhPayload, "APPROVED");
+  await signApproval("scheme", String(fseScheme._id), mpPayload, "APPROVED");
 
   await ensurePosts(); // links staff created after the posts to the post of their role
   // A light audit trail so the Audit screen isn't empty.

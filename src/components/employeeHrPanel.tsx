@@ -92,6 +92,7 @@ export function EmployeeHrPanel({ employee }: { employee: any }) {
             <select id="hr-mode" className="field" disabled={!isHr} value={f.attendanceMode} onChange={(e) => setF({ ...f, attendanceMode: e.target.value })}>
               <option value="FIELD">Field — selfie + GPS anywhere</option>
               <option value="OFFICE">Office — within office radius</option>
+              <option value="HYBRID">Office + field — office punch in range, selfie + GPS outside</option>
             </select>
           </div>
           <div className="space-y-1.5">

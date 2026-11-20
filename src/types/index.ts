@@ -126,7 +126,11 @@ export type Permission =
   | "warehouse.manage"
   | "accounts.view"
   | "accounts.manage"
-  | "expense.create";
+  | "expense.create"
+  // Phase 7: purchase entry by warehouse staff, rate changes, parts counter & battery service
+  | "purchase.create"
+  | "price.manage"
+  | "parts.sell";
 
 export type VehicleCategory =
   | "2W"
@@ -163,7 +167,9 @@ export type IncentiveRuleType =
   | "SLAB"
   | "TARGET_BONUS"
   | "PERCENTAGE"
-  | "TEAM_OVERRIDE";
+  | "TEAM_OVERRIDE"
+  | "DEALER_RECRUITMENT"
+  | "TARGET_COMMISSION";
 
 export type SchemeStatus = "DRAFT" | "ACTIVE" | "EXPIRED" | "ARCHIVED";
 

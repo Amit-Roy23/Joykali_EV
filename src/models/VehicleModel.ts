@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { VehicleCategory } from "@/types";
+import { RateChange, RateChangeSchema } from "./Item";
 
 export interface IVehicleModel extends Document {
   name: string;
@@ -15,6 +16,9 @@ export interface IVehicleModel extends Document {
   superDistributorPrice?: number;
   subDealerPrice?: number;
   gstRate: number; // percentage, e.g. 5
+  /** Battery item that comes with this model (taken into stock when a vehicle is sold without it). */
+  batteryItem?: mongoose.Types.ObjectId | null;
+  rateHistory?: RateChange[];
   hsnCode: string;
   isActive: boolean;
   createdBy?: mongoose.Types.ObjectId;
@@ -43,6 +47,8 @@ const VehicleModelSchema = new Schema<IVehicleModel>(
     subDealerPrice: { type: Number },
     gstRate: { type: Number, required: true, default: 5 }, // 5% standard EV GST in India
     hsnCode: { type: String, required: true, default: "870380" },
+    batteryItem: { type: Schema.Types.ObjectId, ref: "Item", default: null },
+    rateHistory: { type: [RateChangeSchema], default: [] },
     isActive: { type: Boolean, default: true, index: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User" },
     updatedBy: { type: Schema.Types.ObjectId, ref: "User" },

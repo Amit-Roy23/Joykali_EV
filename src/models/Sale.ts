@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 import { PaymentMode, SaleStatus } from "@/types";
+import { IItemLine, ItemLineSchema } from "./Item";
 
 export interface ICustomer {
   name: string;
@@ -8,6 +9,9 @@ export interface ICustomer {
   address: string;
   idProofType?: string; // Aadhaar, PAN, Voter ID
   idProofNumber?: string;
+  /** Business customers: GSTIN (its first two digits are the state code). */
+  gstin?: string;
+  stateCode?: string;
 }
 
 export interface IPriceBreakdown {
@@ -49,6 +53,11 @@ export interface ISale extends Document {
   financierDetails?: IFinancierDetails;
   payments: ISalePayment[];
   status: SaleStatus;
+  /** Accessories / parts billed on the same invoice (taken out of warehouse stock). */
+  items?: IItemLine[];
+  /** Vehicle sold without its battery: the battery went back into stock. */
+  withoutBattery?: boolean;
+  batteryReturn?: { item: mongoose.Types.ObjectId; serialNo?: string; warehouse: mongoose.Types.ObjectId; unitCost: number } | null;
   cancellationReason?: string;
   cancelledBy?: mongoose.Types.ObjectId | null;
   cancelledAt?: Date | null;
@@ -64,6 +73,8 @@ const CustomerSchema = new Schema<ICustomer>(
     address: { type: String, required: true, trim: true },
     idProofType: { type: String, trim: true },
     idProofNumber: { type: String, trim: true },
+    gstin: { type: String, trim: true, uppercase: true },
+    stateCode: { type: String, trim: true },
   },
   { _id: false }
 );
@@ -124,6 +135,15 @@ const SaleSchema = new Schema<ISale>(
       enum: ["BOOKED", "DELIVERED", "CANCELLED"],
       default: "DELIVERED",
       index: true,
+    },
+    items: { type: [ItemLineSchema], default: undefined },
+    withoutBattery: { type: Boolean, default: false },
+    batteryReturn: {
+      type: new Schema(
+        { item: { type: Schema.Types.ObjectId, ref: "Item" }, serialNo: String, warehouse: { type: Schema.Types.ObjectId, ref: "Warehouse" }, unitCost: Number },
+        { _id: false }
+      ),
+      default: null,
     },
     cancellationReason: { type: String },
     cancelledBy: { type: Schema.Types.ObjectId, ref: "User", default: null },

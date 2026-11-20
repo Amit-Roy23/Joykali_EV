@@ -248,7 +248,7 @@ export async function updateProfile(user: JWTPayload, employeeId: string, input:
   if (who === "HR") {
     if (input.departmentId !== undefined) set.department = input.departmentId && mongoose.isValidObjectId(input.departmentId) ? oid(input.departmentId) : null;
     if (input.shiftId !== undefined) set.shift = input.shiftId && mongoose.isValidObjectId(input.shiftId) ? oid(input.shiftId) : null;
-    if (input.attendanceMode) set.attendanceMode = input.attendanceMode === "OFFICE" ? "OFFICE" : "FIELD";
+    if (input.attendanceMode) set.attendanceMode = ["OFFICE", "HYBRID"].includes(input.attendanceMode) ? input.attendanceMode : "FIELD";
     if (input.noticeDays != null) set.noticeDays = Math.min(180, Math.max(0, Number(input.noticeDays)));
     if (input.uan !== undefined) {
       const uan = String(input.uan || "").replace(/\s/g, "");

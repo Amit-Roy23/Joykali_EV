@@ -128,6 +128,7 @@ export function DistributorDetail({ id, portal = false }: { id: string; portal?:
             <DataRow label="Email" value={d.email} />
             <DataRow label="GST state code" value={d.stateCode} />
             {d.assignedASM && <DataRow label="Area manager" value={d.assignedASM.name} />}
+            {d.recruitedBy && <DataRow label="Appointed by" value={`${d.recruitedBy.name} (${d.recruitedBy.employeeCode})`} />}
             <DataRow label="Since" value={dt(d.onboardingDate)} />
           </Card>
           {!portal && (
