@@ -211,7 +211,7 @@ export const PayslipDocument: React.FC<PayslipPDFProps> = (props) => {
         <View style={styles.headerContainer}>
           <View>
             {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            <Image src={LOGO_PNG_DATA_URI} style={{ width: 144, height: 32, marginBottom: 4, marginLeft: -2 }} />
+            <Image src={LOGO_PNG_DATA_URI} style={{ width: 90, height: 54, marginBottom: 4 }} />
             <Text style={styles.headerDetails}>
               {props.company.address}, {props.company.city}, {props.company.state} - {props.company.pincode}
             </Text>

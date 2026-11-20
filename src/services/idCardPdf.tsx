@@ -38,8 +38,10 @@ function Card({ company, emp, photo, qrPng, validTill }: IdCardProps) {
     <Document title={`ID card ${emp.employeeCode}`}>
       <Page size={[W, H]} style={s.page}>
         <View style={s.band}>
-          {/* eslint-disable-next-line jsx-a11y/alt-text */}
-          <Image src={LOGO_WHITE_PNG_DATA_URI} style={{ width: 117, height: 26 }} />
+          <View style={{ backgroundColor: "#ffffff", borderRadius: 4, padding: 2 }}>
+            {/* eslint-disable-next-line jsx-a11y/alt-text */}
+            <Image src={LOGO_WHITE_PNG_DATA_URI} style={{ width: 45, height: 27 }} />
+          </View>
           <Text style={s.small}>EMPLOYEE IDENTITY CARD</Text>
         </View>
         <View style={s.body}>

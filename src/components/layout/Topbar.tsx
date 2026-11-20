@@ -55,7 +55,7 @@ export function Topbar({
           <Menu className="h-5 w-5" />
         </button>
         <Link href="/" className="lg:hidden" aria-label="Dashboard">
-          <BrandLogo className="h-8 w-8" />
+          <BrandLogo className="h-9 w-9" />
         </Link>
 
         <div className="min-w-0 flex-1">
