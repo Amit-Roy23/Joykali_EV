@@ -1,5 +1,6 @@
 import React from "react";
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
+import { LOGO_PNG_DATA_URI } from "@/lib/brandLogo";
 import { numberToWordsINR } from "@/lib/money";
 import { Setting } from "@/models/Setting";
 import { MoneyAccount } from "@/models/Accounts";
@@ -88,6 +89,8 @@ export interface GstInvoiceData {
   remarks?: string[];
   signLeft?: string;
   footer?: string;
+  /** Print the Joykali logo (false on partner-to-partner invoices, where the seller is the partner). */
+  showLogo?: boolean;
 }
 
 const n2 = (p: number) => (p / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -97,7 +100,8 @@ const BORDER = "#1f2937";
 const s = StyleSheet.create({
   page: { padding: 22, fontSize: 8.6, fontFamily: "Helvetica", color: "#111827" },
   frame: { borderWidth: 1, borderColor: BORDER, flexGrow: 1 },
-  head: { alignItems: "center", paddingTop: 8, paddingBottom: 6, paddingHorizontal: 10 },
+  head: { alignItems: "center", paddingTop: 8, paddingBottom: 6, paddingHorizontal: 10, position: "relative", minHeight: 74 },
+  logo: { position: "absolute", left: 8, top: 7, width: 100, height: 60 },
   name: { fontSize: 18, fontFamily: "Helvetica-Bold", letterSpacing: 0.5, color: "#0b2a6b" },
   line: { fontSize: 8.6, marginTop: 1.5, textAlign: "center" },
   titleRow: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 3, position: "relative" },
@@ -163,6 +167,11 @@ function GstInvoice({ d }: { d: GstInvoiceData }) {
       <Page size="A4" style={s.page}>
         <View style={s.frame}>
           <View style={s.head}>
+            {/* the company's own logo on its invoices; partner-to-partner invoices print the seller without it */}
+            {d.showLogo !== false ? (
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={LOGO_PNG_DATA_URI} style={s.logo} />
+            ) : null}
             <Text style={s.name}>{c.name.toUpperCase()}</Text>
             <Text style={s.line}>{[c.address, c.city].filter(Boolean).join(", ").toUpperCase()}</Text>
             <Text style={s.line}>

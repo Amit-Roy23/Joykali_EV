@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, Lock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { BrandLogo, BrandMark } from "@/components/layout/BrandMark";
+import { BrandMark } from "@/components/layout/BrandMark";
 import { RoleBadge } from "@/components/ui/kit";
 import { cn } from "@/components/ui/button";
 
@@ -72,7 +72,7 @@ export default function LoginPage() {
     <div className="min-h-dvh bg-background lg:grid lg:grid-cols-[1.05fr_1fr]">
       {/* ---------------------------------------------------------- hero */}
       <section className="surface-ink relative overflow-hidden px-6 pb-10 pt-[max(2rem,env(safe-area-inset-top))] text-white sm:px-10 lg:flex lg:flex-col lg:justify-between lg:px-14 lg:py-12">
-        <BrandMark className="h-12 self-start sm:h-14" />
+        <BrandMark className="h-20 self-start sm:h-24" />
 
         <div className="mt-10 max-w-xl lg:mt-0">
           <p className="inline-flex items-center gap-2 rounded-full border border-volt-300/30 bg-volt-300/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-volt-300">
@@ -106,8 +106,14 @@ export default function LoginPage() {
           <HierarchyStrip />
         </div>
 
-        {/* decorative bolt */}
-        <BrandLogo className="pointer-events-none absolute -right-16 -top-10 h-72 w-72 opacity-[0.07] sm:-right-10 lg:-bottom-16 lg:top-auto lg:h-[26rem] lg:w-[26rem]" />
+        {/* decorative: the logo as a faint white watermark */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/joykali-logo.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-24 -top-6 w-[26rem] opacity-[0.06] brightness-0 invert lg:-bottom-10 lg:top-auto lg:w-[34rem]"
+        />
       </section>
 
       {/* ---------------------------------------------------------- form */}

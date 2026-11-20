@@ -18,7 +18,7 @@ const s = StyleSheet.create({
   page: { padding: 28, fontSize: 8.5, fontFamily: "Helvetica", color: "#0a2a5e" },
   top: { flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 2, borderBottomColor: "#0d47a1", paddingBottom: 8, marginBottom: 10 },
   brand: { fontSize: 15, fontFamily: "Helvetica-Bold" },
-  logo: { width: 135, height: 30, marginBottom: 4, marginLeft: -2 },
+  logo: { width: 85, height: 51, marginBottom: 4 },
   muted: { color: "#64748b" },
   title: { fontSize: 13, fontFamily: "Helvetica-Bold", textAlign: "right" },
   box: { borderWidth: 0.8, borderColor: "#cbd5e1", padding: 7, marginBottom: 8 },
@@ -59,7 +59,8 @@ export async function generateChannelDocPDF(props: ChannelDocProps & { profile?:
   const models = new Map(
     ((await VehicleModel.find({ _id: { $in: ids } }).select("rangeKm batteryType").lean()) as any[]).map((m) => [String(m._id), m])
   );
-  return generateGstInvoicePDF(channelInvoiceData(profile, props.d, t, { models, dueDays: props.dueDays }));
+  // Company documents carry the Joykali logo; a partner-to-partner invoice is the partner's own bill.
+  return generateGstInvoicePDF({ ...channelInvoiceData(profile, props.d, t, { models, dueDays: props.dueDays }), showLogo: !!props.profile });
 }
 
 /* ------------------------------------------------------------------ */
