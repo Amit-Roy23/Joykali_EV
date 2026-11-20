@@ -89,7 +89,9 @@ const config: Config = {
       keyframes: {
         "fade-up": {
           from: { opacity: "0", transform: "translateY(6px)" },
-          to: { opacity: "1", transform: "translateY(0)" },
+          // "none", not translateY(0): with fill-mode "both" the end value stays applied, and any
+          // transform would make the page a containing block for fixed popups and action bars.
+          to: { opacity: "1", transform: "none" },
         },
         charge: {
           from: { backgroundPosition: "0 0" },
@@ -109,7 +111,9 @@ const config: Config = {
         },
       },
       animation: {
-        "fade-up": "fade-up .35s ease-out both",
+        // "backwards": hold the start state during any delay, but keep nothing once finished —
+        // a lingering transform would make the page a containing block for fixed popups / action bars.
+        "fade-up": "fade-up .35s ease-out backwards",
         charge: "charge 1.2s linear infinite",
         "slide-in": "slide-in .22s ease-out",
         "sheet-up": "sheet-up .22s ease-out",
