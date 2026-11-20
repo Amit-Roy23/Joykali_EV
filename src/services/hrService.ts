@@ -271,7 +271,8 @@ export async function punch(
       me.attendanceMode === "HYBRID"
         ? `You are ${distance != null ? `${distance >= 1000 ? `${(distance / 1000).toFixed(1)} km` : `${distance} m`} from the office` : "away from the office"} — this is a field-visit punch, take a selfie`
         : "Take a selfie: field staff punches need a photo",
-      428
+      // 428 tells the app to open the camera for a hybrid user's field visit
+      me.attendanceMode === "HYBRID" ? 428 : 400
     );
   }
   if (input.photo) {
