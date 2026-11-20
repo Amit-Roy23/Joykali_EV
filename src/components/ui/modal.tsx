@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "./button";
 
@@ -21,6 +22,10 @@ export function Modal({
   children,
   maxWidth = "lg",
 }: ModalProps) {
+  // Render into <body>: a page wrapper with a CSS transform (the fade-up animation) would
+  // otherwise become the containing block of this fixed overlay and push it down the page.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -35,7 +40,7 @@ export function Modal({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const widthClasses = {
     sm: "max-w-sm",
@@ -46,7 +51,7 @@ export function Modal({
     "4xl": "max-w-4xl",
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-end justify-center bg-ink-950/60 backdrop-blur-sm sm:items-center sm:p-4"
       onMouseDown={(e) => {
@@ -80,6 +85,7 @@ export function Modal({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
