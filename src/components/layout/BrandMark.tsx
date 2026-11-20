@@ -20,12 +20,18 @@ export function BrandLogo({ className }: { className?: string; tile?: boolean })
 }
 
 /**
- * Full logo. `dark` (default) = on the blue sidebar / login hero: the logo sits on a white card so
- * its blue letters stay readable. `light` = straight on a white page.
+ * Full logo. `dark` (default) = the version for the blue sidebar / login hero: white "Joykali" and
+ * "Mobility", red "EV", bright green scooter — sits straight on the blue, no box. `light` = the
+ * original colours, for white backgrounds.
  */
 export function BrandMark({ tone = "dark", className }: { tone?: "dark" | "light"; className?: string }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  const img = <img src="/brand/joykali-logo.png" alt="Joykali EV Mobility" className="h-full w-auto select-none object-contain" draggable={false} />;
-  if (tone === "light") return <span className={cn("inline-flex h-12", className)}>{img}</span>;
-  return <span className={cn("inline-flex h-16 items-center rounded-2xl bg-white px-3 py-1.5 shadow-lg shadow-black/10 ring-1 ring-white/60", className)}>{img}</span>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={tone === "dark" ? "/brand/joykali-logo-dark.png" : "/brand/joykali-logo.png"}
+      alt="Joykali EV Mobility"
+      className={cn("h-14 w-auto select-none object-contain", className)}
+      draggable={false}
+    />
+  );
 }
