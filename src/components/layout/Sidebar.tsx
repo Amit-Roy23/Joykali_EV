@@ -87,8 +87,8 @@ export function Sidebar({ user, permissions = [], open = false, onClose }: Sideb
     <>
       {/* Desktop rail */}
       <aside className="surface-ink hidden h-dvh w-[264px] shrink-0 flex-col border-r border-white/[0.06] lg:flex">
-        <div className="flex items-center justify-center px-4 pb-2 pt-4">
-          <BrandMark className="h-[104px] w-full justify-center px-1.5 py-1" />
+        <div className="flex h-[84px] items-center px-5">
+          <BrandMark className="h-[66px]" />
         </div>
         <NavContent user={user} permissions={permissions} />
       </aside>
@@ -98,8 +98,8 @@ export function Sidebar({ user, permissions = [], open = false, onClose }: Sideb
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
           <div className="absolute inset-0 bg-ink-950/60 backdrop-blur-sm" onClick={onClose} />
           <aside className="surface-ink absolute inset-y-0 left-0 flex w-[84%] max-w-[300px] animate-slide-in flex-col shadow-2xl">
-            <div className="flex items-center justify-between gap-2 px-4 pb-2 pt-[max(1rem,env(safe-area-inset-top))]">
-              <BrandMark className="h-[92px] min-w-0 flex-1 justify-center px-1.5 py-1" />
+            <div className="flex h-[76px] items-center justify-between px-5 pt-[env(safe-area-inset-top)]">
+              <BrandMark className="h-[54px]" />
               <button
                 onClick={onClose}
                 aria-label="Close menu"
