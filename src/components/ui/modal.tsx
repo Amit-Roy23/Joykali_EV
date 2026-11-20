@@ -81,7 +81,8 @@ export function Modal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="scroll-thin flex-1 overflow-y-auto px-5 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:px-6">
+        {/* modal-body: the last row of buttons (Cancel / Save …) is pinned to the bottom — see globals.css */}
+        <div className="modal-body scroll-thin flex-1 overflow-y-auto px-5 pt-5 pb-5 sm:px-6">
           {children}
         </div>
       </div>
