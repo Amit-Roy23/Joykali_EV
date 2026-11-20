@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     return jsonResponse(sale, undefined, 201);
   } catch (error: any) {
-    return errorResponse(error.message || "Failed to record sale", 500);
+    return errorResponse(error.message || "Failed to record sale", error.status || (/stock|serial|battery|GSTIN|discount|quantity|Choose/i.test(error.message || "") ? 400 : 500));
   }
 }
 

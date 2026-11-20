@@ -65,6 +65,9 @@ const BH_BASE: Permission[] = [
   "warehouse.manage",
   "accounts.view",
   "expense.create",
+  "purchase.create",
+  "price.manage",
+  "parts.sell",
 ];
 const MP_BASE: Permission[] = [...BH_BASE, "sales.cancel", "purchase.manage", "payroll.lock", "audit.view", "accounts.manage"];
 
@@ -120,6 +123,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "reports.view",
     "inventory.view",
     "warehouse.view",
+    // enters supplier purchase invoices into any warehouse
+    "purchase.create",
   ],
   // Store / warehouse in-charge: stock, transfers and loading for their warehouse.
   STORE_MANAGER: [
@@ -135,6 +140,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "fleet.view",
     "outlet.view",
     "expense.create",
+    // purchase entry, parts counter and battery service — for the warehouses they run only
+    "purchase.create",
+    "parts.sell",
   ],
   // General staff — clerk, personal assistant, driver, office boy: their own HR only.
   STAFF: ["hr.self", "payslip.view.own", "payslip.download"],

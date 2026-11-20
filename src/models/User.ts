@@ -23,7 +23,7 @@ export interface IUser extends Document {
   department?: mongoose.Types.ObjectId | null;
   shift?: mongoose.Types.ObjectId | null;
   /** FIELD staff punch anywhere (location recorded); OFFICE staff must be inside the office radius. */
-  attendanceMode?: "FIELD" | "OFFICE";
+  attendanceMode?: "FIELD" | "OFFICE" | "HYBRID";
   profile?: {
     dob?: string;
     gender?: string;
@@ -70,7 +70,7 @@ const UserSchema = new Schema<IUser>(
     esiNumber: { type: String, trim: true, default: "" },
     department: { type: Schema.Types.ObjectId, ref: "Department", default: null, index: true },
     shift: { type: Schema.Types.ObjectId, ref: "Shift", default: null },
-    attendanceMode: { type: String, enum: ["FIELD", "OFFICE"], default: "FIELD" },
+    attendanceMode: { type: String, enum: ["FIELD", "OFFICE", "HYBRID"], default: "FIELD" },
     profile: {
       dob: String,
       gender: String,

@@ -2,7 +2,14 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 import { PaymentStatus, PaymentMode } from "@/types";
 
 export interface IPurchaseItem {
-  model: mongoose.Types.ObjectId;
+  /** VEHICLE = chassis-wise vehicles of a model; ITEM = parts / accessories / batteries / chargers. */
+  kind?: "VEHICLE" | "ITEM";
+  model?: mongoose.Types.ObjectId | null;
+  item?: mongoose.Types.ObjectId | null;
+  description?: string;
+  /** Warehouse this line was received into (defaults to the purchase's warehouse). */
+  warehouse?: mongoose.Types.ObjectId | null;
+  serials?: string[];
   quantity: number;
   unitCost: number; // in paise
   gstRate: number; // e.g. 5
@@ -41,7 +48,12 @@ export interface IPurchase extends Document {
 
 const PurchaseItemSchema = new Schema<IPurchaseItem>(
   {
-    model: { type: Schema.Types.ObjectId, ref: "VehicleModel", required: true },
+    kind: { type: String, enum: ["VEHICLE", "ITEM"], default: "VEHICLE" },
+    model: { type: Schema.Types.ObjectId, ref: "VehicleModel", default: null },
+    item: { type: Schema.Types.ObjectId, ref: "Item", default: null },
+    description: { type: String },
+    warehouse: { type: Schema.Types.ObjectId, ref: "Warehouse", default: null },
+    serials: { type: [String], default: undefined },
     quantity: { type: Number, required: true, min: 1 },
     unitCost: { type: Number, required: true },
     gstRate: { type: Number, required: true, default: 5 },

@@ -99,7 +99,11 @@ export const VehicleAllocateSchema = z.object({
 
 // Purchase
 export const PurchaseLineItemSchema = z.object({
-  model: z.string().min(1, "Model is required"),
+  kind: z.enum(["VEHICLE", "ITEM"]).default("VEHICLE"),
+  model: z.string().optional(),
+  itemId: z.string().optional(),
+  warehouseId: z.string().optional(),
+  serials: z.array(z.string()).optional(),
   quantity: z.number().int().min(1, "Quantity must be at least 1"),
   unitCost: z.number().min(0, "Unit cost must be positive"),
   gstRate: z.number().default(5),
@@ -122,6 +126,7 @@ export const PurchaseCreateSchema = z.object({
   invoiceDate: z.string().or(z.date()),
   lineItems: z.array(PurchaseLineItemSchema).min(1, "At least one item is required"),
   notes: z.string().optional(),
+  warehouseId: z.string().nullable().optional(),
 });
 
 // Sales
@@ -134,8 +139,25 @@ export const SaleCreateSchema = z.object({
     address: z.string().min(5, "Address is required"),
     idProofType: z.string().optional(),
     idProofNumber: z.string().optional(),
+    gstin: z.string().optional(),
   }),
   vehicleId: z.string().min(1, "Vehicle selection is required"),
+  items: z
+    .array(
+      z.object({
+        itemId: z.string().min(1),
+        qty: z.number().int().min(1),
+        rateRupees: z.number().min(0).optional(),
+        discountRupees: z.number().min(0).optional(),
+        serials: z.array(z.string()).optional(),
+        warehouseId: z.string().optional(),
+      })
+    )
+    .optional(),
+  itemsWarehouseId: z.string().optional(),
+  withoutBattery: z.boolean().optional(),
+  batteryItemId: z.string().optional(),
+  batteryWarehouseId: z.string().optional(),
   dealerId: z.string().optional().nullable(),
   soldBy: z.string().min(1, "Salesperson (FSE) is required"),
   priceBreakdown: z.object({
@@ -175,7 +197,7 @@ export const SlabTierSchema = z.object({
 });
 
 export const IncentiveRuleSchema = z.object({
-  ruleType: z.enum(["PER_UNIT", "SLAB", "TARGET_BONUS", "PERCENTAGE", "TEAM_OVERRIDE"]),
+  ruleType: z.enum(["PER_UNIT", "SLAB", "TARGET_BONUS", "PERCENTAGE", "TEAM_OVERRIDE", "DEALER_RECRUITMENT", "TARGET_COMMISSION"]),
   perUnitAmount: z.number().optional(),
   modelSpecificAmounts: z
     .array(
@@ -193,6 +215,13 @@ export const IncentiveRuleSchema = z.object({
   percentageRate: z.number().optional(),
   teamOverridePerUnit: z.number().optional(),
   teamOverridePercentage: z.number().optional(),
+  // Dealer recruitment: pay per dealer appointed once the minimum is reached in the month
+  minRecruits: z.number().int().min(0).optional(),
+  perRecruitAmount: z.number().min(0).optional(),
+  perDistributorAmount: z.number().min(0).optional(),
+  countSubDealers: z.boolean().optional(),
+  // Target commission: per-unit commission measured against the employee's monthly target
+  targetPayout: z.enum(["ALL_WHEN_MET", "ABOVE_TARGET"]).optional(),
 });
 
 export const IncentiveSchemeCreateSchema = z.object({

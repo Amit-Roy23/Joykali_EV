@@ -53,7 +53,7 @@ export default function PurchasesListPage() {
               </Button>
             </a>
           )}
-          {can("purchase.manage") && (
+          {(can("purchase.manage") || can("purchase.create")) && (
             <Link href="/purchases/new">
               <Button size="sm">
                 <PlusCircle className="w-4 h-4" /> New Purchase Inward

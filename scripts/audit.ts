@@ -38,11 +38,12 @@ async function main() {
     const m = models.get(S(vById.get(S(s.vehicle))?.model));
     const gst = Math.round(((p.exShowroom - p.discount) * (m?.gstRate ?? 5)) / 100);
     if (gst !== p.gst) badGst++;
-    if (p.exShowroom - p.discount + p.gst + p.registration + p.insurance + p.accessories !== s.totalAmount) badTotal++;
+    const itemsTotal = (s.items || []).reduce((t: number, l: any) => t + l.amount, 0);
+    if (p.exShowroom - p.discount + p.gst + p.registration + p.insurance + p.accessories + itemsTotal !== s.totalAmount) badTotal++;
     if ((s.payments || []).reduce((t: number, x: any) => t + x.amount, 0) > s.totalAmount) overpaid++;
   }
   check(`retail sales: GST = rate × (ex-showroom − discount) on all ${sales.length}`, badGst === 0, `${badGst} wrong`);
-  check("retail sales: bill total = ex-showroom − discount + GST + registration + insurance + accessories", badTotal === 0, `${badTotal} wrong`);
+  check("retail sales: bill total = ex-showroom − discount + GST + registration + insurance + accessories + item lines", badTotal === 0, `${badTotal} wrong`);
   check("retail sales: no sale collected more than its bill", overpaid === 0, `${overpaid}`);
   const live = sales.filter((s) => s.status !== "CANCELLED");
   const perVehicle = new Map<string, number>();
@@ -196,6 +197,40 @@ async function main() {
   const due = purchases.reduce((s, p) => s + p.totalAmount - (p.payments || []).reduce((t: number, x: any) => t + x.amount, 0), 0);
   check("outstanding payables = unpaid purchase invoices", out.payableTotal === due, `${out.payableTotal} vs ${due}`);
   check("cash/bank accounts exist with one default of each kind", (await MoneyAccount.countDocuments({ kind: "CASH", isDefault: true })) === 1 && (await MoneyAccount.countDocuments({ kind: "BANK", isDefault: true })) === 1);
+
+  // ---------------- Parts, accessories, batteries & chargers
+  const { Item, ItemStock, ItemSerial, ItemMovement, PartsSale, BatteryJob } = await import("../src/models/Item");
+  const allItems: any[] = await Item.find().lean();
+  let stockVsLedger = 0;
+  let serialVsStock = 0;
+  for (const i of allItems) {
+    for (const cond of ["GOOD", "DEFECTIVE", "REPAIR"]) {
+      const held = (await ItemStock.find({ item: i._id, condition: cond }).lean()).reduce((t: number, x: any) => t + x.qty, 0);
+      const moved = (await ItemMovement.find({ item: i._id, condition: cond }).lean()).reduce((t: number, x: any) => t + x.qty, 0);
+      if (held !== moved) stockVsLedger++;
+      if (i.serialTracked && (await ItemSerial.countDocuments({ item: i._id, status: "IN_STOCK", condition: cond })) !== held) serialVsStock++;
+    }
+  }
+  check(`items: stock on hand = sum of stock movements, per item and condition (${allItems.length} items)`, stockVsLedger === 0, `${stockVsLedger} off`);
+  check("items: serial numbers in stock = quantity on hand for serial-tracked items", serialVsStock === 0, `${serialVsStock} off`);
+  check("items: no negative stock anywhere", (await ItemStock.countDocuments({ qty: { $lt: 0 } })) === 0);
+  const ps: any[] = await PartsSale.find().lean();
+  const badPs = ps.filter((x) => {
+    const sub = x.lines.reduce((t: number, l: any) => t + l.taxable, 0);
+    const gst = x.lines.reduce((t: number, l: any) => t + l.gst, 0);
+    const linesOk = x.lines.every((l: any) => l.taxable === l.rate * l.qty - l.discount && l.gst === Math.round((l.taxable * l.gstRate) / 100) && l.amount === l.taxable + l.gst);
+    return !linesOk || sub !== x.subTotal || gst !== x.gstAmount || sub + gst !== x.totalAmount || x.payments.reduce((t: number, p: any) => t + p.amount, 0) > x.totalAmount;
+  }).length;
+  check(`parts sales: line GST, totals and payments add up (${ps.length} bills)`, badPs === 0, `${badPs} wrong`);
+  const soldOut = (await ItemMovement.find({ type: { $in: ["SALE", "SALE_CANCEL"] } }).lean()).reduce((t: number, m: any) => t - m.qty, 0);
+  const liveLines = [...ps.filter((x) => x.status !== "CANCELLED").flatMap((x) => x.lines), ...live.flatMap((x: any) => x.items || [])].reduce((t: number, l: any) => t + l.qty, 0);
+  check("items: units sold in the stock ledger = units on live invoices", soldOut === liveLines, `${soldOut} vs ${liveLines}`);
+  const noBat: any[] = live.filter((x: any) => x.withoutBattery);
+  const noBatOk = (await Promise.all(noBat.map(async (x: any) => !!x.batteryReturn && (await ItemMovement.exists({ type: "BATTERY_FROM_VEHICLE", reference: x.saleCode }))))).every(Boolean);
+  check(`vehicles sold without battery put the battery into stock (${noBat.length})`, noBatOk);
+  const jobs: any[] = await BatteryJob.find().lean();
+  const repairHeld = (await ItemStock.find({ condition: "REPAIR" }).lean()).reduce((t: number, x: any) => t + x.qty, 0);
+  check("battery service: customer batteries held = jobs still in repair", repairHeld === jobs.filter((j) => j.status === "IN_REPAIR").length, `${repairHeld} vs ${jobs.filter((j) => j.status === "IN_REPAIR").length}`);
 
   console.log(`\n${pass} passed, ${fails.length} failed`);
   await mongoose.disconnect();

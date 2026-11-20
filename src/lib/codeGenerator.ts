@@ -146,6 +146,12 @@ export async function generateOutletCode(session?: any): Promise<string> {
   return `JKOT-${String(seq).padStart(2, "0")}`;
 }
 
+/** Item (part / accessory / battery / charger) code: JKIT-0001. */
+export async function generateItemCode(session?: any): Promise<string> {
+  const seq = await getNextSequence("ITEM", session);
+  return `JKIT-${String(seq).padStart(4, "0")}`;
+}
+
 /** Distributor code: JKDB-0001 (also the distributor's login ID). */
 export async function generateDistributorCode(session?: any): Promise<string> {
   const seq = await getNextSequence("DISTRIBUTOR", session);
@@ -175,6 +181,9 @@ export const FY_SERIES = {
   EXPENSE: "JKEX",
   VOUCHER: "JKV",
   PAYMENT_ADVICE: "JKPA",
+  PARTS_SALE: "JKSP",
+  BATTERY_JOB: "JKBJ",
+  STOCK_ADJUST: "JKSA",
 } as const;
 
 export async function generateFyCode(

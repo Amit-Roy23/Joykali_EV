@@ -11,6 +11,16 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { formatINR } from "@/lib/money";
 
+const RULE_LABEL: Record<string, string> = {
+  PER_UNIT: "Per-unit",
+  SLAB: "Slab tiers",
+  TARGET_BONUS: "Target bonus",
+  PERCENTAGE: "Commission %",
+  TEAM_OVERRIDE: "Team override",
+  DEALER_RECRUITMENT: "Dealer recruitment",
+  TARGET_COMMISSION: "Target commission",
+};
+
 export default function SchemeDetailPage({
   params,
 }: {
@@ -105,8 +115,8 @@ export default function SchemeDetailPage({
           {scheme.rules?.map((rule: any, i: number) => (
             <div key={i} className="p-4 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-800 text-sm">Rule Type: {rule.ruleType}</span>
-                {rule.slabApplication && (
+                <span className="font-bold text-slate-800 text-sm">Rule {i + 1}: {RULE_LABEL[rule.ruleType] || rule.ruleType}</span>
+                {rule.ruleType === "SLAB" && rule.slabApplication && (
                   <Badge variant="secondary">Method: {rule.slabApplication}</Badge>
                 )}
               </div>
@@ -136,6 +146,26 @@ export default function SchemeDetailPage({
               {rule.ruleType === "TARGET_BONUS" && (
                 <p className="text-sm font-semibold text-brand-700">
                   Target: {rule.targetUnits} units → Lump sum bonus: {formatINR(rule.targetBonusAmount)}
+                </p>
+              )}
+
+              {rule.ruleType === "PERCENTAGE" && (
+                <p className="text-sm font-semibold text-brand-700">{rule.percentageRate}% of ex-showroom value</p>
+              )}
+
+              {rule.ruleType === "DEALER_RECRUITMENT" && (
+                <p className="text-sm font-semibold text-brand-700">
+                  {formatINR(rule.perRecruitAmount || 0)} per dealer appointed
+                  {rule.perDistributorAmount ? ` · ${formatINR(rule.perDistributorAmount)} per distributor` : ""} — paid when at least {rule.minRecruits || 0} are
+                  appointed in the month{rule.countSubDealers === false ? " (sub dealers not counted)" : ""}
+                </p>
+              )}
+
+              {rule.ruleType === "TARGET_COMMISSION" && (
+                <p className="text-sm font-semibold text-brand-700">
+                  {formatINR(rule.perUnitAmount || 0)} per vehicle{" "}
+                  {rule.targetPayout === "ABOVE_TARGET" ? "sold above the monthly target" : "sold, once the monthly target is met"} (default target{" "}
+                  {rule.targetUnits || 0} units when no personal target is set)
                 </p>
               )}
 

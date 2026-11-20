@@ -9,6 +9,7 @@ import { EmptyState, Skeleton } from "@/components/ui/kit";
 import { Modal } from "@/components/ui/modal";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, dt, Notice, rupees } from "@/components/workflow";
+import { RecruiterSelect } from "@/components/recruiterSelect";
 
 export type PartyType = "DEALER" | "DISTRIBUTOR";
 
@@ -417,7 +418,7 @@ export function StatementCard({ partyType, partyId, title = "Account statement" 
 /* ------------------------------------------------------------------ */
 /* Appoint a partner                                                    */
 /* ------------------------------------------------------------------ */
-const EMPTY_PARTNER = { tier: "", name: "", ownerName: "", phone: "", email: "", gstin: "", address: "", city: "", pincode: "", state: "West Bengal", creditLimitRupees: "", creditDays: "30", territory: "", password: "" };
+const EMPTY_PARTNER = { tier: "", name: "", ownerName: "", phone: "", email: "", gstin: "", address: "", city: "", pincode: "", state: "West Bengal", creditLimitRupees: "", creditDays: "30", territory: "", password: "", recruitedBy: "" };
 
 export function AppointPartnerModal({
   open,
@@ -542,6 +543,11 @@ export function AppointPartnerModal({
         <Field label="Portal password (blank = no login yet)" className="sm:col-span-2">
           <Input id="ap-password" type="password" autoComplete="new-password" value={form.password} onChange={set("password")} />
         </Field>
+        {!byPartner && (
+          <Field label="Appointed by (FSE / ASM) — for the recruitment incentive" className="sm:col-span-2">
+            <RecruiterSelect id="ap-recruiter" value={form.recruitedBy} onChange={(v) => setForm({ ...form, recruitedBy: v })} />
+          </Field>
+        )}
       </div>
       {error && <Notice className="mt-3">{error}</Notice>}
       <div className="mt-4 flex justify-end gap-2">

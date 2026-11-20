@@ -88,6 +88,18 @@ export async function POST(req: NextRequest) {
       if (r.teamOverridePerUnit !== undefined) {
         r.teamOverridePerUnit = rupeesToPaise(r.teamOverridePerUnit);
       }
+      if (r.perRecruitAmount !== undefined) {
+        r.perRecruitAmount = rupeesToPaise(r.perRecruitAmount);
+      }
+      if (r.perDistributorAmount !== undefined) {
+        r.perDistributorAmount = rupeesToPaise(r.perDistributorAmount);
+      }
+      if (r.ruleType === "DEALER_RECRUITMENT" && !(r.perRecruitAmount > 0) && !(r.perDistributorAmount > 0)) {
+        throw new Error("Dealer recruitment rule: enter the commission per dealer");
+      }
+      if (r.ruleType === "TARGET_COMMISSION" && !(r.perUnitAmount > 0) && !(r.modelSpecificAmounts?.length > 0)) {
+        throw new Error("Target commission rule: enter the commission per vehicle");
+      }
       return r;
     });
 

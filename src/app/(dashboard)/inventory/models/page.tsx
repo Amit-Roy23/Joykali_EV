@@ -3,7 +3,8 @@ import { useSession } from "@/components/layout/session";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, PlusCircle, Layers, BatteryCharging, Gauge } from "lucide-react";
+import { ArrowLeft, PlusCircle, Layers, BatteryCharging, Gauge, Pencil } from "lucide-react";
+import { ModelEditModal } from "@/components/modelEdit";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -16,6 +17,7 @@ export default function VehicleModelsPage() {
   const [models, setModels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
 
   const [form, setForm] = useState({
     name: "",
@@ -106,7 +108,15 @@ export default function VehicleModelsPage() {
                   <CardTitle className="text-base text-slate-900">{m.name}</CardTitle>
                   <p className="text-xs text-slate-500 font-medium">{m.variant}</p>
                 </div>
-                <Badge variant="secondary">{m.category}</Badge>
+                <div className="flex items-center gap-1.5">
+                  {!m.isActive && <Badge variant="secondary">inactive</Badge>}
+                  <Badge variant="secondary">{m.category}</Badge>
+                  {(can("inventory.manage") || can("price.manage")) && (
+                    <Button size="sm" variant="outline" aria-label={`Edit ${m.name} ${m.variant}`} title="Edit / change rate" onClick={() => setEditing(m)}>
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-3 text-xs">
                 <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-lg">
@@ -138,11 +148,25 @@ export default function VehicleModelsPage() {
                     <span className="font-semibold text-slate-700">{m.gstRate}%</span>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                  <span>Dealer: <b className="text-slate-700">{formatINR(m.dealerPrice || Math.round(m.sellingPrice * 0.92))}</b>{!m.dealerPrice && " (auto)"}</span>
+                  <span>Distributor: <b className="text-slate-700">{formatINR(m.distributorPrice || Math.round(m.sellingPrice * 0.88))}</b>{!m.distributorPrice && " (auto)"}</span>
+                  {m.rateHistory?.length ? <span className="col-span-2">Last rate change {new Date(m.rateHistory[m.rateHistory.length - 1].at).toLocaleDateString("en-IN")}</span> : null}
+                </div>
               </CardContent>
             </Card>
           ))
         )}
       </div>
+
+      <ModelEditModal
+        model={editing}
+        onClose={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null);
+          fetchModels();
+        }}
+      />
 
       {/* Add Model Modal */}
       <Modal

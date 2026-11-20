@@ -48,3 +48,4 @@ export * from "./SalaryTemplate";
 export * from "./Notification";
 export * from "./PaymentAdvice";
 export * from "./Post";
+export * from "./Item";

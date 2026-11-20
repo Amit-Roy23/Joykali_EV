@@ -46,10 +46,11 @@ export async function GET(req: NextRequest) {
             ...(outletId ? [{ status: "AT_OUTLET", currentLocationOutlet: outletId }] : []),
           ];
     const vehicles = await Vehicle.find({ $or: sources })
-      .populate("model", "name variant category sellingPrice gstRate rangeKm batteryType")
+      .populate("model", "name variant category sellingPrice gstRate rangeKm batteryType batteryItem")
+      .populate("warehouse", "name")
       .populate("currentLocationDealer", "name city")
       .populate("currentLocationOutlet", "name city")
-      .select("chassisNumber color status model currentLocationDealer currentLocationOutlet currentLocationType")
+      .select("chassisNumber color status model currentLocationDealer currentLocationOutlet currentLocationType warehouse batteryNumber batteryRemoved")
       .sort({ createdAt: 1 })
       .lean();
     const sellers = await User.find(sellerFilter).select("name employeeCode role").sort({ role: 1, name: 1 }).lean();

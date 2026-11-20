@@ -2,6 +2,7 @@
 import { useSession } from "@/components/layout/session";
 import { CreditPanel } from "@/components/party";
 import { DepositPanel, KycPanel } from "@/components/network";
+import { RecruiterSelect } from "@/components/recruiterSelect";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -21,6 +22,7 @@ export default function DealerDetailPage({
   const { id } = use(params);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [recruiter, setRecruiter] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/dealers/${id}`)
@@ -98,6 +100,25 @@ export default function DealerDetailPage({
             <p className="font-bold text-slate-800">
               {dealer.assignedASM ? dealer.assignedASM.name : "Unassigned"}
             </p>
+            <p className="pt-2 text-slate-500">Appointed by (recruitment incentive):</p>
+            {can("dealer.manage") ? (
+              <RecruiterSelect
+                id="dealer-recruiter"
+                className="field h-8 text-xs"
+                value={recruiter ?? (dealer.recruitedBy?._id || "")}
+                onChange={async (v) => {
+                  setRecruiter(v);
+                  const r = await fetch(`/api/dealers/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recruitedBy: v || null }) });
+                  const j = await r.json();
+                  if (!r.ok || !j.success) {
+                    alert(j.error || "Could not save");
+                    setRecruiter(null);
+                  }
+                }}
+              />
+            ) : (
+              <p className="font-bold text-slate-800">{dealer.recruitedBy ? `${dealer.recruitedBy.name} (${dealer.recruitedBy.employeeCode})` : "—"}</p>
+            )}
           </CardContent>
         </Card>
       </div>

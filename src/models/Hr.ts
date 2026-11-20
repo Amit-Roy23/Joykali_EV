@@ -107,6 +107,8 @@ export interface IAttendancePunch extends Document {
   source: "MOBILE" | "WEB" | "BIOMETRIC" | "MANUAL";
   location?: { lat: number; lng: number; accuracy?: number } | null;
   distanceM?: number | null;
+  /** OFFICE = inside the office radius, FIELD = anywhere else (field visit). */
+  place?: "OFFICE" | "FIELD" | null;
   photo?: mongoose.Types.ObjectId | null;
   device?: string;
   note?: string;
@@ -121,6 +123,7 @@ const PunchSchema = new Schema<IAttendancePunch>(
     source: { type: String, enum: ["MOBILE", "WEB", "BIOMETRIC", "MANUAL"], required: true },
     location: { type: new Schema({ lat: Number, lng: Number, accuracy: Number }, { _id: false }), default: null },
     distanceM: { type: Number, default: null },
+    place: { type: String, enum: ["OFFICE", "FIELD", null], default: null },
     photo: ref("StoredFile", { default: null }),
     device: { type: String },
     note: { type: String },

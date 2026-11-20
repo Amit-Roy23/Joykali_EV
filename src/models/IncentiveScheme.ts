@@ -35,6 +35,13 @@ export interface IIncentiveRule {
   // For TEAM_OVERRIDE
   teamOverridePerUnit?: number; // in paise per team unit
   teamOverridePercentage?: number; // % of team revenue
+  // For DEALER_RECRUITMENT
+  minRecruits?: number; // dealers to appoint in the month before any recruitment commission
+  perRecruitAmount?: number; // paise per dealer / sub dealer appointed
+  perDistributorAmount?: number; // paise per distributor appointed (0 = distributors not counted)
+  countSubDealers?: boolean;
+  // For TARGET_COMMISSION (perUnitAmount / modelSpecificAmounts give the rate; targetUnits is the default target)
+  targetPayout?: "ALL_WHEN_MET" | "ABOVE_TARGET";
 }
 
 export interface IIncentiveScheme extends Document {
@@ -78,7 +85,7 @@ const IncentiveRuleSchema = new Schema<IIncentiveRule>(
   {
     ruleType: {
       type: String,
-      enum: ["PER_UNIT", "SLAB", "TARGET_BONUS", "PERCENTAGE", "TEAM_OVERRIDE"],
+      enum: ["PER_UNIT", "SLAB", "TARGET_BONUS", "PERCENTAGE", "TEAM_OVERRIDE", "DEALER_RECRUITMENT", "TARGET_COMMISSION"],
       required: true,
     },
     perUnitAmount: { type: Number },
@@ -95,6 +102,11 @@ const IncentiveRuleSchema = new Schema<IIncentiveRule>(
     percentageRate: { type: Number },
     teamOverridePerUnit: { type: Number },
     teamOverridePercentage: { type: Number },
+    minRecruits: { type: Number },
+    perRecruitAmount: { type: Number },
+    perDistributorAmount: { type: Number },
+    countSubDealers: { type: Boolean, default: true },
+    targetPayout: { type: String, enum: ["ALL_WHEN_MET", "ABOVE_TARGET"], default: "ALL_WHEN_MET" },
   },
   { _id: false }
 );

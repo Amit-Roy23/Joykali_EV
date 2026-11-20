@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { resolveRecruiter, recalcRecruitment } from "./incentiveService";
 import { JWTPayload, isPartnerRole } from "@/types";
 import { Dealer } from "@/models/Dealer";
 import { Distributor } from "@/models/Distributor";
@@ -274,6 +275,7 @@ export async function createPartner(input: PartnerInput, user: JWTPayload) {
     }
   }
 
+  const recruitedBy = byPartner ? null : await resolveRecruiter((input as any).recruitedBy);
   const creditDays = Math.min(180, Math.max(0, Math.floor(Number(input.creditDays ?? 30))));
   const openingLimit = Math.max(0, rupeesToPaise(Number(input.creditLimitRupees || 0)));
 
@@ -303,6 +305,7 @@ export async function createPartner(input: PartnerInput, user: JWTPayload) {
       creditDays,
       assignedASM: !byPartner && input.assignedASM && mongoose.isValidObjectId(input.assignedASM) ? input.assignedASM : (parent?.doc.assignedASM ?? null),
       status: byPartner ? "PENDING" : "ACTIVE",
+      recruitedBy,
       onboardingDate: new Date(),
       createdBy: oid(user.userId),
     };
@@ -380,6 +383,7 @@ export async function createPartner(input: PartnerInput, user: JWTPayload) {
     resourceId: String(result.partner._id),
     after: { code: result.code, tier, name: result.partner.name, parent: parent?.doc.name || "Company", status: result.partner.status },
   });
+  await recalcRecruitment([result.partner.recruitedBy], result.partner.onboardingDate);
   return result;
 }
 

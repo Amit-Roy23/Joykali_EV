@@ -15,6 +15,7 @@ import { generateDealerCode } from "@/lib/codeGenerator";
 import { getScopeFilter } from "@/lib/rbac";
 import { logAudit } from "@/lib/audit";
 import mongoose from "mongoose";
+import { resolveRecruiter, recalcRecruitment } from "@/services/incentiveService";
 
 export async function GET(req: NextRequest) {
   try {
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
     }
 
     const data = parseResult.data;
+    const recruitedBy = await resolveRecruiter(body.recruitedBy);
     const dealerCode = await generateDealerCode();
 
     const dealer = await Dealer.create({
@@ -125,6 +127,7 @@ export async function POST(req: NextRequest) {
       creditLimit: 0, // set only through an approved credit request
       creditDays: Math.min(180, Math.max(0, Number(body.creditDays ?? 30))),
       assignedASM: data.assignedASM ? new mongoose.Types.ObjectId(data.assignedASM) : null,
+      recruitedBy,
       status: data.status || "ACTIVE",
       onboardingDate: new Date(),
       createdBy: new mongoose.Types.ObjectId(auth.user.userId),
@@ -143,6 +146,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    await recalcRecruitment([dealer.recruitedBy], dealer.onboardingDate);
+
     await logAudit({
       user: auth.user,
       action: "CREATE",
@@ -153,7 +158,7 @@ export async function POST(req: NextRequest) {
 
     return jsonResponse(dealer, undefined, 201);
   } catch (error: any) {
-    return errorResponse(error.message || "Failed to create dealer", 500);
+    return errorResponse(error.message || "Failed to create dealer", error.status || 500);
   }
 }
 

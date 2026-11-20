@@ -107,7 +107,18 @@ function TeamToday() {
                 <span className="text-right text-xs tabular text-slate-600">
                   {r.day.inMin != null ? `${hm(r.day.inMin)} – ${hm(r.day.outMin)}` : DAY_LABEL[r.day.status]}
                   {r.day.lateMin ? <span className="block text-amber-700">{r.day.lateMin} min late</span> : null}
-                  {r.day.punches?.some((p: any) => p.lat) ? <span className="block text-slate-400">located{r.day.punches.some((p: any) => p.hasPhoto) ? " · photo" : ""}</span> : null}
+                  {r.day.punches?.some((p: any) => p.lat) ? (
+                    <span className="block text-slate-400">
+                      {r.day.punches.some((p: any) => p.place === "FIELD")
+                        ? r.day.punches.some((p: any) => p.place === "OFFICE")
+                          ? "office + field visit"
+                          : "field visit"
+                        : r.day.punches.some((p: any) => p.place === "OFFICE")
+                          ? "office"
+                          : "located"}
+                      {r.day.punches.some((p: any) => p.hasPhoto) ? " · photo" : ""}
+                    </span>
+                  ) : null}
                 </span>
               </button>
             </li>

@@ -48,7 +48,12 @@ export interface LogAuditParams {
     | "WAREHOUSE"
     | "EXPENSE"
     | "ACCOUNTS"
-    | "BUDGET";
+    | "BUDGET"
+    | "ITEM"
+    | "STOCK"
+    | "PARTS_SALE"
+    | "BATTERY_JOB"
+    | "PRICE";
   resourceId?: string;
   before?: any;
   after?: any;

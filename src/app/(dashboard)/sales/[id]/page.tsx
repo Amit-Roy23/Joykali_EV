@@ -262,6 +262,7 @@ export default function SaleDetailPage({
                 <span className="font-mono font-bold text-slate-900 text-xs mt-0.5 block">
                   {vehicle?.batteryNumber}
                 </span>
+                {sale.withoutBattery && <span className="mt-1 block text-[10px] font-semibold text-amber-700">Sold without battery — battery back in stock</span>}
               </div>
             </div>
           </CardContent>
@@ -285,7 +286,7 @@ export default function SaleDetailPage({
                 </div>
               )}
               <div className="flex justify-between py-1.5 border-b border-slate-100">
-                <span className="text-slate-600">GST @ 5% Concessional EV Rate</span>
+                <span className="text-slate-600">GST on vehicle</span>
                 <span className="font-medium">{formatINR(sale.priceBreakdown.gst)}</span>
               </div>
               {sale.priceBreakdown.insurance > 0 && (
@@ -306,6 +307,16 @@ export default function SaleDetailPage({
                   <span className="font-medium">{formatINR(sale.priceBreakdown.accessories)}</span>
                 </div>
               )}
+              {(sale.items || []).map((l: any, i: number) => (
+                <div key={i} className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-600">
+                    {l.qty} × {l.name} @ {formatINR(l.rate)}
+                    {l.discount ? ` − ${formatINR(l.discount)}` : ""} + GST {l.gstRate}%
+                    {l.serials?.length ? <span className="block font-mono text-[10px] text-slate-400">{l.serials.join(", ")}</span> : null}
+                  </span>
+                  <span className="font-medium">{formatINR(l.amount)}</span>
+                </div>
+              ))}
 
               <div className="flex justify-between py-3 border-t-2 border-brand-500 font-bold text-sm text-slate-900">
                 <span>Total Invoice Amount</span>

@@ -6,6 +6,9 @@ import { User } from "@/models/User";
 import { PayrollRun } from "@/models/PayrollRun";
 import { PayrollEntry } from "@/models/PayrollEntry";
 import { Setting } from "@/models/Setting";
+import { Dealer } from "@/models/Dealer";
+import { Distributor } from "@/models/Distributor";
+import { EmployeeTarget } from "@/models/Hr";
 import { computeIncentives } from "./incentiveEngine";
 import { applyCalc, ensureSnapshotSetup, runPayslip } from "./payrollCalc";
 import { periodOf, periodsBetween } from "@/lib/period";
@@ -58,6 +61,28 @@ export async function recalculateIncentivesForPeriod(
     status: s.status,
   }));
 
+  // Monthly facts for the recruitment and target-commission rules.
+  const ids = employeeIds.filter(Boolean).map((e) => new mongoose.Types.ObjectId(String(e)));
+  const [dealersHired, distsHired, targets] = await Promise.all([
+    Dealer.find({ recruitedBy: { $in: ids }, status: "ACTIVE", onboardingDate: { $gte: periodStart, $lte: periodEnd } }).select("recruitedBy tier dealerCode").lean(),
+    Distributor.find({ recruitedBy: { $in: ids }, status: "ACTIVE", onboardingDate: { $gte: periodStart, $lte: periodEnd } }).select("recruitedBy distributorCode").lean(),
+    EmployeeTarget.find({ employee: { $in: ids }, period }).lean(),
+  ]);
+  const recruitsOf = (id: string) => {
+    const mine = (dealersHired as any[]).filter((d) => String(d.recruitedBy) === id);
+    const dists = (distsHired as any[]).filter((d) => String(d.recruitedBy) === id);
+    return {
+      dealers: mine.filter((d) => d.tier !== "SUB_DEALER").length,
+      subDealers: mine.filter((d) => d.tier === "SUB_DEALER").length,
+      distributors: dists.length,
+      codes: [...mine.map((d) => d.dealerCode), ...dists.map((d) => d.distributorCode)],
+    };
+  };
+  const targetOf = (id: string) => {
+    const t: any = (targets as any[]).find((x) => String(x.employee) === id);
+    return t ? t.targetUnits : null;
+  };
+
   const updated: mongoose.Types.ObjectId[] = [];
 
   for (const empId of employeeIds) {
@@ -82,7 +107,8 @@ export async function recalculateIncentivesForPeriod(
       formattedSales,
       activeSchemes,
       periodStart,
-      periodEnd
+      periodEnd,
+      { recruits: recruitsOf(String(employee._id)), monthTargetUnits: targetOf(String(employee._id)) }
     );
 
     const breakdownItems: any[] = [];
@@ -197,4 +223,23 @@ export async function syncOpenPayrollIncentives(
   };
   await run.save();
   return entries.length;
+}
+
+/**
+ * Who appointed a partner, for recruitment incentives: an active FSE or ASM.
+ * Returns null for an empty value; throws for anyone else.
+ */
+export async function resolveRecruiter(id: unknown): Promise<mongoose.Types.ObjectId | null> {
+  if (id === undefined || id === null || id === "") return null;
+  if (!mongoose.isValidObjectId(id)) throw Object.assign(new Error("Choose who appointed this partner"), { status: 400 });
+  const u: any = await User.findById(id).select("role status").lean();
+  if (!u || !["FEC", "ASM"].includes(u.role)) throw Object.assign(new Error("Only an FSE or ASM can be credited with appointing a partner"), { status: 400 });
+  return u._id;
+}
+
+/** Re-run the month's incentives for the employees credited with appointing a partner. */
+export async function recalcRecruitment(recruiters: Array<unknown>, onboardingDate: Date | string | null | undefined) {
+  const ids = [...new Set(recruiters.filter(Boolean).map(String))];
+  if (!ids.length || !onboardingDate) return;
+  await recalculateIncentivesForPeriod(ids, new Date(onboardingDate));
 }

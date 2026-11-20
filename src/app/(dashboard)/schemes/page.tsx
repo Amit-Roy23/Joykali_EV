@@ -109,7 +109,7 @@ export default function SchemesListPage() {
                     <TableCell className="text-xs">
                       {s.rules?.map((r: any, idx: number) => (
                         <Badge key={idx} variant="secondary" className="mr-1 text-[10px]">
-                          {r.ruleType}
+                          {r.ruleType.replace(/_/g, " ").toLowerCase()}
                         </Badge>
                       ))}
                     </TableCell>

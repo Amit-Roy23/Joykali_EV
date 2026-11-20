@@ -47,6 +47,9 @@ import {
   ClipboardCheck,
   IndianRupee,
   BriefcaseBusiness,
+  Wrench,
+  BatteryCharging,
+  ShoppingBasket,
 } from "lucide-react";
 import { isPartnerRole } from "@/types";
 
@@ -75,6 +78,8 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Sales & Invoices", href: "/sales", icon: Receipt, permission: "sales.view.own" },
       { title: "Record a Sale", href: "/sales/new", icon: PlusCircle, permission: "sales.create" },
+      { title: "Parts & Accessories Sale", href: "/parts-sales", icon: ShoppingBasket, permission: "parts.sell", audience: "staff" },
+      { title: "Battery Service", href: "/battery-service", icon: BatteryCharging, permission: "parts.sell", audience: "staff" },
     ],
   },
   {
@@ -113,6 +118,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Stock",
     items: [
       { title: "Vehicle Inventory", href: "/inventory", icon: Warehouse, permission: "inventory.view" },
+      { title: "Parts & Accessories Stock", href: "/inventory/parts", icon: Wrench, permission: "inventory.view", audience: "staff" },
       { title: "Warehouses", href: "/warehouses", icon: Building, permission: "warehouse.view", audience: "staff" },
       { title: "Models & Pricing", href: "/inventory/models", icon: Layers, permission: "inventory.view" },
       { title: "Purchases", href: "/purchases", icon: PackagePlus, permission: "purchase.view" },

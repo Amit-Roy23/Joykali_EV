@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import mongoose from "mongoose";
+import { resolveRecruiter, recalcRecruitment } from "@/services/incentiveService";
 import { connectToDatabase, withTransaction } from "@/lib/db";
 import { Distributor } from "@/models/Distributor";
 import { User } from "@/models/User";
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest) {
     if (b.login?.password && (await User.findOne({ email: loginEmail }))) return errorResponse("That login email is already in use", 409);
     if (b.assignedASM && !mongoose.isValidObjectId(b.assignedASM)) return errorResponse("Invalid ASM", 400);
 
+    const recruitedBy = await resolveRecruiter(b.recruitedBy);
     const result = await withTransaction(async (session) => {
       const code = await generateDistributorCode(session);
       const [dist] = await Distributor.create(
@@ -79,6 +81,7 @@ export async function POST(req: NextRequest) {
             creditLimit: 0,
             creditDays: Math.min(180, Math.max(0, Number(b.creditDays ?? 30))),
             assignedASM: b.assignedASM || null,
+            recruitedBy,
             status: "ACTIVE",
             createdBy: new mongoose.Types.ObjectId(auth.user.userId),
           },
@@ -129,6 +132,7 @@ export async function POST(req: NextRequest) {
       }
       return { distributor: dist, login };
     });
+    await recalcRecruitment([result.distributor.recruitedBy], result.distributor.onboardingDate);
     await logAudit({
       user: auth.user,
       action: "CREATE",

@@ -65,6 +65,7 @@ export default function MyHrPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [visitNote, setVisitNote] = useState("");
   const [modal, setModal] = useState<null | "leave" | "fix" | "advance" | "claim" | "resign">(null);
   const camRef = useRef<HTMLInputElement>(null);
 
@@ -88,7 +89,9 @@ export default function MyHrPage() {
     } catch {}
   };
 
-  const field = d?.profile?.attendanceMode !== "OFFICE";
+  const mode = d?.profile?.attendanceMode || "FIELD";
+  const field = mode === "FIELD";
+  const hybrid = mode === "HYBRID";
   const doPunch = async (file?: File | null) => {
     setBusy(true);
     setError(null);
@@ -101,10 +104,18 @@ export default function MyHrPage() {
       fd.set("accuracy", String(Math.round(pos.coords.accuracy)));
       fd.set("device", navigator.userAgent.slice(0, 150));
       if (file) fd.set("photo", await compress(file), "selfie.jpg");
+      if (visitNote.trim()) fd.set("note", visitNote.trim());
       const res = await fetch("/api/hr/punch", { method: "POST", body: fd });
       const j = await res.json();
+      // Hybrid staff outside the office: the server asks for a selfie, so open the camera.
+      if (res.status === 428 && !file) {
+        setNotice(j.error || "Field-visit punch: take a selfie");
+        camRef.current?.click();
+        return;
+      }
       if (!res.ok || !j.success) throw new Error(j.error || "Punch failed");
-      setNotice(`Punched ${j.data.type === "IN" ? "in" : "out"} at ${new Date(j.data.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}${pos.coords.accuracy ? ` · location ±${Math.round(pos.coords.accuracy)} m` : ""}`);
+      setVisitNote("");
+      setNotice(`Punched ${j.data.type === "IN" ? "in" : "out"}${j.data.place === "FIELD" ? " (field visit)" : j.data.place === "OFFICE" ? " (office)" : ""} at ${new Date(j.data.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}${pos.coords.accuracy ? ` · location ±${Math.round(pos.coords.accuracy)} m` : ""}`);
       load();
     } catch (e: any) {
       setError(e.message);
@@ -183,6 +194,15 @@ export default function MyHrPage() {
                   if (f) doPunch(f);
                 }}
               />
+              {(field || hybrid) && (
+                <Input
+                  id="visit-note"
+                  placeholder={hybrid ? "Field visit? Where / why (optional)" : "Visit note (optional)"}
+                  value={visitNote}
+                  maxLength={200}
+                  onChange={(e) => setVisitNote(e.target.value)}
+                />
+              )}
               <Button
                 size="lg"
                 className={cn("h-14 w-full text-base", d.nextAction === "OUT" ? "bg-rose-600 hover:bg-rose-700" : "bg-emerald-600 hover:bg-emerald-700")}
@@ -195,7 +215,11 @@ export default function MyHrPage() {
               </Button>
               <p className="flex items-center gap-1.5 text-xs text-slate-500">
                 <MapPin className="h-3.5 w-3.5" />
-                {field ? "Field staff: a selfie and your location are saved with every punch." : "Office staff: punch inside the office; your location is checked."}
+                {field
+                  ? "Field staff: a selfie and your location are saved with every punch."
+                  : hybrid
+                    ? "Office + field: inside the office just punch; on a field visit you'll be asked for a selfie. Hours count from first in to last out, wherever you are."
+                    : "Office staff: punch inside the office; your location is checked."}
               </p>
               {t?.punches?.length > 0 && (
                 <ul className="divide-y divide-slate-100 rounded-xl border border-slate-100 text-sm">
@@ -204,9 +228,10 @@ export default function MyHrPage() {
                       <span className="font-semibold">{p.type === "IN" ? "In" : "Out"}</span>
                       <span className="tabular">{new Date(p.at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kolkata" })}</span>
                       <span className="text-xs text-slate-500">
-                        {p.source.toLowerCase()}
+                        {p.place === "FIELD" ? "field visit" : p.place === "OFFICE" ? "office" : p.source.toLowerCase()}
                         {p.hasPhoto ? " · photo" : ""}
-                        {p.lat ? " · located" : ""}
+                        {p.lat && !p.place ? " · located" : ""}
+                        {p.note ? ` · ${p.note}` : ""}
                       </span>
                     </li>
                   ))}
@@ -490,7 +515,7 @@ function ProfileTab({ d, reload, onResign }: { d: any; reload: () => void; onRes
             ["Department", p.department?.name || "—"],
             ["Reports to", p.reportsTo?.name || "—"],
             ["Shift", p.shift ? `${p.shift.name} ${p.shift.start}–${p.shift.end}` : "General"],
-            ["Attendance", p.attendanceMode === "OFFICE" ? "Office" : "Field (photo + GPS)"],
+            ["Attendance", p.attendanceMode === "OFFICE" ? "Office" : p.attendanceMode === "HYBRID" ? "Office + field visits" : "Field (photo + GPS)"],
             ["Notice period", `${p.noticeDays ?? 30} days`],
           ].map(([k, v]) => (
             <div key={k}>

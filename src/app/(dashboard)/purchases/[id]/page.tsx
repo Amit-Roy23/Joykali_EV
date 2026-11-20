@@ -82,7 +82,7 @@ export default function PurchaseDetailPage({
               <span className="font-semibold">{formatINR(purchase.subTotal)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">GST (5%):</span>
+              <span className="text-slate-500">GST:</span>
               <span className="font-semibold">{formatINR(purchase.gstAmount)}</span>
             </div>
             <div className="flex justify-between text-sm font-bold text-brand-700 pt-1 border-t border-slate-100">
@@ -92,6 +92,47 @@ export default function PurchaseDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Invoice lines */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Invoice lines</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 text-left text-slate-500">
+                <th className="py-1.5 pr-2">#</th>
+                <th className="py-1.5 pr-2">Description</th>
+                <th className="py-1.5 pr-2">Warehouse</th>
+                <th className="py-1.5 pr-2 text-right">Qty</th>
+                <th className="py-1.5 pr-2 text-right">Rate</th>
+                <th className="py-1.5 pr-2 text-right">GST</th>
+                <th className="py-1.5 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {purchase.lineItems.map((l: any, i: number) => (
+                <tr key={i} className="border-b border-slate-100">
+                  <td className="py-1.5 pr-2">{i + 1}</td>
+                  <td className="py-1.5 pr-2">
+                    <span className="font-semibold text-slate-800">
+                      {l.kind === "ITEM" ? l.item?.name || l.description : l.model ? `${l.model.name} ${l.model.variant}` : l.description}
+                    </span>
+                    <span className="ml-1 text-slate-400">{l.kind === "ITEM" ? (l.item?.category || "item").toLowerCase().replace("_", " ") : "vehicle"}</span>
+                    {l.serials?.length ? <p className="font-mono text-[10px] text-slate-500">{l.serials.join(", ")}</p> : null}
+                  </td>
+                  <td className="py-1.5 pr-2">{l.warehouse?.name || purchase.warehouse?.name || "Main"}</td>
+                  <td className="py-1.5 pr-2 text-right">{l.quantity}</td>
+                  <td className="py-1.5 pr-2 text-right">{formatINR(l.unitCost)}</td>
+                  <td className="py-1.5 pr-2 text-right">{l.gstRate}%</td>
+                  <td className="py-1.5 text-right font-semibold">{formatINR(l.totalCost)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
 
       {/* Inwarded Vehicles List */}
       <Card>

@@ -153,6 +153,20 @@ export function calculateSlabIncentive(
   }
 }
 
+/** Extra monthly facts some rules need (dealer recruitment, monthly target). */
+export interface IncentiveExtras {
+  /** Partners this employee appointed whose onboarding date falls in the month (active only). */
+  recruits?: { dealers: number; subDealers: number; distributors: number; codes: string[] };
+  /** The employee's own unit target for the month (Targets page); null = not set. */
+  monthTargetUnits?: number | null;
+}
+
+/** Per-unit rate for a sale: model-specific amount if set, else the default. */
+function unitRate(rule: IIncentiveRule, modelId: string) {
+  const specific = (rule.modelSpecificAmounts || []).find((m: any) => String(m.model) === String(modelId));
+  return specific ? specific.amount : rule.perUnitAmount || 0;
+}
+
 /**
  * Pure, unit-testable incentive engine function
  */
@@ -161,7 +175,8 @@ export function computeIncentives(
   sales: SaleItemForIncentive[],
   schemes: Array<IIncentiveScheme | any>,
   periodStart: Date,
-  periodEnd: Date
+  periodEnd: Date,
+  extras: IncentiveExtras = {}
 ): IncentiveCalculationOutput {
   const pStartTime = new Date(periodStart).getTime();
   const pEndTime = new Date(periodEnd).getTime();
@@ -345,6 +360,56 @@ export function computeIncentives(
           qualifyingRevenue: totalBaseRevenue,
           earnedAmount: earned,
           description: `${rule.percentageRate}% on ex-showroom revenue`,
+          qualifyingSaleCodes: personalQualifying.map((s) => s.saleCode),
+        });
+      } else if (rule.ruleType === "DEALER_RECRUITMENT") {
+        // Commission per partner appointed in the month, paid only once the minimum is reached.
+        const r = extras.recruits || { dealers: 0, subDealers: 0, distributors: 0, codes: [] };
+        const dealerCount = r.dealers + (rule.countSubDealers === false ? 0 : r.subDealers);
+        const distCount = rule.perDistributorAmount ? r.distributors : 0;
+        const total = dealerCount + distCount;
+        const min = rule.minRecruits || 0;
+        const met = total > 0 && total >= min;
+        const earned = met ? dealerCount * (rule.perRecruitAmount || 0) + distCount * (rule.perDistributorAmount || 0) : 0;
+        schemeTotal += earned;
+        rulesBreakdown.push({
+          ruleType: "DEALER_RECRUITMENT",
+          qualifyingUnits: total,
+          qualifyingRevenue: 0,
+          earnedAmount: earned,
+          description: met
+            ? `${total} partner(s) appointed (min ${min}) — ${dealerCount} dealer(s)${distCount ? `, ${distCount} distributor(s)` : ""}`
+            : `${total} of ${min} partners appointed — minimum not reached`,
+          // recruitment is not a sale, so no sale codes are counted as units
+          qualifyingSaleCodes: [],
+        });
+      } else if (rule.ruleType === "TARGET_COMMISSION") {
+        // Per-vehicle commission measured against the employee's own monthly target.
+        const personalQualifying = qualifyingSales.filter((s) => String(s.soldBy) === String(employee._id));
+        const units = personalQualifying.length;
+        const target = extras.monthTargetUnits != null && extras.monthTargetUnits > 0 ? extras.monthTargetUnits : rule.targetUnits || 0;
+        const ordered = [...personalQualifying].sort((a, b) => +new Date(a.saleDate) - +new Date(b.saleDate));
+        let paid: SaleItemForIncentive[] = [];
+        let description: string;
+        if (!target) {
+          description = "No monthly target set — commission is paid against a target";
+        } else if (rule.targetPayout === "ABOVE_TARGET") {
+          paid = ordered.slice(target);
+          description = `${units} sold vs target ${target} — paid on ${paid.length} unit(s) above target`;
+        } else if (units >= target) {
+          paid = ordered;
+          description = `Target ${target} achieved (${units} sold) — paid on all ${units} unit(s)`;
+        } else {
+          description = `${units} of ${target} target — commission starts when the target is met`;
+        }
+        const earned = paid.reduce((t, s) => t + unitRate(rule, s.modelId), 0);
+        schemeTotal += earned;
+        rulesBreakdown.push({
+          ruleType: "TARGET_COMMISSION",
+          qualifyingUnits: units,
+          qualifyingRevenue: personalQualifying.reduce((t, s) => t + s.exShowroom, 0),
+          earnedAmount: earned,
+          description,
           qualifyingSaleCodes: personalQualifying.map((s) => s.saleCode),
         });
       } else if (rule.ruleType === "TEAM_OVERRIDE") {

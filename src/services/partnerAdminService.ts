@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { recalcRecruitment } from "./incentiveService";
 import { JWTPayload, isPartnerRole } from "@/types";
 import { Dealer } from "@/models/Dealer";
 import { Distributor } from "@/models/Distributor";
@@ -108,6 +109,11 @@ export async function verifyPartyDocument(user: JWTPayload, docId: string, decis
     const Coll: any = doc.partyType === "DEALER" ? Dealer : Distributor;
     const r = await Coll.updateOne({ _id: doc.party, status: "PENDING" }, { $set: { status: "ACTIVE" } });
     activated = r.modifiedCount > 0;
+    if (activated) {
+      // A partner counts for its recruiter's appointment incentive once it is active.
+      const p: any = await Coll.findById(doc.party).select("recruitedBy onboardingDate").lean();
+      await recalcRecruitment([p?.recruitedBy], p?.onboardingDate);
+    }
   }
   await logAudit({ user, action: "VERIFY", resource: "KYC", resourceId: docId, after: { decision, remarks, activated } });
   return { doc, activated };
