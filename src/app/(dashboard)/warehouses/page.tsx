@@ -542,7 +542,7 @@ function TransferDetail({ id, onClose, onChanged }: { id: string; onClose: () =>
             {t.remarks ? ` · ${t.remarks}` : ""}
           </p>
           {err && <Notice>{err}</Notice>}
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="modal-actions flex flex-wrap justify-end gap-2">
             {t.canCancel && (
               <span className="flex items-center gap-2">
                 <Input id="wt-cancel" className="h-9 w-44" placeholder="Reason to cancel" value={reason} onChange={(e) => setReason(e.target.value)} />

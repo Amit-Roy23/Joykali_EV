@@ -153,9 +153,8 @@ function EmployeeMonth({ employee, onClose }: { employee: any; onClose: () => vo
           </span>
         )}
       </div>
-      {!m ? <Skeleton className="h-56" /> : <MonthGrid days={m.days} />}
       {pendingOt.length > 0 && (
-        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">
           <p className="font-semibold text-amber-900">Overtime waiting for approval</p>
           <p className="text-amber-800">{pendingOt.map((d: any) => `${d.date.slice(8)}: ${d.otMin} min`).join(" · ")}</p>
           <Button
@@ -176,6 +175,7 @@ function EmployeeMonth({ employee, onClose }: { employee: any; onClose: () => vo
           </Button>
         </div>
       )}
+      {!m ? <Skeleton className="h-56" /> : <MonthGrid days={m.days} />}
       {msg && <Notice tone="success" className="mt-3">{msg}</Notice>}
       {err && <Notice className="mt-3">{err}</Notice>}
     </Modal>

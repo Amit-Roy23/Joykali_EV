@@ -142,3 +142,35 @@
     overflow: visible !important;
   }
 }
+
+/*
+ * Popup action row always visible: the closing row of buttons in a modal (directly in the
+ * body, or at the end of a <form> in it) sticks to the bottom of the popup while the fields
+ * scroll above it, so Save / Cancel never sit below the fold on short screens.
+ */
+.modal-body > :last-child:has(> button),
+.modal-body > :last-child:has(> a > button),
+.modal-body > form:last-child > :last-child:has(> button),
+.modal-body .modal-actions {
+  position: sticky;
+  bottom: -1.25rem; /* the body's bottom padding: sit flush with the popup's bottom edge */
+  z-index: 5;
+  margin-left: -1.25rem;
+  margin-right: -1.25rem;
+  margin-bottom: -1.25rem;
+  padding: 0.75rem 1.25rem max(0.75rem, env(safe-area-inset-bottom));
+  background: #fff;
+  border-top: 1px solid rgb(241 245 249);
+  box-shadow: 0 -6px 12px -10px rgb(15 23 42 / 0.25);
+}
+@media (min-width: 640px) {
+  .modal-body > :last-child:has(> button),
+  .modal-body > :last-child:has(> a > button),
+  .modal-body > form:last-child > :last-child:has(> button),
+  .modal-body .modal-actions {
+    margin-left: -1.5rem;
+    margin-right: -1.5rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
