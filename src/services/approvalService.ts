@@ -18,7 +18,7 @@ import { AdvanceLoan, ExpenseClaim, Resignation } from "@/models/Hr";
 import { Expense } from "@/models/Accounts";
 import { SalaryTemplate } from "@/models/SalaryTemplate";
 import { activateAdvance, closeSettlement } from "./hrMoneyService";
-import { notifyParty } from "./notificationService";
+import { notifyParty, notifyRoles, notifyUsers } from "./notificationService";
 import { assertCredit } from "./creditService";
 import { recalculateForScheme } from "./incentiveService";
 
@@ -61,6 +61,7 @@ export async function signApproval(
   }
 
   let result: { signatures: ApprovalSignature[]; final: boolean; status: string };
+  let raisedBy: any = null; // who asked for it — told when it is approved or rejected
   let summary = "";
 
   if (kind === "order") {
@@ -206,6 +207,7 @@ export async function signApproval(
     if (!a) throw new ApprovalError("Request not found", 404);
     if (a.status !== "PENDING_APPROVAL") throw new ApprovalError(`Request is ${a.status.toLowerCase()}`);
     if (String(a.employee) === user.userId) throw new ApprovalError("You cannot approve your own advance", 403);
+    raisedBy = a.employee;
     result = sign(a.approvals, user, decision, note);
     a.approvals = result.signatures;
     if (result.status === "REJECTED") a.status = "REJECTED";
@@ -231,6 +233,7 @@ export async function signApproval(
     if (!r || !r.settlement) throw new ApprovalError("Settlement not found", 404);
     if (r.status !== "SETTLEMENT_PENDING") throw new ApprovalError(`Settlement is ${r.status.toLowerCase()}`);
     if (String(r.employee) === user.userId) throw new ApprovalError("You cannot approve your own settlement", 403);
+    raisedBy = r.employee;
     result = sign(r.approvals, user, decision, note);
     r.approvals = result.signatures;
     if (result.status === "REJECTED") r.status = "ACCEPTED"; // HR recomputes
@@ -242,6 +245,7 @@ export async function signApproval(
     if (!e) throw new ApprovalError("Expense not found", 404);
     if (e.status !== "PENDING_APPROVAL") throw new ApprovalError(`Expense is ${e.status.toLowerCase().replace("_", " ")}`);
     if (String(e.createdBy) === user.userId) throw new ApprovalError("You cannot approve an expense you entered", 403);
+    raisedBy = e.createdBy;
     result = sign(e.approvals, user, decision, note);
     e.approvals = result.signatures;
     if (result.status === "APPROVED") e.status = "APPROVED";
@@ -269,6 +273,8 @@ export async function signApproval(
     throw new ApprovalError("Unknown approval type", 400);
   }
 
+  await announce(kind, result.status, summary, user, raisedBy, note);
+
   await logAudit({
     user,
     action: decision === "APPROVED" ? "APPROVE" : "REJECT",
@@ -278,6 +284,43 @@ export async function signApproval(
   });
 
   return { kind, id, status: result.status, final: result.final, waitingFor: approvalState(result.signatures).next };
+}
+
+/** Approved items that money has to be paid out for — they go to Accounts → Payments desk. */
+const PAYABLE: Partial<Record<ApprovalKind, string>> = {
+  expense: "Company expense",
+  advance: "Salary advance / loan",
+  settlement: "Full & final settlement",
+};
+
+/**
+ * Who hears about a signature:
+ *  - first signature (Business Head) → the Managing Partner: "waiting for your signature";
+ *  - final approval of something payable → every Accountant: "approved — ready to pay";
+ *  - approval or rejection → the person who raised it.
+ * Never throws (a notice must not undo an approval).
+ */
+async function announce(kind: ApprovalKind, status: string, summary: string, user: JWTPayload, raisedBy: any, note?: string) {
+  try {
+    const label = KIND_LABEL[kind];
+    if (status === "APPROVED") {
+      if (PAYABLE[kind]) {
+        await notifyRoles(
+          ["ACCOUNTANT"],
+          { kind: "payment", title: `Approved — ready to pay: ${summary}`, body: `${PAYABLE[kind]} signed by the Business Head and the Managing Partner. Pay it from Accounts → Payments desk.`, href: "/accounts" },
+          user.userId
+        );
+      }
+      if (raisedBy) await notifyUsers([raisedBy], { kind: "approval", title: `${label} approved: ${summary}`, body: PAYABLE[kind] ? "Accounts will now pay it." : undefined, href: kind === "expense" ? "/accounts/expenses" : "/me" }, user.userId);
+    } else if (status === "REJECTED") {
+      if (raisedBy) await notifyUsers([raisedBy], { kind: "approval", title: `${label} rejected: ${summary}`, body: note ? `Reason: ${note}` : undefined, href: kind === "expense" ? "/accounts/expenses" : "/me" }, user.userId);
+    } else {
+      // first signature done — the Managing Partner is next
+      await notifyRoles(["MANAGING_PARTNER"], { kind: "approval", title: `Waiting for your signature: ${label}`, body: `${summary} — signed by ${user.name}.`, href: "/approvals" }, user.userId);
+    }
+  } catch (e) {
+    console.error("approval notice failed", e);
+  }
 }
 
 /**

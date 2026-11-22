@@ -487,6 +487,15 @@ export async function createExpense(user: JWTPayload, input: ExpenseInput) {
     createdByName: user.name,
   });
   await logAudit({ user, action: "CREATE", resource: "EXPENSE", resourceId: String(e._id), after: { code: e.code, total, category: e.category, status } });
+  // A small bill (no approval needed) entered by someone else goes straight to the Payments desk.
+  if (status === "APPROVED") {
+    const { notifyRoles } = await import("./notificationService");
+    await notifyRoles(
+      ["ACCOUNTANT"],
+      { kind: "payment", title: `New bill to pay: ${e.code} ${e.category} ₹${Math.round(total / 100).toLocaleString("en-IN")}`, body: `${e.description} — entered by ${user.name}. Pay it from Accounts → Payments desk.`, href: "/accounts" },
+      user.userId
+    );
+  }
   return e;
 }
 

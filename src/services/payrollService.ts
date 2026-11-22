@@ -297,7 +297,7 @@ export async function lockPayrollRun(
   runId: string,
   user: JWTPayload
 ): Promise<IPayrollRun> {
-  return await withTransaction(async (session) => {
+  const locked = await withTransaction(async (session) => {
     const run = await PayrollRun.findById(runId).session(session ?? null);
     if (!run) throw new Error("Payroll run not found");
     if (run.status === "LOCKED") throw new Error("Payroll run is already locked");
@@ -326,5 +326,18 @@ export async function lockPayrollRun(
 
     return run;
   });
+  // Salaries are now due: tell Accounts (Payments desk).
+  const { notifyRoles } = await import("./notificationService");
+  await notifyRoles(
+    ["ACCOUNTANT"],
+    {
+      kind: "payment",
+      title: `Salaries ready to pay: ${locked.runCode}`,
+      body: `Payroll locked — ${locked.totals?.totalEmployees || 0} staff, net ₹${Math.round((locked.totals?.totalNet || 0) / 100).toLocaleString("en-IN")}. Pay it from Accounts → Payments desk.`,
+      href: "/accounts",
+    },
+    user.userId
+  );
+  return locked;
 }
 

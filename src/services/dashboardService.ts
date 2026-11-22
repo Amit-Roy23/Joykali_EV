@@ -334,6 +334,18 @@ export async function getDashboardData(user: JWTPayload) {
       actions.push({ kind: "approval", label: `${mine.length} approval${mine.length > 1 ? "s" : ""} waiting for your signature`, href: "/approvals", tone: "amber" });
     }
   }
+  // Approved money waiting for Accounts to pay (expenses, salaries, advances, F&F, supplier bills).
+  if (user.role === "ACCOUNTANT") {
+    const { pendingPayouts } = await import("./accountsService");
+    const due = await pendingPayouts();
+    const approvedSpend = due.filter((d) => d.kind !== "purchase");
+    if (approvedSpend.length) {
+      const amt = approvedSpend.reduce((s, d) => s + d.amount, 0);
+      actions.push({ kind: "payment", label: `${approvedSpend.length} approved payment${approvedSpend.length > 1 ? "s" : ""} waiting to be paid (₹${Math.round(amt / 100).toLocaleString("en-IN")})`, href: "/accounts", tone: "amber" });
+    }
+    const bills = due.filter((d) => d.kind === "purchase");
+    if (bills.length) actions.push({ kind: "payment", label: `${bills.length} supplier invoice${bills.length > 1 ? "s" : ""} unpaid`, href: "/accounts", tone: "brand" });
+  }
   const [doWaiting, fleet] = await Promise.all([
     DeliveryOrder.aggregate([{ $match: { status: { $in: ["SUBMITTED", "LOADED"] } } }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
     FleetVehicle.find({ status: "ACTIVE" }).lean(),
