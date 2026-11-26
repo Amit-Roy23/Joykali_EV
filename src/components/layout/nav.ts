@@ -11,6 +11,7 @@ import {
   MapPin,
   KeyRound,
   Calculator,
+  FileCheck2,
   Network,
   Trophy,
   Sparkles,
@@ -146,6 +147,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "HR & Attendance", href: "/hr", icon: CalendarClock, permission: "attendance.team", audience: "staff" },
       { title: "Advances & Claims", href: "/hr/money", icon: Coins, permission: ["attendance.team", "hr.manage", "approvals.sign"], audience: "staff" },
       { title: "Exits", href: "/hr/exits", icon: DoorOpen, permission: ["attendance.team", "hr.manage", "approvals.sign"], audience: "staff" },
+      { title: "No Dues Certificates", href: "/hr/no-dues", icon: FileCheck2, permission: ["hr.manage", "approvals.sign"], audience: "staff" },
     ],
   },
   {
@@ -193,6 +195,8 @@ const EXTRA_ROUTES: Array<{ prefix: string; permission?: string | string[]; titl
   { prefix: "/change-password", title: "Change Password" },
   // the person a cash box is being handed to opens this before they have cashier rights
   { prefix: "/accounts/handover/accept", title: "Accept Cash Handover" },
+  // a leaving employee downloads their own certificate
+  { prefix: "/hr/no-dues/mine", permission: "hr.self", title: "My No Dues Certificate" },
 ];
 
 export function canSee(item: { permission?: string | string[]; audience?: "staff" | "partner" }, role: string, permissions: string[]) {

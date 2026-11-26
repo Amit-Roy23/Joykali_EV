@@ -88,7 +88,8 @@ import {
   verifyPartyDocument,
 } from "../src/services/partnerAdminService";
 import { Department, Shift, Holiday, LeaveType, LeaveRequest, AttendancePunch, AttendanceDay, Regularization, EmployeeTarget, EmployeeDocument } from "../src/models/Hr";
-import { requestAdvance, submitClaim, verifyClaim, submitResignation } from "../src/services/hrMoneyService";
+import { requestAdvance, submitClaim, verifyClaim, submitResignation, acceptResignation } from "../src/services/hrMoneyService";
+import { openNoDues, tickItem } from "../src/services/noDuesService";
 import { applyLeave, approveOvertime } from "../src/services/hrService";
 import { createWarehouseTransfer, mainWarehouse, receiveWarehouseTransfer, saveWarehouse, setMinStock } from "../src/services/warehouseService";
 import { accountBalances, createExpense, createVoucher, ensureAccounts, recordPayout, saveMoneyAccount, setBudget, SALARY_HEAD } from "../src/services/accountsService";
@@ -1158,7 +1159,17 @@ async function main() {
   await verifyClaim(hrPayload, String(c3._id), "VERIFIED");
   await signApproval("claim" as any, String(c3._id), bhPayload, "APPROVED");
   await signApproval("claim" as any, String(c3._id), mpPayload, "APPROVED");
-  await submitResignation(asPayload(f12), { reason: "Moving to Bangalore with family", requestedLwd: new Date(Date.now() + 330 * 60000 + 20 * 86400000).toISOString().slice(0, 10) });
+  const lwd12 = new Date(Date.now() + 330 * 60000 + 20 * 86400000).toISOString().slice(0, 10);
+  await submitResignation(asPayload(f12), { reason: "Moving to Bangalore with family", requestedLwd: lwd12 });
+  // Another FSE is leaving: accepted by the ASM, and HR has opened the no dues certificate —
+  // the settlement and his area still block it.
+  const f11 = fecs[10].user;
+  const lwd11 = new Date(Date.now() + 330 * 60000 + 10 * 86400000).toISOString().slice(0, 10);
+  const res11 = await submitResignation(asPayload(f11), { reason: "Joining the family business in Durgapur", requestedLwd: lwd11 });
+  await acceptResignation(asPayload(asmSouth), String(res11._id), { lwd: lwd11 });
+  const nd12 = await openNoDues(asPayload(hrUser), String(f11._id));
+  await tickItem(asPayload(hrUser), String(nd12._id), { key: "ID_CARD", status: "CLEARED", note: "Collected at Barasat office" });
+  await tickItem(asPayload(hrUser), String(nd12._id), { key: "VEHICLE", status: "NA" });
   // Monthly unit targets for every FEC, set by their ASM.
   for (const f of fecs) await EmployeeTarget.create({ employee: f.user._id, period: current.period, targetUnits: Math.max(3, Math.round(6 * f.skill)), setByName: "Area Sales Manager" });
   await EmployeeDocument.create([
