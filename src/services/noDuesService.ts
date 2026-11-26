@@ -64,7 +64,7 @@ export async function noDuesChecks(employeeId: any): Promise<DueCheck[]> {
           ? `Settlement is ${r.status === "SETTLEMENT_PENDING" ? "waiting for BH + MP approval" : "not worked out yet"} (Exits page)`
           : !fnfOk
             ? `Approved — ${rupees(Math.abs(r.settlement.net))} still to be ${r.settlement.net > 0 ? "paid" : "recovered"} by Accounts`
-            : `Settled${r.settlement ? `: net ${rupees(r.settlement.net)}` : ""}${r.payment ? ` · paid ${r.payment.date}` : ""}`,
+            : `Settled${r.settlement ? (r.settlement.net > 0 ? `: ${rupees(r.settlement.net)} paid to the employee` : r.settlement.net < 0 ? `: ${rupees(-r.settlement.net)} recovered from the employee` : ": nothing either way") : ""}${r.payment ? ` on ${r.payment.date}` : ""}`,
     },
     { key: "LOANS", label: "No salary advance or loan outstanding", level: "block", ok: loans.length === 0, detail: loans.length ? `${loans.length} open (${rupees(loanBal)} balance) — recover it in the settlement` : "None" },
     { key: "CLAIMS", label: "No expense claim in progress", level: "block", ok: claims.length === 0, detail: claims.length ? (claims as any[]).map((c) => c.code).join(", ") : "None" },

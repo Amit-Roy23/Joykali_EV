@@ -15,7 +15,7 @@ const s = StyleSheet.create({
   b: { fontFamily: "Helvetica-Bold" },
   h: { marginTop: 14, marginBottom: 4, fontSize: 9, fontFamily: "Helvetica-Bold", color: "#475569", letterSpacing: 1 },
   row: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: "#e2e8f0", paddingVertical: 3.5 },
-  c1: { width: 18, color: "#059669", fontFamily: "Helvetica-Bold" },
+  c1: { width: 30, color: "#059669", fontFamily: "Helvetica-Bold", fontSize: 8.5 },
   c2: { flex: 1 },
   c3: { width: 210, color: "#475569", fontSize: 8.5 },
   foot: { marginTop: 22, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
@@ -30,6 +30,8 @@ export interface NoDuesPdfProps {
   qrPng: Buffer;
   verifyUrl: string;
 }
+/** The PDF font has no rupee sign. */
+const pdfText = (t: string) => String(t || "").replace(/₹/g, "Rs. ");
 const d = (x?: string | Date | null) =>
   x ? new Date(typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x) ? `${x}T12:00:00+05:30` : x).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "—";
 
@@ -61,14 +63,14 @@ function Certificate({ company, nd, qrPng, verifyUrl }: NoDuesPdfProps) {
         <Text style={s.h}>CLEARANCE CHECKED</Text>
         {checks.map((c: any) => (
           <View key={c.key} style={s.row}>
-            <Text style={s.c1}>✓</Text>
+            <Text style={s.c1}>YES</Text>
             <Text style={s.c2}>{c.label}</Text>
-            <Text style={s.c3}>{c.detail}</Text>
+            <Text style={s.c3}>{pdfText(c.detail)}</Text>
           </View>
         ))}
         {(nd.items || []).map((i: any) => (
           <View key={i.key} style={s.row}>
-            <Text style={s.c1}>{i.status === "NA" ? "–" : "✓"}</Text>
+            <Text style={[s.c1, i.status === "NA" ? { color: "#94a3b8" } : {}]}>{i.status === "NA" ? "N/A" : "YES"}</Text>
             <Text style={s.c2}>{i.label}</Text>
             <Text style={s.c3}>{i.status === "NA" ? "Not applicable" : `Cleared${i.byName ? ` · ${i.byName}` : ""}`}{i.note ? ` · ${i.note}` : ""}</Text>
           </View>
