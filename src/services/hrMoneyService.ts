@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { clearTerritories } from "./territoryAssignService";
 import { JWTPayload } from "@/types";
 import { User } from "@/models/User";
 import { SalaryStructure } from "@/models/SalaryStructure";
@@ -361,6 +362,7 @@ export async function closeSettlement(id: any) {
   await ExpenseClaim.updateMany({ employee: r.employee, status: "APPROVED" }, { $set: { status: "PAID", paidInPeriod: `F&F ${r.acceptedLwd}` } });
   const lwdDate = new Date(`${r.acceptedLwd}T23:59:59+05:30`);
   await User.updateOne({ _id: r.employee }, { $set: { exitDate: lwdDate, ...(lwdDate <= new Date() ? { status: "INACTIVE" } : {}) } });
+  if (lwdDate <= new Date()) await clearTerritories(r.employee, "System", "Left the company");
   r.status = "SETTLED";
   r.settledAt = new Date();
   await r.save();
@@ -368,6 +370,8 @@ export async function closeSettlement(id: any) {
 
 /** Daily job: deactivate logins whose last working day has passed. */
 export async function deactivateLeavers() {
+  const leaving = await User.find({ status: "ACTIVE", exitDate: { $ne: null, $lt: new Date() } }).select("_id").lean();
+  for (const u of leaving) await clearTerritories(u._id, "System", "Left the company");
   const res = await User.updateMany({ status: "ACTIVE", exitDate: { $ne: null, $lt: new Date() } }, { $set: { status: "INACTIVE" } });
   return res.modifiedCount;
 }

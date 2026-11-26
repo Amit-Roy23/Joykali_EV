@@ -189,6 +189,7 @@ export default function EmployeesListPage() {
                     <p className="truncate font-semibold text-slate-900">{emp.name}</p>
                     <p className="truncate font-mono text-[11px] text-slate-500">{emp.employeeCode}</p>
                     {emp.reportsTo && <p className="truncate text-[11px] text-slate-500">Reports to {emp.reportsTo.name}</p>}
+                    {emp.territories?.length > 0 && <p className="truncate text-[11px] text-brand-700">📍 {emp.territories.map((t: any) => t.name).join(", ")}</p>}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <RoleBadge role={emp.role} short />
@@ -207,6 +208,7 @@ export default function EmployeesListPage() {
                   <TableHead>Code</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Reports to</TableHead>
+                  <TableHead>Area</TableHead>
                   <TableHead>Contact</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -230,6 +232,15 @@ export default function EmployeesListPage() {
                       <RoleBadge role={emp.role} />
                     </TableCell>
                     <TableCell className="text-slate-700">{emp.reportsTo?.name || <span className="text-slate-400">—</span>}</TableCell>
+                    <TableCell className="max-w-[200px] text-xs text-slate-600">
+                      {emp.territories?.length ? (
+                        emp.territories.map((t: any) => t.name).join(", ")
+                      ) : ["ASM", "FEC"].includes(emp.role) ? (
+                        <span className="text-amber-600">Not assigned</span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <p className="text-xs text-slate-700">{emp.email}</p>
                       <p className="text-[11px] text-slate-500">{emp.phone}</p>

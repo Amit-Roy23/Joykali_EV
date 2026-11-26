@@ -9,6 +9,7 @@ import { EmptyState, PageHeader, Skeleton } from "@/components/ui/kit";
 import { Modal } from "@/components/ui/modal";
 import { useSession } from "@/components/layout/session";
 import { api, Notice } from "@/components/workflow";
+import { TerritoryTabs } from "@/components/territoryPanel";
 
 const KIND_LABEL: Record<string, string> = { ZONE: "Zone", DISTRICT: "District", AREA: "Area" };
 const CHILD: Record<string, string> = { ZONE: "DISTRICT", DISTRICT: "AREA" };
@@ -29,6 +30,16 @@ function TNode({ t, depth, onAdd, canEdit }: { t: any; depth: number; onAdd: (ki
           ) : (
             <p className="text-xs text-slate-400">{t.kind === "AREA" ? "No partner allocated — open area" : t.kind === "DISTRICT" ? "No super distributor" : ""}</p>
           )}
+          {t.kind !== "ZONE" && (
+            <p className={cn("mt-0.5 text-xs", t.staff?.length ? "text-emerald-700" : "text-amber-600")}>
+              {t.staff?.length
+                ? t.staff.map((s: any) => `${s.role === "ASM" ? "ASM" : s.role === "FEC" ? "FSE" : "BH"}: ${s.name}`).join(" · ")
+                : t.kind === "DISTRICT"
+                  ? "No ASM assigned"
+                  : "No FSE assigned"}
+            </p>
+          )}
+          {t.kind === "ZONE" && t.staff?.length > 0 && <p className="mt-0.5 text-xs text-emerald-700">{t.staff.map((s: any) => `BH: ${s.name}`).join(" · ")}</p>}
         </div>
         {canEdit && CHILD[t.kind] && (
           <Button size="sm" variant="ghost" onClick={() => onAdd(CHILD[t.kind], t)}>
@@ -80,7 +91,7 @@ export default function TerritoriesPage() {
       <PageHeader
         eyebrow="Channel"
         title="Territories"
-        description="Super distributors are allocated districts; distributors get areas inside those districts (one distributor per area). Dealers, sub dealers and outlets sit in an area."
+        description="Super distributors are allocated districts; distributors get areas inside those districts (one distributor per area). Dealers, sub dealers and outlets sit in an area. ASMs are given districts and FSEs areas — see Field team areas."
         actions={
           canEdit && (
             <Button size="sm" onClick={() => setAdd({ kind: "ZONE", parent: null })}>
@@ -89,6 +100,9 @@ export default function TerritoriesPage() {
           )
         }
       />
+      <div className="mb-4">
+        <TerritoryTabs />
+      </div>
       {error && <Notice className="mb-4">{error}</Notice>}
       <Card className="overflow-hidden">
         {!tree ? (

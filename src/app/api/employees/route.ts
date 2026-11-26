@@ -52,12 +52,20 @@ export async function GET(req: NextRequest) {
     const post = searchParams.get("post");
     if (post && /^[a-f0-9]{24}$/i.test(post)) query.$and.push({ post: new (await import("mongoose")).Types.ObjectId(post) });
     if (status) query.status = status;
+    const territory = searchParams.get("territory");
+    if (territory && /^[a-f0-9]{24}$/i.test(territory)) {
+      const { Territory } = await import("@/models/Territory");
+      const mg = await import("mongoose");
+      const kids = await Territory.find({ parent: territory }).select("_id").lean();
+      query.$and.push({ territories: { $in: [new mg.Types.ObjectId(territory), ...kids.map((k: any) => k._id)] } });
+    }
 
     const total = await User.countDocuments(query);
     const employees = await User.find(query)
       .populate("reportsTo", "name employeeCode role")
       .populate("dealer", "name dealerCode")
       .populate("post", "name code accessRole")
+      .populate("territories", "name code kind")
       .select("-passwordHash")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)

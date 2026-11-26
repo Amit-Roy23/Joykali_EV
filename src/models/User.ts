@@ -15,6 +15,8 @@ export interface IUser extends Document {
   outlet?: mongoose.Types.ObjectId | null;
   /** The post (designation) this person holds; its access level is `role`. */
   post?: mongoose.Types.ObjectId | null;
+  /** Territories this person covers now: districts for an ASM, areas for an FSE (history in TerritoryAssignment). */
+  territories?: mongoose.Types.ObjectId[];
   /** For STORE_MANAGER logins: the warehouse they run. */
   warehouse?: mongoose.Types.ObjectId | null;
   /** Statutory numbers for PF / ESI returns. */
@@ -65,6 +67,7 @@ const UserSchema = new Schema<IUser>(
     distributor: { type: Schema.Types.ObjectId, ref: "Distributor", default: null, index: true },
     outlet: { type: Schema.Types.ObjectId, ref: "Outlet", default: null, index: true },
     warehouse: { type: Schema.Types.ObjectId, ref: "Warehouse", default: null },
+    territories: { type: [{ type: Schema.Types.ObjectId, ref: "Territory" }], default: [], index: true },
     post: { type: Schema.Types.ObjectId, ref: "Post", default: null, index: true },
     uan: { type: String, trim: true, default: "" },
     esiNumber: { type: String, trim: true, default: "" },

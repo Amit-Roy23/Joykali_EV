@@ -256,6 +256,29 @@ async function main() {
   }
   check(`payment requests: paid ones have their voucher, approved ones a decision, nobody approves their own (${reqs.length})`, badReq === 0, `${badReq} wrong`);
 
+  // Field team areas: current set on the user = open spells; right kinds; one ASM per district; FSE areas inside their ASM's districts.
+  const { TerritoryAssignment } = await import("../src/models/TerritoryAssignment");
+  const { Territory: TerrM } = await import("../src/models/Territory");
+  const { User: UserM } = await import("../src/models/User");
+  const terrKind = new Map((await TerrM.find().select("kind parent").lean()).map((t: any) => [String(t._id), t]));
+  const field: any[] = await UserM.find({ role: { $in: ["ASM", "FEC", "BUSINESS_HEAD"] } }).select("name role status territories reportsTo").lean();
+  const want: Record<string, string> = { ASM: "DISTRICT", FEC: "AREA", BUSINESS_HEAD: "ZONE" };
+  let badT = 0;
+  const districtOwner = new Map<string, number>();
+  for (const u of field) {
+    const cur = (u.territories || []).map(String).sort();
+    const open = (await TerritoryAssignment.find({ employee: u._id, to: null }).select("territory").lean()).map((x: any) => String(x.territory)).sort();
+    if (cur.join() !== open.join()) badT++;
+    if (u.status !== "ACTIVE" && cur.length) badT++;
+    if (cur.some((t: string) => terrKind.get(t)?.kind !== want[u.role])) badT++;
+    if (u.role === "ASM" && u.status === "ACTIVE") for (const t of cur) districtOwner.set(t, (districtOwner.get(t) || 0) + 1);
+  }
+  const twice = [...districtOwner.values()].filter((n) => n > 1).length;
+  const asmD = new Map(field.filter((u) => u.role === "ASM").map((u) => [String(u._id), (u.territories || []).map(String)]));
+  const outside = field.filter((u) => u.role === "FEC" && u.status === "ACTIVE" && asmD.get(String(u.reportsTo))?.length && (u.territories || []).some((t: any) => !asmD.get(String(u.reportsTo))!.includes(String(terrKind.get(String(t))?.parent)))).length;
+  const badSpell = await TerritoryAssignment.countDocuments({ to: { $ne: null }, $expr: { $lt: ["$to", "$from"] } });
+  check(`field team areas: current = open spells, right kind, one ASM per district, FSE areas inside their ASM's districts (${field.length} people)`, badT === 0 && twice === 0 && outside === 0 && badSpell === 0, `${badT} mismatched, ${twice} shared districts, ${outside} outside, ${badSpell} bad spells`);
+
   console.log(`\n${pass} passed, ${fails.length} failed`);
   await mongoose.disconnect();
 }
