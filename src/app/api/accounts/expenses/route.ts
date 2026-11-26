@@ -1,3 +1,4 @@
+import { userCan } from "@/lib/grants";
 import { handle, fileFrom } from "@/lib/route";
 import { hasPermission } from "@/lib/rbac";
 import { errorResponse } from "@/lib/apiHelper";
@@ -7,10 +8,10 @@ import { createExpense, listExpenses } from "@/services/accountsService";
 /** Accounts see every expense; others with expense.create see what they entered. */
 export const GET = handle(async ({ req, user }) => {
   const sp = req.nextUrl.searchParams;
-  if (await hasPermission(user.role, "accounts.view")) {
+  if (await userCan(user, "accounts.view")) {
     return listExpenses({ status: sp.get("status") || undefined, from: sp.get("from") || undefined, to: sp.get("to") || undefined, category: sp.get("category") || undefined });
   }
-  if (!(await hasPermission(user.role, "expense.create"))) return errorResponse("Not allowed", 403);
+  if (!(await userCan(user, "expense.create"))) return errorResponse("Not allowed", 403);
   return Expense.find({ createdBy: user.userId }).sort({ date: -1 }).limit(100).lean();
 });
 

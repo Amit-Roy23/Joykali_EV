@@ -29,6 +29,7 @@ export interface IAdjustment {
   addedAt: Date;
   /** Added automatically from HR (overtime, reimbursements); replaced on every regeneration. */
   auto?: boolean;
+  wage?: boolean;
 }
 
 export interface IPayrollEntry extends Document {
@@ -66,6 +67,8 @@ const AdjustmentSchema = new Schema<IAdjustment>(
     addedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     addedAt: { type: Date, default: Date.now },
     auto: { type: Boolean, default: false },
+    /** false = not wages for ESI (e.g. travel allowance). */
+    wage: { type: Boolean, default: true },
   },
   { _id: false }
 );

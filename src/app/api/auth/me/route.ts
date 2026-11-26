@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { User } from "@/models/User";
 import { authenticateAndAuthorize, jsonResponse, errorResponse } from "@/lib/apiHelper";
-import { getPermissionsForRole } from "@/lib/rbac";
+import { permissionsForUser } from "@/lib/grants";
 
 export async function GET(req: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       return errorResponse("User not found", 404);
     }
 
-    const permissions = await getPermissionsForRole(user.role);
+    const permissions = await permissionsForUser({ userId: String((user as any).userId || (user as any)._id), role: user.role });
 
     return jsonResponse({
       user,

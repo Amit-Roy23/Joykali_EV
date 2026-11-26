@@ -14,8 +14,8 @@ export function monthLines(struct: any, setup: SalarySetup) {
   return legacyLines(struct);
 }
 
-/** Reimbursements are not wages for ESI. */
-const isWage = (reason: string) => !/^Reimbursement/i.test(reason || "");
+/** Reimbursements and travel allowance are not wages for ESI. */
+const isWage = (reason: string) => !/^(Reimbursement|Travel allowance)/i.test(reason || "");
 
 /** Entries generated before salary templates carry no setup: rebuild it from the stored structure. */
 export async function ensureSnapshotSetup(entry: any, session?: any) {
@@ -42,7 +42,7 @@ export function runPayslip(
     lopDays: x.lopDays,
     incentives: x.incentives,
     incentiveBreakdown: x.incentiveBreakdown,
-    adjustments: x.adjustments.map((a: any) => ({ amount: a.amount, reason: a.reason, wage: isWage(a.reason) })),
+    adjustments: x.adjustments.map((a: any) => ({ amount: a.amount, reason: a.reason, wage: a.wage === false ? false : isWage(a.reason) })),
     tds: x.tds,
     advanceRecovery: x.advanceRecovery,
   });

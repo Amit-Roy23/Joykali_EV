@@ -1,3 +1,4 @@
+import { userCan } from "@/lib/grants";
 import mongoose from "mongoose";
 import { JWTPayload } from "@/types";
 import { MoneyAccount, PaymentRequest, Voucher } from "@/models/Accounts";
@@ -61,7 +62,7 @@ async function activeAccount(id: any, label: string) {
 
 export async function createRequest(user: JWTPayload, input: RequestInput) {
   const [canRaise, isApprover] = await Promise.all([
-    Promise.all([hasPermission(user.role, "expense.create"), hasPermission(user.role, "accounts.manage")]).then((x) => x.some(Boolean)),
+    Promise.all([userCan(user, "expense.create"), userCan(user, "accounts.manage")]).then((x) => x.some(Boolean)),
     hasPermission(user.role, "payment.approve"),
   ]);
   if (!canRaise && !isApprover) throw new RequestError("You cannot raise payment requests", 403);
@@ -145,7 +146,7 @@ export async function decideRequest(user: JWTPayload, id: string, decision: "APP
 
 /** The cashier carries out an approved request: payment voucher (or contra for a transfer). */
 export async function payRequest(user: JWTPayload, id: string, input: { accountId?: string; date?: string; reference?: string }) {
-  if (!(await hasPermission(user.role, "accounts.manage"))) throw new RequestError("Only the cashier / accounts can pay", 403);
+  if (!(await userCan(user, "accounts.manage"))) throw new RequestError("Only the cashier / accounts can pay", 403);
   if (!mongoose.isValidObjectId(id)) throw new RequestError("Request not found", 404);
   // claim it first so two clicks cannot pay twice
   const r = await PaymentRequest.findOneAndUpdate({ _id: id, status: "APPROVED", payment: null }, { $set: { status: "PAID" } }, { new: false });
@@ -211,7 +212,7 @@ export async function cancelRequest(user: JWTPayload, id: string, reason: string
 
 /** Requests the user may see: accounts and approvers see all; anyone else sees their own. */
 export async function listRequests(user: JWTPayload, q: { status?: string; type?: string }) {
-  const all = (await hasPermission(user.role, "accounts.view")) || (await hasPermission(user.role, "payment.approve"));
+  const all = (await userCan(user, "accounts.view")) || (await hasPermission(user.role, "payment.approve"));
   const f: any = all ? {} : { requestedBy: oid(user.userId) };
   if (q.status) f.status = { $in: q.status.split(",") };
   if (q.type) f.type = q.type;
@@ -219,7 +220,7 @@ export async function listRequests(user: JWTPayload, q: { status?: string; type?
   return {
     list: list.map((r: any) => ({ ...r, direction: r.type === "TRANSFER" ? transferKind(r.account?.kind, r.toAccount?.kind).label : null })),
     canApprove: await hasPermission(user.role, "payment.approve"),
-    canPay: await hasPermission(user.role, "accounts.manage"),
+    canPay: await userCan(user, "accounts.manage"),
     me: user.userId,
   };
 }
@@ -249,6 +250,7 @@ export async function transferRegister(q: { from?: string; to?: string; directio
       status: r.status,
       purpose: r.purpose,
       requestedBy: r.requestedByName,
+      requestedById: String(r.requestedBy),
       approvedBy: r.decision?.byName,
       doneBy: null as string | null,
       reference: null as string | null,
@@ -265,6 +267,7 @@ export async function transferRegister(q: { from?: string; to?: string; directio
       status: v.status === "CANCELLED" ? "CANCELLED" : "DONE",
       purpose: v.narration,
       requestedBy: v.request?.requestedByName || v.createdByName,
+      requestedById: null as string | null,
       approvedBy: v.request?.decision?.byName || null,
       doneBy: v.createdByName,
       reference: v.reference || null,

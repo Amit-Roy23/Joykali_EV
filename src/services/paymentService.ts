@@ -1,3 +1,4 @@
+import { userCan } from "@/lib/grants";
 import mongoose from "mongoose";
 import { JWTPayload, isPartnerRole } from "@/types";
 import { LedgerEntry } from "@/models/LedgerEntry";
@@ -270,7 +271,7 @@ export async function adviceList(user: JWTPayload, status?: string) {
 
 /** Tick receipts as seen on the bank statement (or untick a mistake). */
 export async function setCleared(user: JWTPayload, ids: string[], statementDate: string | null) {
-  if (!(await hasPermission(user.role, "ledger.manage")) && !(await hasPermission(user.role, "accounts.manage"))) throw new PaymentError("Not allowed", 403);
+  if (!(await hasPermission(user.role, "ledger.manage")) && !(await userCan(user, "accounts.manage"))) throw new PaymentError("Not allowed", 403);
   if (statementDate && (!YMD.test(statementDate) || statementDate > istDay(new Date()))) throw new PaymentError("Choose the bank statement date");
   const valid = (ids || []).filter((i) => mongoose.isValidObjectId(i)).map(oid);
   if (!valid.length) throw new PaymentError("Pick at least one receipt");

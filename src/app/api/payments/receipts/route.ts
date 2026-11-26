@@ -1,3 +1,4 @@
+import { userCan } from "@/lib/grants";
 import ExcelJS from "exceljs";
 import { handle } from "@/lib/route";
 import { errorResponse } from "@/lib/apiHelper";
@@ -8,7 +9,7 @@ import { receiptRegister } from "@/services/paymentService";
 
 /** Payments received from partners. ?from&to&mode&account&cleared=yes|no&party&format=xlsx */
 export const GET = handle(async ({ req, user }) => {
-  if (!(await hasPermission(user.role, "ledger.view")) && !(await hasPermission(user.role, "accounts.view"))) return errorResponse("Not allowed", 403);
+  if (!(await hasPermission(user.role, "ledger.view")) && !(await userCan(user, "accounts.view"))) return errorResponse("Not allowed", 403);
   const sp = req.nextUrl.searchParams;
   const r = await receiptRegister(user, {
     from: sp.get("from") || undefined,

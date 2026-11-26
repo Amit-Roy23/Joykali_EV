@@ -66,7 +66,7 @@ export async function authenticateAndAuthorize(
   }
 
   if (requiredPermission) {
-    const permitted = await hasPermission(user.role, requiredPermission);
+    const permitted = (await hasPermission(user.role, requiredPermission)) || (await (await import("./grants")).userCan(user, requiredPermission));
     if (!permitted) {
       return {
         user: null,

@@ -1,3 +1,4 @@
+import { userCan } from "@/lib/grants";
 import { NextRequest, NextResponse } from "next/server";
 import mongoose from "mongoose";
 import { connectToDatabase } from "@/lib/db";
@@ -23,8 +24,8 @@ async function canOpen(user: JWTPayload, fileId: mongoose.Types.ObjectId, upload
   if (String(uploadedBy) === user.userId) return true;
   if (await FleetVehicle.exists({ "documents.file": fileId })) return hasPermission(user.role, "fleet.view");
   const advice: any = await PaymentAdvice.findOne({ proof: fileId }).select("partyType party").lean();
-  if (advice) return (await hasPermission(user.role, "accounts.view")) || ((await hasPermission(user.role, "ledger.view")) && (await canActOnParty(user, advice.partyType, advice.party)).ok);
-  if (await Expense.exists({ bill: fileId })) return (await hasPermission(user.role, "accounts.view")) || (await hasPermission(user.role, "approvals.sign"));
+  if (advice) return (await userCan(user, "accounts.view")) || ((await hasPermission(user.role, "ledger.view")) && (await canActOnParty(user, advice.partyType, advice.party)).ok);
+  if (await Expense.exists({ bill: fileId })) return (await userCan(user, "accounts.view")) || (await hasPermission(user.role, "approvals.sign"));
   const kyc: any = await PartyDocument.findOne({ file: fileId }).select("partyType party").lean();
   if (kyc) return (await canActOnParty(user, kyc.partyType, kyc.party)).ok;
   const photoOf: any = await User.findOne({ "profile.photo": fileId }).select("_id").lean();

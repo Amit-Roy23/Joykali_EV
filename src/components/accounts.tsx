@@ -35,6 +35,7 @@ const TABS = [
   { href: "/accounts/expenses", label: "Expenses", perm: "expense.create" },
   { href: "/accounts/requests", label: "Payment requests", perm: "expense.create" },
   { href: "/accounts/transfers", label: "Transfers", perm: "accounts.view" },
+  { href: "/accounts/handover", label: "Cash handover", perm: "accounts.view" },
   { href: "/accounts/outstanding", label: "Outstanding", perm: "accounts.view" },
   { href: "/accounts/budget", label: "Budget vs actual", perm: "accounts.view" },
 ];

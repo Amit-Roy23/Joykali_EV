@@ -9,6 +9,8 @@ import {
   Store,
   Users,
   MapPin,
+  KeyRound,
+  Calculator,
   Network,
   Trophy,
   Sparkles,
@@ -150,6 +152,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Earnings",
     items: [
       { title: "My Incentives", href: "/incentives/my-incentives", icon: Trophy, permission: "scheme.view" },
+      { title: "Payout Structure", href: "/incentives/payout-structure", icon: Calculator, permission: ["scheme.view", "payroll.view"], audience: "staff" },
       { title: "Payslips", href: "/payslips", icon: FileText, permission: "payslip.view.own" },
       { title: "Incentive Schemes", href: "/schemes", icon: Sparkles, permission: "scheme.view" },
       { title: "Scheme Builder", href: "/schemes/builder", icon: Wand2, permission: "scheme.create" },
@@ -166,6 +169,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Expenses", href: "/accounts/expenses", icon: Receipt, permission: ["accounts.view", "expense.create"], audience: "staff" },
       { title: "Payment Requests", href: "/accounts/requests", icon: HandCoins, permission: ["payment.approve", "expense.create", "accounts.manage"], audience: "staff" },
       { title: "Bank & Cash Transfers", href: "/accounts/transfers", icon: Landmark, permission: "accounts.view", audience: "staff" },
+      { title: "Cash Handover", href: "/accounts/handover", icon: KeyRound, permission: ["accounts.view", "payment.approve"], audience: "staff" },
       { title: "Outstanding", href: "/accounts/outstanding", icon: Scale, permission: "accounts.view", audience: "staff" },
       { title: "Budget vs Actual", href: "/accounts/budget", icon: PieChart, permission: "accounts.view", audience: "staff" },
     ],
@@ -187,6 +191,8 @@ const EXTRA_ROUTES: Array<{ prefix: string; permission?: string | string[]; titl
   { prefix: "/dispatch", permission: "dispatch.view", title: "Delivery Orders" },
   { prefix: "/purchases/new", permission: "purchase.manage", title: "New Purchase" },
   { prefix: "/change-password", title: "Change Password" },
+  // the person a cash box is being handed to opens this before they have cashier rights
+  { prefix: "/accounts/handover/accept", title: "Accept Cash Handover" },
 ];
 
 export function canSee(item: { permission?: string | string[]; audience?: "staff" | "partner" }, role: string, permissions: string[]) {

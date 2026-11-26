@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { planIncentiveLines } from "./payoutPlanService";
 import { IncentiveScheme } from "@/models/IncentiveScheme";
 import { IncentiveLedger } from "@/models/IncentiveLedger";
 import { Sale } from "@/models/Sale";
@@ -84,6 +85,8 @@ export async function recalculateIncentivesForPeriod(
   };
 
   const updated: mongoose.Types.ObjectId[] = [];
+  // Joykali payout structure (activation benefit + target incentive) for ASMs / FSEs.
+  const planLines = await planIncentiveLines(employeeIds.filter(Boolean), period);
 
   for (const empId of employeeIds) {
     if (!empId) continue;
@@ -129,12 +132,16 @@ export async function recalculateIncentivesForPeriod(
       }
     }
 
+    const fromPlan = planLines.get(String(employee._id)) || [];
+    breakdownItems.push(...fromPlan);
+    const planTotal = fromPlan.reduce((t: number, l: any) => t + l.earnedAmount, 0);
+
     await IncentiveLedger.findOneAndUpdate(
       { employee: employee._id, period },
       {
         employee: employee._id,
         period,
-        totalEarned: output.totalIncentiveEarned,
+        totalEarned: output.totalIncentiveEarned + planTotal,
         totalUnits: countedSales.size,
         breakdown: breakdownItems,
         isLocked: false,
@@ -241,5 +248,8 @@ export async function resolveRecruiter(id: unknown): Promise<mongoose.Types.Obje
 export async function recalcRecruitment(recruiters: Array<unknown>, onboardingDate: Date | string | null | undefined) {
   const ids = [...new Set(recruiters.filter(Boolean).map(String))];
   if (!ids.length || !onboardingDate) return;
-  await recalculateIncentivesForPeriod(ids, new Date(onboardingDate));
+  // an ASM paid on the team's dealers (payout structure) is recalculated too
+  const managers = await User.find({ _id: { $in: ids } }).select("reportsTo").lean();
+  const all = [...new Set([...ids, ...managers.map((m: any) => (m.reportsTo ? String(m.reportsTo) : "")).filter(Boolean)])];
+  await recalculateIncentivesForPeriod(all, new Date(onboardingDate));
 }
