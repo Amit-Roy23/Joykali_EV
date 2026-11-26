@@ -329,3 +329,61 @@ const BatteryJobSchema = new Schema<IBatteryJob>(
   { timestamps: true }
 );
 export const BatteryJob = model<IBatteryJob>("BatteryJob", BatteryJobSchema);
+
+/**
+ * Battery taken out of a vehicle — why, by whom, where it went — and whether it was put back.
+ * One open (REMOVED) record per vehicle at a time; the vehicle carries batteryRemoved = true meanwhile.
+ */
+export const BATTERY_REMOVAL_REASONS = {
+  CUSTOMER_NO_BATTERY: "Customer buying the vehicle without battery",
+  FAULTY: "Battery faulty / weak — for check, repair or warranty claim",
+  NEEDED_ELSEWHERE: "Battery needed for another vehicle or a battery sale",
+  DISPLAY: "Showroom display vehicle (battery kept separately)",
+  STORAGE: "Long storage / safety — battery stored separately",
+  OTHER: "Other",
+} as const;
+export type BatteryRemovalReason = keyof typeof BATTERY_REMOVAL_REASONS;
+
+export interface IBatteryRemoval extends Document {
+  vehicle: mongoose.Types.ObjectId;
+  chassisNumber: string;
+  modelName: string;
+  item: mongoose.Types.ObjectId;
+  serialNo?: string;
+  warehouse: mongoose.Types.ObjectId;
+  condition: StockCondition;
+  reason: BatteryRemovalReason;
+  notes: string;
+  status: "REMOVED" | "REFITTED";
+  sale?: mongoose.Types.ObjectId | null;
+  saleCode?: string;
+  removedAt: Date;
+  removedBy: mongoose.Types.ObjectId;
+  removedByName: string;
+  refit?: { at: Date; byName: string; item: mongoose.Types.ObjectId; serialNo?: string; warehouse: mongoose.Types.ObjectId; notes?: string } | null;
+}
+const BatteryRemovalSchema = new Schema<IBatteryRemoval>(
+  {
+    vehicle: ref("Vehicle", { required: true, index: true }),
+    chassisNumber: { type: String, required: true },
+    modelName: { type: String, default: "" },
+    item: ref("Item", { required: true }),
+    serialNo: { type: String, uppercase: true, trim: true },
+    warehouse: ref("Warehouse", { required: true }),
+    condition: { type: String, enum: ["GOOD", "DEFECTIVE", "REPAIR"], default: "GOOD" },
+    reason: { type: String, enum: Object.keys(BATTERY_REMOVAL_REASONS), required: true },
+    notes: { type: String, required: true, trim: true },
+    status: { type: String, enum: ["REMOVED", "REFITTED"], default: "REMOVED", index: true },
+    sale: ref("Sale", { default: null }),
+    saleCode: String,
+    removedAt: { type: Date, required: true, index: true },
+    removedBy: ref("User", { required: true }),
+    removedByName: { type: String, required: true },
+    refit: {
+      type: new Schema({ at: Date, byName: String, item: ref("Item"), serialNo: String, warehouse: ref("Warehouse"), notes: String }, { _id: false }),
+      default: null,
+    },
+  },
+  { timestamps: true }
+);
+export const BatteryRemoval = model<IBatteryRemoval>("BatteryRemoval", BatteryRemovalSchema);

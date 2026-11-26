@@ -12,7 +12,7 @@ import { api, Notice, rupees, rupeesShort } from "@/components/workflow";
 import { QuickFormModal } from "@/components/network";
 import { AccountsTabs, Amt, PayModal } from "@/components/accounts";
 
-const KIND_LABEL: Record<string, string> = { expense: "Expense", payroll: "Salaries", advance: "Advance / loan", settlement: "Full & final", purchase: "Supplier" };
+const KIND_LABEL: Record<string, string> = { expense: "Expense", payroll: "Salaries", advance: "Advance / loan", settlement: "Full & final", purchase: "Supplier", request: "Request", transfer: "Transfer" };
 
 export default function AccountsOverviewPage() {
   const { can } = useSession();
@@ -108,11 +108,18 @@ export default function AccountsOverviewPage() {
                   </p>
                 </div>
                 <span className="font-semibold tabular">{rupees(p.amount)}</span>
-                {manage && (
-                  <Button size="sm" onClick={() => setPay(p)}>
-                    <Wallet className="h-4 w-4" /> Pay
-                  </Button>
-                )}
+                {manage &&
+                  (p.kind === "transfer" ? (
+                    <Link href="/accounts/requests">
+                      <Button size="sm">
+                        <Wallet className="h-4 w-4" /> Do transfer
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Button size="sm" onClick={() => setPay(p)}>
+                      <Wallet className="h-4 w-4" /> Pay
+                    </Button>
+                  ))}
               </li>
             ))}
             {d.payouts.length === 0 && <li className="px-4 py-3 text-sm text-slate-500">Nothing waiting to be paid.</li>}

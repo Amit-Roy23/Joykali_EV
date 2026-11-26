@@ -68,6 +68,7 @@ const BH_BASE: Permission[] = [
   "purchase.create",
   "price.manage",
   "parts.sell",
+  "payment.approve",
 ];
 const MP_BASE: Permission[] = [...BH_BASE, "sales.cancel", "purchase.manage", "payroll.lock", "audit.view", "accounts.manage"];
 

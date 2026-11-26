@@ -6,6 +6,7 @@ import { ArrowLeft, Clock, MapPin, Truck, User, ArrowDownRight } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Badge, StatusBadge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { BatteryPanel } from "@/components/batteryPanel";
 
 export default function VehicleDetailPage({
   params,
@@ -16,6 +17,7 @@ export default function VehicleDetailPage({
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     fetch(`/api/vehicles/${id}/movements`)
       .then((res) => res.json())
@@ -23,7 +25,7 @@ export default function VehicleDetailPage({
         if (res.success) setData(res.data);
         setLoading(false);
       });
-  }, [id]);
+  }, [id, tick]);
 
   if (loading) {
     return <div className="p-8 text-center text-slate-500">Loading vehicle history...</div>;
@@ -93,6 +95,8 @@ export default function VehicleDetailPage({
         </Card>
       </div>
 
+      <BatteryPanel vehicle={vehicle} onChanged={() => setTick((t) => t + 1)} />
+
       {/* Movement Timeline */}
       <Card>
         <CardHeader>
@@ -113,7 +117,7 @@ export default function VehicleDetailPage({
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                         <Badge variant="secondary" className="text-[10px]">
-                          {m.movementType}
+                          {m.movementType.replace(/_/g, " ")}
                         </Badge>
                         {m.reference && <span className="font-mono text-slate-600 font-semibold">#{m.reference}</span>}
                       </span>

@@ -232,6 +232,30 @@ async function main() {
   const repairHeld = (await ItemStock.find({ condition: "REPAIR" }).lean()).reduce((t: number, x: any) => t + x.qty, 0);
   check("battery service: customer batteries held = jobs still in repair", repairHeld === jobs.filter((j) => j.status === "IN_REPAIR").length, `${repairHeld} vs ${jobs.filter((j) => j.status === "IN_REPAIR").length}`);
 
+  // ---------------- Battery out register & payment requests
+  const { BatteryRemoval } = await import("../src/models/Item");
+  const openRemovals = await BatteryRemoval.find({ status: "REMOVED" }).select("vehicle").lean();
+  const offVehicles = await Vehicle.find({ batteryRemoved: true }).select("_id").lean();
+  const openSet = new Set(openRemovals.map((r: any) => String(r.vehicle)));
+  check(
+    `battery register: every vehicle without battery has one open record, and only those (${offVehicles.length})`,
+    openRemovals.length === offVehicles.length && offVehicles.every((v: any) => openSet.has(String(v._id))),
+    `${openRemovals.length} records vs ${offVehicles.length} vehicles`
+  );
+  const { Item: ItemM } = await import("../src/models/Item");
+  check("batteries carry 18% GST", (await ItemM.countDocuments({ category: "BATTERY", gstRate: { $ne: 18 } })) === 0);
+  const { PaymentRequest, Voucher: VoucherM } = await import("../src/models/Accounts");
+  const reqs: any[] = await PaymentRequest.find().lean();
+  let badReq = 0;
+  for (const r of reqs) {
+    const v: any = r.payment?.voucher ? await VoucherM.findById(r.payment.voucher).lean() : null;
+    if (r.status === "PAID" && (!v || v.amount !== r.amount || v.status !== "POSTED" || String(v.request) !== String(r._id) || v.type !== (r.type === "TRANSFER" ? "CONTRA" : "PAYMENT"))) badReq++;
+    if (r.status !== "PAID" && r.payment) badReq++;
+    if (["APPROVED", "PAID", "REJECTED"].includes(r.status) && !r.decision) badReq++;
+    if (r.decision && String(r.decision.by) === String(r.requestedBy) && !["BUSINESS_HEAD", "MANAGING_PARTNER", "ADMIN"].includes(r.requestedByRole)) badReq++;
+  }
+  check(`payment requests: paid ones have their voucher, approved ones a decision, nobody approves their own (${reqs.length})`, badReq === 0, `${badReq} wrong`);
+
   console.log(`\n${pass} passed, ${fails.length} failed`);
   await mongoose.disconnect();
 }

@@ -158,6 +158,7 @@ export const SaleCreateSchema = z.object({
   withoutBattery: z.boolean().optional(),
   batteryItemId: z.string().optional(),
   batteryWarehouseId: z.string().optional(),
+  batteryNote: z.string().max(300).optional(),
   dealerId: z.string().optional().nullable(),
   soldBy: z.string().min(1, "Salesperson (FSE) is required"),
   priceBreakdown: z.object({

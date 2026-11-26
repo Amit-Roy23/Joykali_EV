@@ -526,7 +526,7 @@ export async function cancelExpense(user: JWTPayload, id: string, reason: string
 /* Payouts: approved expenses, salaries, advances, settlements, suppliers */
 /* ------------------------------------------------------------------ */
 
-export type PayoutKind = "expense" | "payroll" | "advance" | "settlement" | "purchase";
+export type PayoutKind = "expense" | "payroll" | "advance" | "settlement" | "purchase" | "request" | "transfer";
 
 /** Everything approved that still has to be paid out. */
 export async function pendingPayouts() {
@@ -538,7 +538,17 @@ export async function pendingPayouts() {
     Purchase.find({ paymentStatus: { $ne: "PAID" } }).populate("supplier", "name").sort({ invoiceDate: 1 }).lean(),
   ]);
   const paid = (p: any) => (p.payments || []).reduce((s: number, x: any) => s + x.amount, 0);
+  const { PaymentRequest } = await import("@/models/Accounts");
+  const requests = await PaymentRequest.find({ status: "APPROVED" }).populate("account", "name").populate("toAccount", "name").sort({ createdAt: 1 }).lean();
   return [
+    ...requests.map((r: any) => ({
+      kind: (r.type === "TRANSFER" ? "transfer" : "request") as "transfer" | "request",
+      id: String(r._id),
+      title: `${r.code} · ${r.type === "TRANSFER" ? `${r.account?.name} → ${r.toAccount?.name}` : r.head}`,
+      subtitle: `${r.purpose}${r.payee ? ` · ${r.payee}` : ""} · approved by ${r.decision?.byName || "—"}`,
+      amount: r.amount,
+      since: istDay(r.decision?.at || r.createdAt),
+    })),
     ...expenses.map((e: any) => ({ kind: "expense" as const, id: String(e._id), title: `${e.code} · ${e.category}`, subtitle: `${e.description}${e.vendor ? ` · ${e.vendor}` : ""} · bill ${e.date}`, amount: e.total, since: e.date })),
     ...runs.map((r: any) => ({ kind: "payroll" as const, id: String(r._id), title: `Salaries ${r.runCode}`, subtitle: `${r.totals?.totalEmployees || 0} staff · net pay (locked)`, amount: r.totals?.totalNet || 0, since: istDay(r.lockedAt || r.updatedAt) })),
     ...advances.map((a: any) => ({ kind: "advance" as const, id: String(a._id), title: `${a.code} · ${a.employeeName}`, subtitle: `${a.kind === "LOAN" ? "Loan" : "Salary advance"} approved · ${a.reason}`, amount: a.amount, since: istDay(a.updatedAt) })),
@@ -554,6 +564,10 @@ export async function pendingPayouts() {
 /** Record a payout from a cash or bank account. Purchases accept a part payment. */
 export async function recordPayout(user: JWTPayload, kind: PayoutKind, id: string, input: { accountId: string; date?: string; reference?: string; amountRupees?: number }) {
   if (!mongoose.isValidObjectId(id)) throw new AccountsError("Not found", 404);
+  if (kind === "request" || kind === "transfer") {
+    const { payRequest } = await import("./paymentRequestService");
+    return payRequest(user, id, input);
+  }
   const date = payDate(input.date);
   const a = await openAccount(input.accountId, date);
   const st = stamp(user, a, date, input.reference);
@@ -605,6 +619,15 @@ export async function recordPayout(user: JWTPayload, kind: PayoutKind, id: strin
     summary = `${p.purchaseCode} ${amt}`;
   } else throw new AccountsError("Unknown payout");
   await logAudit({ user, action: "PAYMENT", resource: "ACCOUNTS", resourceId: id, after: { kind, account: a.name, date, summary } });
+  // Done: tell the Admin and Business Head (and whoever entered an expense bill).
+  const { notifyRoles, notifyUsers } = await import("./notificationService");
+  const label: Record<string, string> = { expense: "Expense", payroll: "Salaries", advance: "Advance / loan", settlement: "Full & final", purchase: "Supplier invoice" };
+  const notice = { kind: "payment", title: `Paid: ${label[kind]} ${summary.split(" ")[0]}`, body: `Paid from ${a.name} by ${user.name} on ${date}${input.reference ? ` (ref ${input.reference})` : ""}.`, href: "/accounts/books" };
+  await notifyRoles(["ADMIN", "BUSINESS_HEAD"], notice, user.userId);
+  if (kind === "expense") {
+    const e: any = await Expense.findById(id).select("createdBy").lean();
+    await notifyUsers([e?.createdBy], notice, user.userId);
+  }
   return { ok: true };
 }
 
@@ -617,7 +640,7 @@ export async function voucherHeads() {
   return {
     RECEIPT: [...cfg.incomeHeads, ...NON_INCOME_RECEIPTS],
     PAYMENT: [...cfg.expenseCategories, ...NON_EXPENSE_PAYMENTS],
-    CONTRA: ["Cash deposited in bank", "Cash withdrawn from bank", "Transfer between banks"],
+    CONTRA: ["Cash deposited in bank", "Cash withdrawn from bank", "Transfer between banks", "Transfer between cash accounts"],
   };
 }
 

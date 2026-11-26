@@ -334,6 +334,15 @@ export async function getDashboardData(user: JWTPayload) {
       actions.push({ kind: "approval", label: `${mine.length} approval${mine.length > 1 ? "s" : ""} waiting for your signature`, href: "/approvals", tone: "amber" });
     }
   }
+  // Payment / transfer requests waiting for the Admin, Business Head or Managing Partner.
+  if (["ADMIN", "BUSINESS_HEAD", "MANAGING_PARTNER"].includes(user.role)) {
+    const { PaymentRequest } = await import("@/models/Accounts");
+    const waiting = await PaymentRequest.find({ status: "PENDING", requestedBy: { $ne: new mongoose.Types.ObjectId(user.userId) } }).select("amount").lean();
+    if (waiting.length) {
+      const amt = waiting.reduce((s: number, r: any) => s + r.amount, 0);
+      actions.unshift({ kind: "payment", label: `${waiting.length} payment request${waiting.length > 1 ? "s" : ""} waiting for your approval (₹${Math.round(amt / 100).toLocaleString("en-IN")})`, href: "/accounts/requests", tone: "amber" });
+    }
+  }
   // Approved money waiting for Accounts to pay (expenses, salaries, advances, F&F, supplier bills).
   if (user.role === "ACCOUNTANT") {
     const { pendingPayouts } = await import("./accountsService");
