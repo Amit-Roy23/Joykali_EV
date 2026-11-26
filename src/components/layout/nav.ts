@@ -10,6 +10,7 @@ import {
   Users,
   MapPin,
   KeyRound,
+  Calculator,
   Network,
   Trophy,
   Sparkles,
@@ -151,6 +152,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "Earnings",
     items: [
       { title: "My Incentives", href: "/incentives/my-incentives", icon: Trophy, permission: "scheme.view" },
+      { title: "Payout Structure", href: "/incentives/payout-structure", icon: Calculator, permission: ["scheme.view", "payroll.view"], audience: "staff" },
       { title: "Payslips", href: "/payslips", icon: FileText, permission: "payslip.view.own" },
       { title: "Incentive Schemes", href: "/schemes", icon: Sparkles, permission: "scheme.view" },
       { title: "Scheme Builder", href: "/schemes/builder", icon: Wand2, permission: "scheme.create" },

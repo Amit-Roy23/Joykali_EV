@@ -1,4 +1,6 @@
 import { PayrollRun, IPayrollRun } from "@/models/PayrollRun";
+import { planFor } from "./payoutPlanService";
+import { taForMonth } from "./payoutPlanEngine";
 import { PayrollEntry, IPayrollEntry } from "@/models/PayrollEntry";
 import { User } from "@/models/User";
 import { SalaryStructure } from "@/models/SalaryStructure";
@@ -130,6 +132,12 @@ export async function generateDraftPayrollRun(
         ...(hr.otPay > 0 ? [{ amount: hr.otPay, reason: `Overtime ${(hr.otMinutes / 60).toFixed(1)} h (approved)`, addedBy: systemUser, addedAt: new Date(), auto: true }] : []),
         ...hr.claims.map((c) => ({ amount: c.amount, reason: `Reimbursement ${c.code}`, addedBy: systemUser, addedAt: new Date(), auto: true })),
       ];
+      // Travel allowance from the payout structure (cut for unpaid days; not ESI wages).
+      const plan = await planFor(emp.role, period);
+      if (plan && plan.ta > 0) {
+        const ta = taForMonth(plan.ta, workingDays, lopDays);
+        if (ta > 0) autoAdjustments.push({ amount: ta, reason: "Travel allowance (TA)", addedBy: systemUser, addedAt: new Date(), auto: true, wage: false } as any);
+      }
       const adjustments = [...manualAdjustments, ...autoAdjustments];
       const tds = existingEntry?.deductions?.tds || 0;
       const loanRecovery = hr.loans.reduce((s, l) => s + l.amount, 0);
@@ -229,6 +237,15 @@ export async function adjustPayrollEntry(
     const lopDays = data.lopDays ?? entry.lopDays;
 
     const adjustments = [...(entry.adjustments || [])];
+    // TA follows the paid days: re-work it when working / LOP days change.
+    const taIdx = adjustments.findIndex((a: any) => a.auto && a.reason === "Travel allowance (TA)");
+    if (taIdx >= 0) {
+      const emp: any = await User.findById(entry.employee).select("role").session(session ?? null).lean();
+      const plan = await planFor(emp?.role, `${run.year}-${String(run.month).padStart(2, "0")}`);
+      const ta = plan ? taForMonth(plan.ta, workingDays, lopDays) : 0;
+      if (ta > 0) adjustments[taIdx] = { ...(adjustments[taIdx] as any).toObject?.() ?? adjustments[taIdx], amount: ta } as any;
+      else adjustments.splice(taIdx, 1);
+    }
     if (data.adjustment && data.adjustment.amount !== 0) {
       adjustments.push({
         amount: rupeesToPaise(data.adjustment.amount),

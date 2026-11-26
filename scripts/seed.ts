@@ -52,6 +52,8 @@ import { signApproval } from "../src/services/approvalService";
 import { assignTerritories } from "../src/services/territoryAssignService";
 import { Territory } from "../src/models/Territory";
 import { TerritoryAssignment } from "../src/models/TerritoryAssignment";
+import { PayoutPlan } from "../src/models/PayoutPlan";
+import { recalcRecruitment } from "../src/services/incentiveService";
 import { placeOrder, recordPayment, requestCreditChange } from "../src/services/orderService";
 import {
   autoPick,
@@ -272,9 +274,9 @@ async function main() {
   const mp = await makeUser("MANAGING_PARTNER", "Joydeb Kali Sarkar", "mp@joykaliev.in", "Managing Partner", null, { basic: 60000, hra: 24000, conveyance: 6000, other: 30000 });
   const bh = await makeUser("BUSINESS_HEAD", "Ananya Bhattacharya", "bh@joykaliev.in", "Business Head — West Bengal", mp, { basic: 42000, hra: 16800, conveyance: 4800, other: 21400 });
 
-  const asmNorth = await makeUser("ASM", "Tanmoy Ghosh", "asm.north@joykaliev.in", "Area Sales Manager — North Bengal", bh, { basic: 18000, hra: 7200, conveyance: 2400, other: 4400 });
-  const asmKolkata = await makeUser("ASM", "Moumita Banerjee", "asm.kolkata@joykaliev.in", "Area Sales Manager — Kolkata Metro", bh, { basic: 18000, hra: 7200, conveyance: 2400, other: 4400 });
-  const asmSouth = await makeUser("ASM", "Partha Mondal", "asm.south@joykaliev.in", "Area Sales Manager — South Bengal", bh, { basic: 18000, hra: 7200, conveyance: 2400, other: 4400 });
+  const asmNorth = await makeUser("ASM", "Tanmoy Ghosh", "asm.north@joykaliev.in", "Area Sales Manager — North Bengal", bh, { basic: 13000, hra: 5200, conveyance: 1600, other: 6200 });
+  const asmKolkata = await makeUser("ASM", "Moumita Banerjee", "asm.kolkata@joykaliev.in", "Area Sales Manager — Kolkata Metro", bh, { basic: 13000, hra: 5200, conveyance: 1600, other: 6200 });
+  const asmSouth = await makeUser("ASM", "Partha Mondal", "asm.south@joykaliev.in", "Area Sales Manager — South Bengal", bh, { basic: 13000, hra: 5200, conveyance: 1600, other: 6200 });
 
   // ---------------------------------------------------------------- dealers
   console.log("• Dealer network");
@@ -326,6 +328,12 @@ async function main() {
     { name: "Mithun Halder", asm: asmSouth, dealer: 5, skill: 1.15 },
     { name: "Shyamal Bose", asm: asmSouth, dealer: 5, skill: 0.75 },
   ];
+  // Joykali's payout structure (client sheet): ASM ₹26,000 + ₹500/dealer × 40 + ₹60/vehicle × 600 (team) + TA ₹2,000 = CTC ₹84,000;
+  // FSE ₹18,000 + ₹1,000/dealer × 5 + ₹180/vehicle × 75 + TA ₹3,000 = CTC ₹39,500. Paid on all once the monthly number is reached.
+  await PayoutPlan.create([
+    { role: "ASM", effectiveFrom: months[0].period, salary: rupeesToPaise(26000), perDealer: rupeesToPaise(500), dealerTarget: 40, dealerPay: "ON_TARGET", vehicleTarget: 600, perVehicle: rupeesToPaise(60), vehiclePay: "ON_TARGET", ta: rupeesToPaise(2000), measure: "TEAM", headcount: 1, updatedByName: "Joydeb Kali Sarkar", note: "Counted on the ASM's whole team" },
+    { role: "FEC", effectiveFrom: months[0].period, salary: rupeesToPaise(18000), perDealer: rupeesToPaise(1000), dealerTarget: 5, dealerPay: "ON_TARGET", vehicleTarget: 75, perVehicle: rupeesToPaise(180), vehiclePay: "ON_TARGET", ta: rupeesToPaise(3000), measure: "SELF", headcount: 1, updatedByName: "Joydeb Kali Sarkar" },
+  ]);
   const fecs: Array<{ user: any; skill: number; dealer: any }> = [];
   for (const [i, f] of fecSpecs.entries()) {
     const user = await makeUser(
@@ -334,7 +342,7 @@ async function main() {
       `fse${i + 1}@joykaliev.in`,
       "Field Sales Executive",
       f.asm,
-      { basic: 9000 + (i % 3) * 500, hra: 3600, conveyance: 1600, other: 1800, esi: true },
+      { basic: 9000, hra: 3600, conveyance: 1600, other: 3800, esi: true },
       { dealer: dealers[f.dealer]._id }
     );
     fecs.push({ user, skill: f.skill, dealer: dealers[f.dealer] });
@@ -1462,7 +1470,7 @@ async function main() {
   void Item;
 
   // FSE recruitment: the top FSE appointed five dealers this month, another FSE two.
-  console.log("• FSE dealer recruitment + target commission scheme");
+  console.log("• FSE dealer recruitment (payout structure)");
   const newDealer = async (name: string, city: string, fse: any, day: number) => {
     const code = await generateDealerCode();
     return Dealer.create({
@@ -1474,20 +1482,8 @@ async function main() {
   };
   for (const [i, [n, c]] of [["Maa Tara EV Point", "Habra"], ["Green Wheels", "Bongaon"], ["Joy Motors", "Basirhat"], ["E-Ride Hub", "Barrackpore"], ["Shakti Auto", "Naihati"]].entries()) await newDealer(n, c, fecs[0], 2 + i * 2);
   for (const [i, [n, c]] of [["Sundarban EV", "Canning"], ["Riya Electric", "Diamond Harbour"]].entries()) await newDealer(n, c, fecs[1], 3 + i * 3);
-  const fseScheme = await IncentiveScheme.create({
-    name: "FSE dealer recruitment + target commission",
-    description: "₹1,000 per dealer appointed once 5 are appointed in the month; ₹500 per vehicle once the monthly target is met.",
-    status: "DRAFT",
-    validFrom: current.start,
-    validTo: current.end,
-    applicableRoles: ["FEC"],
-    rules: [
-      { ruleType: "DEALER_RECRUITMENT", minRecruits: 5, perRecruitAmount: rupeesToPaise(1000), perDistributorAmount: 0, countSubDealers: true },
-      { ruleType: "TARGET_COMMISSION", perUnitAmount: rupeesToPaise(500), targetUnits: 6, targetPayout: "ALL_WHEN_MET" },
-    ],
-  });
-  await signApproval("scheme", String(fseScheme._id), bhPayload, "APPROVED");
-  await signApproval("scheme", String(fseScheme._id), mpPayload, "APPROVED");
+  // These recruits are paid by the payout structure (₹1,000 per dealer once 5 are activated in the month).
+  await recalcRecruitment([fecs[0].user._id, fecs[1].user._id], new Date());
 
 
   // Battery taken out of a stock vehicle (faulty) — kept in the battery out register.

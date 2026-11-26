@@ -300,6 +300,38 @@ async function main() {
   }
   check(`cash custody: holder matches the last accepted handover, differences add up (${boxes.length} cash box(es))`, badC === 0, `${badC} wrong`);
 
+  // Payout structure: this month's plan lines in each ASM / FSE ledger match the structure; TA on payslips matches the plan.
+  const { planIncentiveLines, planFor } = await import("../src/services/payoutPlanService");
+  const { taForMonth } = await import("../src/services/payoutPlanEngine");
+  const { IncentiveLedger: IL } = await import("../src/models/IncentiveLedger");
+  const { getCurrentPeriod } = await import("../src/lib/period");
+  const per = getCurrentPeriod();
+  const fieldIds = (await UserM.find({ role: { $in: ["ASM", "FEC"] }, status: "ACTIVE" }).select("_id").lean()).map((u: any) => u._id);
+  const want2 = await planIncentiveLines(fieldIds, per);
+  let badP = 0;
+  for (const id of fieldIds) {
+    const led: any = await IL.findOne({ employee: id, period: per }).lean();
+    const got = (led?.breakdown || []).filter((b: any) => String(b.ruleType).startsWith("PLAN_"));
+    const exp = want2.get(String(id)) || [];
+    if (exp.length !== got.length || exp.some((e: any) => !got.find((g: any) => g.ruleType === e.ruleType && g.earnedAmount === e.earnedAmount))) badP++;
+    if (led && led.totalEarned !== (led.breakdown || []).reduce((t: number, b: any) => t + (b.earnedAmount || 0), 0)) badP++;
+  }
+  const { PayrollEntry: PE } = await import("../src/models/PayrollEntry");
+  const { PayrollRun: PR } = await import("../src/models/PayrollRun");
+  let badTa = 0, taCount = 0;
+  for (const run of (await PR.find().lean()) as any[]) {
+    const period = `${run.year}-${String(run.month).padStart(2, "0")}`;
+    const entries: any[] = await PE.find({ payrollRun: run._id }).populate("employee", "role").lean();
+    for (const e of entries) {
+      const plan: any = await planFor(e.employee?.role, period);
+      const ta = (e.adjustments || []).filter((a: any) => a.reason === "Travel allowance (TA)").reduce((t: number, a: any) => t + a.amount, 0);
+      const exp = plan ? taForMonth(plan.ta, e.workingDays, e.lopDays) : 0;
+      if (ta !== exp) badTa++;
+      if (ta) taCount++;
+    }
+  }
+  check(`payout structure: plan incentives in this month's ledgers and TA on ${taCount} payslips match the structure`, badP === 0 && badTa === 0, `${badP} ledgers, ${badTa} payslips wrong`);
+
   console.log(`\n${pass} passed, ${fails.length} failed`);
   await mongoose.disconnect();
 }
