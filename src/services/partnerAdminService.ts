@@ -14,6 +14,7 @@ import { SecurityDeposit } from "@/models/SecurityDeposit";
 import { PartnerTarget } from "@/models/PartnerTarget";
 import { Territory, TerritoryKind } from "@/models/Territory";
 import { Outlet } from "@/models/Outlet";
+import { staffByTerritory } from "./territoryAssignService";
 import { StockTransfer } from "@/models/StockTransfer";
 import { StoredFile } from "@/models/StoredFile";
 import { Sale } from "@/models/Sale";
@@ -368,6 +369,7 @@ export async function createTerritory(user: JWTPayload, input: { kind: Territory
 
 /** Territory tree with the partners allocated in each node. */
 export async function territoryTree() {
+  const staff = await staffByTerritory();
   const [all, sds, dists, dealers, outlets] = await Promise.all([
     Territory.find({ isActive: true }).sort({ kind: 1, name: 1 }).lean(),
     Distributor.find({ tier: "SUPER_DISTRIBUTOR" }).select("name distributorCode territories status").lean(),
@@ -387,6 +389,7 @@ export async function territoryTree() {
       ...dealers.filter((d: any) => same(d.territory, t._id)).map((d: any) => ({ label: d.tier === "SUB_DEALER" ? "Sub dealer" : "Dealer", name: d.name, code: d.dealerCode })),
       ...outlets.filter((o: any) => same(o.territory, t._id)).map((o: any) => ({ label: "Outlet", name: o.name, code: o.outletCode })),
     ],
+    staff: staff.get(String(t._id)) || [],
     children: all.filter((c: any) => same(c.parent, t._id)).map(node),
   });
   return all.filter((t: any) => t.kind === "ZONE").map(node);

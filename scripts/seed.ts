@@ -49,6 +49,9 @@ import {
 } from "../src/services/payrollService";
 import type { JWTPayload, UserRole } from "../src/types";
 import { signApproval } from "../src/services/approvalService";
+import { assignTerritories } from "../src/services/territoryAssignService";
+import { Territory } from "../src/models/Territory";
+import { TerritoryAssignment } from "../src/models/TerritoryAssignment";
 import { placeOrder, recordPayment, requestCreditChange } from "../src/services/orderService";
 import {
   autoPick,
@@ -849,6 +852,32 @@ async function main() {
   await Distributor.updateOne({ _id: bardhaman._id }, { $set: { territories: [aBDN._id] } });
   await Distributor.updateOne({ _id: malda._id }, { $set: { territories: [aEBZ._id] } });
   await Distributor.updateOne({ _id: bihar._id }, { $set: { territories: [aPAT._id] } });
+
+  // Field team areas: each ASM covers districts, each FSE areas inside them.
+  // Patna is left without an ASM and one FSE without an area, so the gaps show.
+  const aOML = await terr("AREA", "Old Malda", "AR-OML", dMLD);
+  const aCHN = await terr("AREA", "Chanchal", "AR-CHN", dMLD);
+  const aNTN = await terr("AREA", "New Town", "AR-NTN", dKOL);
+  const aBHL = await terr("AREA", "Behala", "AR-BHL", dKOL);
+  const aSURI = await Territory.findOne({ code: "AR-SURI" }).lean();
+  const give = (by: JWTPayload, who: any, list: any[], note = "Initial assignment") => assignTerritories(by, String(who._id), { territoryIds: list.map((t) => String(t._id)), note });
+  await give(mpPayload, bh, [zSB, zNB, zBR]);
+  await give(bhPayload, asmNorth, [dMLD]);
+  await give(bhPayload, asmKolkata, [dKOL]);
+  await give(bhPayload, asmSouth, [dBDN, dBIR]);
+  const fseAreas: any[][] = [[aEBZ], [aOML], [aCHN], [aBHL], [aSLK], [aNTN], [aSLK, aBHL], [], [aBDN, aMEM], [aKLN], [aGUS], [aBOL, aSURI]];
+  for (const [i, areas] of fseAreas.entries()) if (areas.length) await give(i < 3 ? asPayload(asmNorth) : bhPayload, fecs[i].user, areas);
+  // Back-date the spells to joining, and keep Indranil's earlier Malda spell (before the move to Kolkata).
+  for (const u of [bh, asmNorth, asmKolkata, asmSouth, ...fecs.map((f) => f.user)]) {
+    await TerritoryAssignment.updateMany({ employee: u._id, to: null }, { $set: { from: u.joiningDate || new Date() } });
+  }
+  const movedAt = (await ReportingHistory.findOne({ employee: fecs[3].user._id }).sort({ changedAt: -1 }).lean())?.changedAt || new Date();
+  await TerritoryAssignment.updateMany({ employee: fecs[3].user._id, to: null }, { $set: { from: movedAt } });
+  await TerritoryAssignment.create({
+    employee: fecs[3].user._id, employeeName: fecs[3].user.name, employeeCode: fecs[3].user.employeeCode, role: "FEC",
+    territory: aEBZ._id, territoryName: aEBZ.name, territoryCode: aEBZ.code, kind: "AREA",
+    from: fecs[3].user.joiningDate || new Date(Date.now() - 300 * 864e5), to: movedAt, assignedByName: bh.name, endedByName: bh.name, note: "Moved to the Kolkata team",
+  });
 
   // KYC for the company-supplied distributors: uploaded by the MP, verified by the BH.
   const kyc = async (by: JWTPayload, type: "DEALER" | "DISTRIBUTOR", party: any, items: Array<[string, string]>, verifier: JWTPayload | null) => {

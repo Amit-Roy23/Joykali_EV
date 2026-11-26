@@ -2,6 +2,7 @@
 import { useSession } from "@/components/layout/session";
 import { SalaryPanel } from "@/components/salaryPanel";
 import { EmployeeHrPanel } from "@/components/employeeHrPanel";
+import { TerritoryPanel } from "@/components/territoryPanel";
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
@@ -197,6 +198,8 @@ export default function EmployeeDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <TerritoryPanel employeeId={String(user._id)} role={user.role} name={user.name} />
 
       {/* Salary: automatic breakup, revisions with BH + MP approval */}
       <SalaryPanel employeeId={String(user._id)} isSelf={String(user._id) === String(session.user?.userId)} />

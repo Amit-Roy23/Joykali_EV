@@ -20,6 +20,7 @@ import { canManageRole, getScopeFilter } from "@/lib/rbac";
 import { hashPassword } from "@/lib/auth";
 import { rupeesToPaise } from "@/lib/money";
 import { logAudit } from "@/lib/audit";
+import { clearTerritories } from "@/services/territoryAssignService";
 import mongoose from "mongoose";
 
 export async function GET(
@@ -42,6 +43,7 @@ export async function GET(
       .populate("post", "name code accessRole")
       .populate("outlet", "name")
       .populate("warehouse", "name")
+      .populate("territories", "name code kind")
       .select("-passwordHash")
       .lean();
 
@@ -193,6 +195,11 @@ export async function PUT(
       }
 
       await existingUser.save({ session });
+
+      // Leaving, or a post with another access level: their areas end today.
+      if (existingUser.status === "INACTIVE" || existingUser.role !== beforeState.role) {
+        await clearTerritories(existingUser._id, auth.user.name, existingUser.status === "INACTIVE" ? "Left / deactivated" : `Moved to post ${existingUser.designation}`, session);
+      }
 
       // Salary changes are never applied directly: they go through
       // /api/employees/[id]/salary as a revision that BH + MP must approve.
