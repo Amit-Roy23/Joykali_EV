@@ -17,6 +17,13 @@ export interface IMoneyAccount extends Document {
   /** Receipts/payments recorded only with a mode (cash, UPI, bank) land in the default account of that kind. */
   isDefault: boolean;
   status: "ACTIVE" | "CLOSED";
+  /** CASH only: who holds this cash box now (only they move cash in or out of it). */
+  custodian?: mongoose.Types.ObjectId | null;
+  custodianName?: string;
+  /** While someone covers (leave / illness): the regular holder it goes back to, and the planned return date. */
+  regularCustodian?: mongoose.Types.ObjectId | null;
+  regularCustodianName?: string;
+  coverUntil?: string | null;
   createdAt: Date;
 }
 export const MoneyAccount = model<IMoneyAccount>(
@@ -32,6 +39,11 @@ export const MoneyAccount = model<IMoneyAccount>(
       openingDate: { type: String, required: true },
       isDefault: { type: Boolean, default: false },
       status: { type: String, enum: ["ACTIVE", "CLOSED"], default: "ACTIVE" },
+      custodian: ref("User", { default: null, index: true }),
+      custodianName: { type: String, default: "" },
+      regularCustodian: ref("User", { default: null }),
+      regularCustodianName: { type: String, default: "" },
+      coverUntil: { type: String, default: null },
     },
     { timestamps: true }
   )
@@ -241,3 +253,77 @@ const BudgetSchema = new Schema<IBudget>(
 );
 BudgetSchema.index({ period: 1, head: 1 }, { unique: true });
 export const Budget = model<IBudget>("Budget", BudgetSchema);
+
+/* ---------------- Cash handover (change of cashier) ---------------- */
+export const HANDOVER_REASONS = ["LEAVE", "SICK", "TRANSFER", "RESIGNED", "SHIFT", "OTHER"] as const;
+export interface ICashHandover extends Document {
+  code: string;
+  account: mongoose.Types.ObjectId;
+  accountName: string;
+  /** HANDOVER = for good; COVER = someone stands in (leave / illness); RETURN = the cover gives it back. */
+  type: "HANDOVER" | "COVER" | "RETURN";
+  reason: (typeof HANDOVER_REASONS)[number];
+  note?: string;
+  from?: mongoose.Types.ObjectId | null;
+  fromName: string;
+  to: mongoose.Types.ObjectId;
+  toName: string;
+  expectedReturn?: string | null;
+  cover?: mongoose.Types.ObjectId | null;
+  startedBy: mongoose.Types.ObjectId;
+  startedByName: string;
+  /** The outgoing holder was not there to count (e.g. fell ill): started by Admin / BH / MP. */
+  outgoingAbsent: boolean;
+  bookBalanceAtStart: number;
+  countedByFrom?: number | null;
+  denominations?: Array<{ note: number; count: number }>;
+  status: "PENDING" | "ACCEPTED" | "CANCELLED";
+  acceptedAt?: Date;
+  bookBalanceAtAccept?: number;
+  countedByTo?: number;
+  /** countedByTo − book balance at acceptance (negative = short). */
+  difference?: number;
+  acceptNote?: string;
+  cancelledByName?: string;
+  cancelReason?: string;
+  settlement?: { status: "NONE" | "OPEN" | "WRITTEN_OFF" | "MADE_GOOD"; byName?: string; at?: Date; note?: string; voucher?: mongoose.Types.ObjectId | null };
+  createdAt: Date;
+}
+export const CashHandover = model<ICashHandover>(
+  "CashHandover",
+  new Schema<ICashHandover>(
+    {
+      code: { type: String, required: true, unique: true },
+      account: ref("MoneyAccount", { required: true, index: true }),
+      accountName: { type: String, required: true },
+      type: { type: String, enum: ["HANDOVER", "COVER", "RETURN"], required: true },
+      reason: { type: String, enum: HANDOVER_REASONS, required: true },
+      note: String,
+      from: ref("User", { default: null }),
+      fromName: { type: String, default: "" },
+      to: ref("User", { required: true, index: true }),
+      toName: { type: String, required: true },
+      expectedReturn: { type: String, default: null },
+      cover: ref("CashHandover", { default: null }),
+      startedBy: ref("User", { required: true }),
+      startedByName: { type: String, required: true },
+      outgoingAbsent: { type: Boolean, default: false },
+      bookBalanceAtStart: { type: Number, required: true },
+      countedByFrom: { type: Number, default: null },
+      denominations: { type: [new Schema({ note: Number, count: Number }, { _id: false })], default: [] },
+      status: { type: String, enum: ["PENDING", "ACCEPTED", "CANCELLED"], default: "PENDING", index: true },
+      acceptedAt: Date,
+      bookBalanceAtAccept: Number,
+      countedByTo: Number,
+      difference: Number,
+      acceptNote: String,
+      cancelledByName: String,
+      cancelReason: String,
+      settlement: {
+        type: new Schema({ status: { type: String, enum: ["NONE", "OPEN", "WRITTEN_OFF", "MADE_GOOD"], default: "NONE" }, byName: String, at: Date, note: String, voucher: ref("Voucher", { default: null }) }, { _id: false }),
+        default: () => ({ status: "NONE" }),
+      },
+    },
+    { timestamps: true }
+  )
+);

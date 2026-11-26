@@ -1,3 +1,4 @@
+import { userCan } from "@/lib/grants";
 import mongoose from "mongoose";
 import { JWTPayload } from "@/types";
 import { MoneyAccount, IMoneyAccount, Expense, Voucher, Budget, PaymentStamp } from "@/models/Accounts";
@@ -39,6 +40,9 @@ const today = () => istDay(new Date());
 /* ------------------------------------------------------------------ */
 
 export const NON_INCOME_RECEIPTS = ["Capital introduced", "Loan received", "Other receipt (not income)"];
+/** Found when the cash box is counted at a change of cashier (P&L: other income / expense). */
+export const CASH_SHORT_HEAD = "Cash shortage written off";
+export const CASH_EXCESS_HEAD = "Cash excess found";
 export const NON_EXPENSE_PAYMENTS = ["Drawings", "Loan repaid", "Asset purchase", "GST paid", "TDS paid", "Other payment (not expense)"];
 
 export async function accountsSettings() {
@@ -122,6 +126,17 @@ async function openAccount(id: string, date: string) {
   if (!a || a.status !== "ACTIVE") throw new AccountsError("That account is closed or missing");
   if (date < a.openingDate) throw new AccountsError(`${a.name} starts on ${a.openingDate}`);
   return a;
+}
+
+/**
+ * Only the person holding a cash box moves cash out of (or into, for a transfer) it.
+ * The Managing Partner and Admin may step in (it is in the audit log). A box with no holder is open.
+ */
+export function assertCashHolder(user: JWTPayload, a: any) {
+  if (a?.kind !== "CASH" || !a.custodian) return;
+  if (String(a.custodian) === user.userId) return;
+  if (["MANAGING_PARTNER", "ADMIN"].includes(user.role)) return;
+  throw new AccountsError(`${a.name} is held by ${a.custodianName || "another cashier"} — only they can pay cash from it. Hand the cash over first (Accounts → Cash handover).`, 403);
 }
 
 function payDate(d?: string) {
@@ -459,7 +474,7 @@ export async function createExpense(user: JWTPayload, input: ExpenseInput) {
   let payment: PaymentStamp | null = null;
   if (input.payNow?.accountId) {
     if (approvalRequired) throw new AccountsError(`Expenses of ₹${cfg.expenseApprovalPaise / 100} or more need Business Head and Managing Partner approval before payment`);
-    if (!(await hasPermission(user.role, "accounts.manage"))) throw new AccountsError("Only Accounts can pay an expense", 403);
+    if (!(await userCan(user, "accounts.manage"))) throw new AccountsError("Only Accounts can pay an expense", 403);
     const date = payDate(input.payNow.date);
     if (date < input.date) throw new AccountsError("Payment date is before the bill date");
     const a = await openAccount(input.payNow.accountId, date);
@@ -513,7 +528,7 @@ export async function cancelExpense(user: JWTPayload, id: string, reason: string
   const e = await Expense.findById(id);
   if (!e) throw new AccountsError("Expense not found", 404);
   if (!["PENDING_APPROVAL", "APPROVED"].includes(e.status)) throw new AccountsError("Only an unpaid expense can be cancelled");
-  if (String(e.createdBy) !== user.userId && !(await hasPermission(user.role, "accounts.manage"))) throw new AccountsError("Not allowed", 403);
+  if (String(e.createdBy) !== user.userId && !(await userCan(user, "accounts.manage"))) throw new AccountsError("Not allowed", 403);
   if (!reason?.trim()) throw new AccountsError("Give a reason");
   e.status = "CANCELLED";
   e.rejectReason = reason.trim();
@@ -570,6 +585,7 @@ export async function recordPayout(user: JWTPayload, kind: PayoutKind, id: strin
   }
   const date = payDate(input.date);
   const a = await openAccount(input.accountId, date);
+  assertCashHolder(user, a);
   const st = stamp(user, a, date, input.reference);
   let summary = "";
   if (kind === "expense") {
@@ -638,15 +654,16 @@ export async function recordPayout(user: JWTPayload, kind: PayoutKind, id: strin
 export async function voucherHeads() {
   const cfg = await accountsSettings();
   return {
-    RECEIPT: [...cfg.incomeHeads, ...NON_INCOME_RECEIPTS],
-    PAYMENT: [...cfg.expenseCategories, ...NON_EXPENSE_PAYMENTS],
+    RECEIPT: [...cfg.incomeHeads, ...NON_INCOME_RECEIPTS, CASH_EXCESS_HEAD],
+    PAYMENT: [...cfg.expenseCategories, ...NON_EXPENSE_PAYMENTS, CASH_SHORT_HEAD],
     CONTRA: ["Cash deposited in bank", "Cash withdrawn from bank", "Transfer between banks", "Transfer between cash accounts"],
   };
 }
 
 export async function createVoucher(
   user: JWTPayload,
-  input: { type: "RECEIPT" | "PAYMENT" | "CONTRA"; date: string; accountId: string; toAccountId?: string; amountRupees: number; head: string; narration: string; reference?: string }
+  input: { type: "RECEIPT" | "PAYMENT" | "CONTRA"; date: string; accountId: string; toAccountId?: string; amountRupees: number; head: string; narration: string; reference?: string },
+  opts: { bookEntryOnly?: boolean } = {}
 ) {
   if (!["RECEIPT", "PAYMENT", "CONTRA"].includes(input.type)) throw new AccountsError("Choose receipt, payment or contra");
   const date = payDate(input.date);
@@ -660,7 +677,11 @@ export async function createVoucher(
   if (input.type === "CONTRA") {
     to = await openAccount(input.toAccountId || "", date);
     if (String(to._id) === String(a._id)) throw new AccountsError("Choose two different accounts");
+    // bank → cash: the cash comes into the box, so its holder does it
+    if (a.kind === "BANK" && !opts.bookEntryOnly) assertCashHolder(user, to);
   }
+  // a book correction (cash shortage write-off) moves no cash, so the holder rule does not apply
+  if (input.type !== "RECEIPT" && !opts.bookEntryOnly) assertCashHolder(user, a);
   if (input.type !== "RECEIPT") {
     // A cash account can never go below zero.
     if (a.kind === "CASH") {

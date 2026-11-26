@@ -279,6 +279,27 @@ async function main() {
   const badSpell = await TerritoryAssignment.countDocuments({ to: { $ne: null }, $expr: { $lt: ["$to", "$from"] } });
   check(`field team areas: current = open spells, right kind, one ASM per district, FSE areas inside their ASM's districts (${field.length} people)`, badT === 0 && twice === 0 && outside === 0 && badSpell === 0, `${badT} mismatched, ${twice} shared districts, ${outside} outside, ${badSpell} bad spells`);
 
+  // Cash custody: holder = last accepted handover's receiver; one pending at most; differences add up; write-offs have their voucher.
+  const { CashHandover, MoneyAccount: MA } = await import("../src/models/Accounts");
+  const boxes: any[] = await MA.find({ kind: "CASH" }).lean();
+  let badC = 0;
+  for (const b of boxes) {
+    const hs: any[] = await CashHandover.find({ account: b._id }).sort({ acceptedAt: 1 }).lean();
+    const acc = hs.filter((h) => h.status === "ACCEPTED");
+    if (acc.length && String(acc[acc.length - 1].to) !== String(b.custodian)) badC++;
+    if (hs.filter((h) => h.status === "PENDING").length > 1) badC++;
+    for (const h of acc) {
+      if (h.difference !== h.countedByTo - h.bookBalanceAtAccept) badC++;
+      if ((h.difference === 0) !== (h.settlement?.status === "NONE")) badC++;
+      if (h.settlement?.status === "WRITTEN_OFF") {
+        const v: any = await VoucherM.findById(h.settlement.voucher).lean();
+        if (!v || v.amount !== Math.abs(h.difference)) badC++;
+      }
+    }
+    if (b.regularCustodian && !b.coverUntil) badC++;
+  }
+  check(`cash custody: holder matches the last accepted handover, differences add up (${boxes.length} cash box(es))`, badC === 0, `${badC} wrong`);
+
   console.log(`\n${pass} passed, ${fails.length} failed`);
   await mongoose.disconnect();
 }

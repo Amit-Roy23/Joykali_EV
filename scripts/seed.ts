@@ -98,6 +98,7 @@ import { ensurePosts } from "../src/services/postService";
 import { recordReceipt, rejectAdvice, setCleared, submitAdvice, verifyAdvice } from "../src/services/paymentService";
 import { createItem, createPartsSale, receiveBattery, removeBattery, returnBattery, stockIn, stockOut, transferItems } from "../src/services/itemService";
 import { createRequest, decideRequest, payRequest } from "../src/services/paymentRequestService";
+import { acceptHandover, settleDifference, startHandover } from "../src/services/cashHandoverService";
 import { Item } from "../src/models/Item";
 
 export const DEMO_PASSWORD = "Joykali@123";
@@ -1245,6 +1246,9 @@ async function main() {
   const bankAcc = await MoneyAccount.findOne({ kind: "BANK" });
   cashAcc!.openingBalance = rupeesToPaise(150000);
   cashAcc!.openingDate = fyFrom;
+  // The accountant holds the cash box: only the holder pays cash from it.
+  cashAcc!.custodian = accountsUser._id as any;
+  cashAcc!.custodianName = accountsUser.name;
   await cashAcc!.save();
   bankAcc!.name = "SBI Current A/c — Barasat";
   bankAcc!.bankName = "State Bank of India";
@@ -1508,6 +1512,17 @@ async function main() {
   const tr2 = await createRequest(bhPayload, { type: "TRANSFER", amountRupees: 150000, purpose: "Top up the salary account for advances", accountId: String(bankAcc!._id), toAccountId: String(hdfc._id) });
   await payRequest(accountsPayload, String(tr2._id), { date: todayYmd, reference: `NEFT ${between(100000, 999999)}` });
   await createRequest(accountsPayload, { type: "TRANSFER", amountRupees: 40000, purpose: "Deposit today's showroom cash", accountId: String(cashAcc!._id), toAccountId: String(bankAcc!._id) });
+
+  // Cash handover: the accountant fell ill, the clerk covered (₹200 short, made good), then handed back.
+  console.log("• Cash handover: cover during sick leave, counted both ways");
+  const clerkU = await User.findOne({ email: "clerk@joykaliev.in" });
+  const clerkPayload = asPayload(clerkU);
+  const bookNow = async () => (await accountBalances(todayYmd)).find((a: any) => String(a._id) === String(cashAcc!._id))!.balance / 100;
+  const cashCover = await startHandover(accountsPayload, { accountId: String(cashAcc!._id), type: "COVER", toUserId: String(clerkU!._id), reason: "SICK", expectedReturn: todayYmd, countedRupees: await bookNow(), note: "Fever — doctor advised 3 days rest. Cash box keys and petty-cash file handed over." });
+  const took = await acceptHandover(clerkPayload, String(cashCover._id), { countedRupees: (await bookNow()) - 200, note: "One ₹200 note short in the petty-cash envelope" });
+  await settleDifference(bhPayload, String(took!._id), { how: "MADE_GOOD", note: "Found in the courier-charges envelope and put back" });
+  const back = await startHandover(clerkPayload, { accountId: String(cashAcc!._id), type: "RETURN", toUserId: String(accountsUser._id), countedRupees: await bookNow() });
+  await acceptHandover(accountsPayload, String(back._id), { countedRupees: await bookNow(), note: "Back at work" });
 
   await ensurePosts(); // links staff created after the posts to the post of their role
   // A light audit trail so the Audit screen isn't empty.

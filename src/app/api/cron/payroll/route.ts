@@ -37,6 +37,7 @@ export async function GET(req: NextRequest) {
     const expired = await IncentiveScheme.updateMany({ status: "ACTIVE", validTo: { $lt: new Date() } }, { $set: { status: "EXPIRED" } });
     report.schemesExpired = expired.modifiedCount;
     report.leaversDeactivated = await deactivateLeavers();
+    report.cashCoversOverdue = await (await import("@/services/cashHandoverService")).remindOverdueCovers();
 
     const cur = periodOf(new Date());
     const prev = cur.month === 1 ? periodFor(cur.year - 1, 12) : periodFor(cur.year, cur.month - 1);

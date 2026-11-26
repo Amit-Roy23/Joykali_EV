@@ -1,3 +1,4 @@
+import { userCan } from "@/lib/grants";
 import { handle, fileFrom } from "@/lib/route";
 import { errorResponse } from "@/lib/apiHelper";
 import { hasPermission } from "@/lib/rbac";
@@ -5,7 +6,7 @@ import { isPartnerRole } from "@/types";
 import { adviceList, submitAdvice } from "@/services/paymentService";
 
 export const GET = handle(async ({ req, user }) => {
-  if (!isPartnerRole(user.role) && !(await hasPermission(user.role, "ledger.view")) && !(await hasPermission(user.role, "accounts.view"))) return errorResponse("Not allowed", 403);
+  if (!isPartnerRole(user.role) && !(await hasPermission(user.role, "ledger.view")) && !(await userCan(user, "accounts.view"))) return errorResponse("Not allowed", 403);
   return adviceList(user, req.nextUrl.searchParams.get("status") || undefined);
 });
 
