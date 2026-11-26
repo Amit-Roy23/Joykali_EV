@@ -12,7 +12,7 @@ import { JWTPayload } from "@/types";
 import mongoose from "mongoose";
 import { getTeamUserIds } from "@/lib/rbac";
 import { Setting } from "@/models/Setting";
-import { batteryItemFor, LineInput, moveLines, moveStock, priceLines } from "./itemService";
+import { LineInput, moveLines, priceLines, refitBattery, removeBattery } from "./itemService";
 import { mainWarehouse } from "./warehouseService";
 
 export interface CreateSaleInput {
@@ -34,6 +34,8 @@ export interface CreateSaleInput {
   withoutBattery?: boolean;
   batteryItemId?: string;
   batteryWarehouseId?: string;
+  /** Extra explanation for selling without the battery. */
+  batteryNote?: string;
   dealerId?: string | null;
   soldBy: string; // FEC id
   priceBreakdown: {
@@ -223,31 +225,36 @@ export async function createSale(
     // Accessories / parts leave warehouse stock with this invoice.
     if (itemLines.length) await moveLines(session, user, itemLines, "OUT", saleCode, input.customer.name, saleDateObj);
 
-    // Sold without battery: the vehicle's battery goes back into stock as a sellable battery.
+    // Sold without battery: the vehicle's battery goes back into stock as a sellable battery (18% GST
+    // when billed on its own). A battery taken out earlier (recorded with its reason) is simply linked.
     if (input.withoutBattery) {
-      if (vehicle.batteryRemoved) throw new Error("This vehicle's battery is already off");
-      const batteryItem = await batteryItemFor(vehicle.model, input.batteryItemId, session);
-      const wh = input.batteryWarehouseId || defaultWh;
-      const serialNo = batteryItem.serialTracked ? String(vehicle.batteryNumber || "").toUpperCase() : "";
-      if (batteryItem.serialTracked && !serialNo) throw new Error("This vehicle has no battery number to put into stock");
-      await moveStock(session, user, {
-        item: batteryItem,
-        warehouse: wh,
-        qty: 1,
-        serials: serialNo ? [serialNo] : [],
-        type: "BATTERY_FROM_VEHICLE",
-        reference: saleCode,
-        party: `Vehicle ${vehicle.chassisNumber}`,
-        unitCost: batteryItem.purchasePrice || 0,
-        notes: "Vehicle sold without battery",
-        at: saleDateObj,
-        source: "VEHICLE",
-        vehicle: vehicle._id,
-        allowReturning: true,
-      });
-      sale.batteryReturn = { item: batteryItem._id as any, serialNo: serialNo || undefined, warehouse: new mongoose.Types.ObjectId(String(wh)), unitCost: batteryItem.purchasePrice || 0 };
+      const { BatteryRemoval } = await import("@/models/Item");
+      let rec: any = vehicle.batteryRemoved ? await BatteryRemoval.findOne({ vehicle: vehicle._id, status: "REMOVED" }).sort({ removedAt: -1 }).session(session ?? null) : null;
+      if (!rec) {
+        const out = await removeBattery(
+          user,
+          {
+            vehicleId: String(vehicle._id),
+            reason: "CUSTOMER_NO_BATTERY",
+            notes: `Sold without battery on invoice ${saleCode}${input.batteryNote?.trim() ? ` — ${input.batteryNote.trim()}` : ""}`,
+            batteryItemId: input.batteryItemId,
+            warehouseId: input.batteryWarehouseId || String(defaultWh),
+          },
+          { session, sale: { _id: sale._id, saleCode }, at: saleDateObj, skipGuard: true }
+        );
+        rec = out.record;
+      } else {
+        rec.sale = sale._id;
+        rec.saleCode = saleCode;
+        await rec.save({ session });
+      }
+      const { Item } = await import("@/models/Item");
+      const bi: any = await Item.findById(rec.item).select("purchasePrice").session(session ?? null).lean();
+      sale.batteryReturn = { item: rec.item, serialNo: rec.serialNo || undefined, warehouse: rec.warehouse, unitCost: bi?.purchasePrice || 0 };
       await sale.save({ session });
       vehicle.batteryRemoved = true;
+    } else if (vehicle.batteryRemoved) {
+      throw new Error("This vehicle's battery has been taken out — refit a battery first, or tick “Sold without battery”");
     }
 
     // 4. Update Vehicle status
@@ -321,29 +328,24 @@ export async function cancelSale(
 
     // Revert Vehicle status
     const vehicle = await Vehicle.findById(sale.vehicle).session(session ?? null);
-    if (vehicle && sale.withoutBattery && sale.batteryReturn) {
-      // The battery that went into stock goes back on the vehicle — it must still be in stock.
-      const { Item } = await import("@/models/Item");
-      const batteryItem = await Item.findById(sale.batteryReturn.item).session(session ?? null);
-      if (batteryItem) {
+    if (vehicle && sale.withoutBattery) {
+      // Battery taken out by this sale → fitted back (it must still be in stock).
+      // Battery taken out earlier for another reason → stays out; the vehicle returns to stock without it.
+      const { BatteryRemoval } = await import("@/models/Item");
+      const rec: any = await BatteryRemoval.findOne({ vehicle: vehicle._id, status: "REMOVED" }).sort({ removedAt: -1 }).session(session ?? null);
+      if (rec && rec.reason === "CUSTOMER_NO_BATTERY" && String(rec.sale) === String(sale._id)) {
         try {
-          await moveStock(session, user, {
-            item: batteryItem,
-            warehouse: sale.batteryReturn.warehouse,
-            qty: -1,
-            serials: sale.batteryReturn.serialNo ? [sale.batteryReturn.serialNo] : [],
-            type: "BATTERY_TO_VEHICLE",
-            reference: sale.saleCode,
-            party: `Vehicle ${vehicle.chassisNumber}`,
-            unitCost: sale.batteryReturn.unitCost,
-            notes: "Sale cancelled — battery refitted",
-            outStatus: "FITTED",
-          });
+          await refitBattery(user, { vehicleId: String(vehicle._id), notes: `Sale ${sale.saleCode} cancelled` }, { session, skipGuard: true, allowSold: true });
         } catch (e: any) {
           throw new Error(`The battery taken off this vehicle is no longer in stock (${e.message}). Put a battery back on the vehicle before cancelling.`);
         }
+        vehicle.batteryRemoved = false;
+        if (rec.serialNo) vehicle.batteryNumber = rec.serialNo;
+      } else if (rec) {
+        rec.sale = null;
+        rec.saleCode = undefined;
+        await rec.save({ session });
       }
-      vehicle.batteryRemoved = false;
     }
     if (vehicle) {
       vehicle.status = vehicle.currentLocationDealer

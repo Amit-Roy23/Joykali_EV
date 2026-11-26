@@ -130,7 +130,9 @@ export type Permission =
   // Phase 7: purchase entry by warehouse staff, rate changes, parts counter & battery service
   | "purchase.create"
   | "price.manage"
-  | "parts.sell";
+  | "parts.sell"
+  // Approve payment / fund-transfer requests before the cashier pays
+  | "payment.approve";
 
 export type VehicleCategory =
   | "2W"

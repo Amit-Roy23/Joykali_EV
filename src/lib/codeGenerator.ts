@@ -184,6 +184,7 @@ export const FY_SERIES = {
   PARTS_SALE: "JKSP",
   BATTERY_JOB: "JKBJ",
   STOCK_ADJUST: "JKSA",
+  PAYMENT_REQUEST: "JKRQ",
 } as const;
 
 export async function generateFyCode(

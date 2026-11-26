@@ -245,7 +245,10 @@ function VoucherForm({ meta, onClose, onSaved }: { meta: any; onClose: () => voi
   const save = async () => {
     setErr(null);
     try {
-      await api("/api/accounts/vouchers", { method: "POST", json: { ...v, amountRupees: Number(v.amountRupees) } });
+      const r: any = await api("/api/accounts/vouchers", { method: "POST", json: { ...v, amountRupees: Number(v.amountRupees) } });
+      if (r?.routedForApproval) {
+        alert(`${r.request.code} ${r.request.status === "APPROVED" ? "is approved — pay it from Payment requests." : "was sent to the Admin / Business Head for approval. Once approved, pay it from Payment requests."}`);
+      }
       onSaved();
       onClose();
     } catch (e: any) {
@@ -253,7 +256,7 @@ function VoucherForm({ meta, onClose, onSaved }: { meta: any; onClose: () => voi
     }
   };
   return (
-    <Modal isOpen onClose={onClose} title="New voucher" description="Receipt: money in that is not from a sale or partner (interest, capital, scrap). Payment: money out not covered by an expense bill. Contra: cash deposited in or withdrawn from a bank.">
+    <Modal isOpen onClose={onClose} title="New voucher" description="Receipt: money in that is not from a sale or partner (interest, capital, scrap) — posted at once. Payment (money out) and contra (bank ↔ bank, bank → cash, cash → bank) need approval first: they go to the Admin / Business Head as a payment request.">
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Type">
           <select id="v-type" className="field" value={v.type} onChange={(e) => setV({ ...v, type: e.target.value, head: "" })}>
@@ -307,7 +310,7 @@ function VoucherForm({ meta, onClose, onSaved }: { meta: any; onClose: () => voi
             ))}
           </select>
         </Field>
-        <Field label="Narration" className="sm:col-span-2">
+        <Field label={v.type === "RECEIPT" ? "Narration" : "What is it for?"} className="sm:col-span-2">
           <Input id="v-nar" value={v.narration} onChange={(e) => setV({ ...v, narration: e.target.value })} />
         </Field>
         <Field label="Party / cheque / UTR (optional)" className="sm:col-span-2">
@@ -319,7 +322,7 @@ function VoucherForm({ meta, onClose, onSaved }: { meta: any; onClose: () => voi
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button onClick={save}>Post voucher</Button>
+        <Button onClick={save}>{v.type === "RECEIPT" ? "Post receipt" : "Send for approval"}</Button>
       </div>
     </Modal>
   );

@@ -93,7 +93,8 @@ import { MoneyAccount } from "../src/models/Accounts";
 import { Post } from "../src/models/Post";
 import { ensurePosts } from "../src/services/postService";
 import { recordReceipt, rejectAdvice, setCleared, submitAdvice, verifyAdvice } from "../src/services/paymentService";
-import { createItem, createPartsSale, receiveBattery, returnBattery, stockIn, stockOut, transferItems } from "../src/services/itemService";
+import { createItem, createPartsSale, receiveBattery, removeBattery, returnBattery, stockIn, stockOut, transferItems } from "../src/services/itemService";
+import { createRequest, decideRequest, payRequest } from "../src/services/paymentRequestService";
 import { Item } from "../src/models/Item";
 
 export const DEMO_PASSWORD = "Joykali@123";
@@ -1454,6 +1455,30 @@ async function main() {
   });
   await signApproval("scheme", String(fseScheme._id), bhPayload, "APPROVED");
   await signApproval("scheme", String(fseScheme._id), mpPayload, "APPROVED");
+
+
+  // Battery taken out of a stock vehicle (faulty) — kept in the battery out register.
+  const weak = await Vehicle.findOne({ status: "IN_STOCK", warehouse: mainWh._id, model: models.STORM._id, batteryRemoved: { $ne: true } }).lean();
+  if (weak) await removeBattery(bhPayload, { vehicleId: String(weak._id), reason: "FAULTY", notes: "Battery shows 48% health in the pre-delivery check — kept aside for a warranty claim", condition: "DEFECTIVE" });
+
+  console.log("• Payment requests: approval by Admin / BH, cashier pays, bank ↔ cash transfers");
+  const adminPayload = asPayload(admin);
+  const r1 = await createRequest(accountsPayload, { type: "PAYMENT", amountRupees: 18500, purpose: "Advance for showroom signboard repainting — Salt Lake", head: "Repairs & maintenance", payee: "Rangdhanu Art Works", preferredMode: "UPI" });
+  await decideRequest(bhPayload, String(r1._id), "APPROVED", "OK — get the bill after work");
+  await payRequest(accountsPayload, String(r1._id), { accountId: String(bankAcc!._id), date: todayYmd, reference: `UPI${between(100000000, 999999999)}` });
+  const r2 = await createRequest(accountsPayload, { type: "PAYMENT", amountRupees: 6200, purpose: "Generator diesel for the Barasat warehouse (power cut week)", head: "Fuel & conveyance", payee: "IOCL Barasat", preferredMode: "Cash" });
+  await decideRequest(adminPayload, String(r2._id), "APPROVED");
+  await createRequest(accountsPayload, { type: "PAYMENT", amountRupees: 42000, purpose: "Puja bonus sweets & gifts for dealers", head: "Marketing & advertising", payee: "Balaram Mullick", neededBy: todayYmd });
+  await createRequest(storePayload, { type: "PAYMENT", amountRupees: 1450, purpose: "Shutter lock repair — Siliguri warehouse", head: "Repairs & maintenance", payee: "Local mechanic", preferredMode: "Cash" });
+  const r5 = await createRequest(accountsPayload, { type: "PAYMENT", amountRupees: 90000, purpose: "New laptop for accounts", head: "Office supplies & printing", payee: "Croma" });
+  await decideRequest(mpPayload, String(r5._id), "REJECTED", "Buy next quarter — use the old one for now");
+  // Transfers: bank → cash (done), bank → bank (BH instruction, done), cash → bank waiting for approval.
+  const tr1 = await createRequest(accountsPayload, { type: "TRANSFER", amountRupees: 25000, purpose: "Cash for showroom change and petty expenses", accountId: String(bankAcc!._id), toAccountId: String(cashAcc!._id) });
+  await decideRequest(bhPayload, String(tr1._id), "APPROVED");
+  await payRequest(accountsPayload, String(tr1._id), { date: todayYmd, reference: `CHQ SELF ${between(100000, 999999)}` });
+  const tr2 = await createRequest(bhPayload, { type: "TRANSFER", amountRupees: 150000, purpose: "Top up the salary account for advances", accountId: String(bankAcc!._id), toAccountId: String(hdfc._id) });
+  await payRequest(accountsPayload, String(tr2._id), { date: todayYmd, reference: `NEFT ${between(100000, 999999)}` });
+  await createRequest(accountsPayload, { type: "TRANSFER", amountRupees: 40000, purpose: "Deposit today's showroom cash", accountId: String(cashAcc!._id), toAccountId: String(bankAcc!._id) });
 
   await ensurePosts(); // links staff created after the posts to the post of their role
   // A light audit trail so the Audit screen isn't empty.

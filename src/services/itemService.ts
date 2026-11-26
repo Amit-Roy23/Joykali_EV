@@ -12,6 +12,9 @@ import {
   IItemLine,
   PartsSale,
   BatteryJob,
+  BatteryRemoval,
+  BATTERY_REMOVAL_REASONS,
+  BatteryRemovalReason,
   ITEM_CATEGORIES,
   ITEM_UNITS,
   ItemCategory,
@@ -42,6 +45,9 @@ const oid = (v: any) => new mongoose.Types.ObjectId(String(v));
 const same = (a: any, b: any) => !!a && !!b && String(a) === String(b);
 const S = (s: Session) => s ?? null;
 const istDay = (d: Date) => new Date(d.getTime() + 330 * 60000).toISOString().slice(0, 10);
+
+/** GST on a battery billed on its own. */
+export const BATTERY_GST = 18;
 
 export const CATEGORY_LABEL: Record<ItemCategory, string> = {
   BATTERY: "Battery",
@@ -210,13 +216,30 @@ function validItem(input: ItemInput) {
   if (!ITEM_CATEGORIES.includes(input.category)) throw new ItemError("Choose the item type");
   if (!/^\d{4,8}$/.test(String(input.hsnCode || "").trim())) throw new ItemError("HSN code must be 4 to 8 digits");
   if (![0, 5, 12, 18, 28].includes(Number(input.gstRate))) throw new ItemError("GST rate must be 0, 5, 12, 18 or 28%");
+  // Batteries sold on their own (spare, replacement, or from a vehicle sold without one) carry 18% GST.
+  if (input.category === "BATTERY" && Number(input.gstRate) !== BATTERY_GST) throw new ItemError(`Batteries are billed at ${BATTERY_GST}% GST`);
   for (const [k, v] of [["purchase rate", input.purchaseRupees], ["selling rate", input.sellingRupees]] as const) {
     if (!Number.isFinite(Number(v)) || Number(v) < 0) throw new ItemError(`Enter a valid ${k}`);
   }
   if (input.unit && !(ITEM_UNITS as readonly string[]).includes(input.unit)) throw new ItemError("Choose a valid unit");
 }
 
+let batteryGstChecked = false;
+/** One-time fix: battery items created before the 18% rule are moved to 18% (kept in the rate history). */
+async function ensureBatteryGst() {
+  if (batteryGstChecked) return;
+  batteryGstChecked = true;
+  const wrong = await Item.find({ category: "BATTERY", gstRate: { $ne: BATTERY_GST } }).select("gstRate").lean();
+  for (const w of wrong as any[]) {
+    await Item.updateOne(
+      { _id: w._id },
+      { $set: { gstRate: BATTERY_GST }, $push: { rateHistory: { at: new Date(), byName: "System", changes: [{ field: "gstRate", from: w.gstRate, to: BATTERY_GST }], note: "Batteries are billed at 18% GST" } } }
+    );
+  }
+}
+
 export async function listItems(q: { category?: string; q?: string; active?: string; warehouse?: string }) {
+  await ensureBatteryGst();
   const filter: any = {};
   if (q.category && ITEM_CATEGORIES.includes(q.category as ItemCategory)) filter.category = q.category;
   if (q.active === "1") filter.isActive = true;
@@ -901,3 +924,202 @@ export async function batteryItemFor(modelId: any, chosen?: string | null, sessi
 }
 
 export { mainWarehouse };
+
+/* ------------------------------------------------------------------ */
+/* Battery taken out of a vehicle (tracked with the reason)            */
+/* ------------------------------------------------------------------ */
+
+export { BATTERY_REMOVAL_REASONS };
+
+export interface RemoveBatteryInput {
+  vehicleId: string;
+  reason: BatteryRemovalReason;
+  notes: string;
+  /** Battery item to put into stock (default: the model's battery). */
+  batteryItemId?: string | null;
+  /** Warehouse the battery is kept in (default: the vehicle's warehouse). */
+  warehouseId?: string | null;
+  condition?: "GOOD" | "DEFECTIVE";
+}
+
+/**
+ * Take the battery out of a vehicle: the battery (by the vehicle's battery number) goes into
+ * warehouse stock — good (sellable) or defective — and the reason is recorded.
+ * `opts.sale` links it to the sale that sold the vehicle without its battery.
+ */
+export async function removeBattery(user: JWTPayload, input: RemoveBatteryInput, opts: { session?: Session; sale?: { _id: any; saleCode: string }; at?: Date; skipGuard?: boolean } = {}) {
+  if (!(input.reason in BATTERY_REMOVAL_REASONS)) throw new ItemError("Choose why the battery is being taken out");
+  const notes = String(input.notes || "").trim();
+  if (notes.length < 5) throw new ItemError("Write a short explanation of why the battery is taken out");
+  const run = async (session: Session) => {
+    if (!mongoose.isValidObjectId(input.vehicleId)) throw new ItemError("Vehicle not found", 404);
+    const vehicle = await Vehicle.findById(input.vehicleId).populate("model", "name variant batteryItem").session(S(session));
+    if (!vehicle) throw new ItemError("Vehicle not found", 404);
+    if (vehicle.batteryRemoved) throw new ItemError(`The battery of ${vehicle.chassisNumber} is already taken out`);
+    if (!opts.sale && !["IN_STOCK", "AT_OUTLET"].includes(vehicle.status)) {
+      throw new ItemError(`Only a vehicle in company stock can have its battery taken out (this one is ${vehicle.status.toLowerCase().replace(/_/g, " ")})`);
+    }
+    const whId = input.warehouseId && mongoose.isValidObjectId(input.warehouseId) ? input.warehouseId : vehicle.warehouse || (await mainWarehouse(session))._id;
+    const wh: any = opts.skipGuard ? await Warehouse.findById(whId).session(S(session)).lean() : await guardWarehouse(user, whId);
+    if (!wh) throw new ItemError("Warehouse not found", 404);
+    const model: any = vehicle.model;
+    const item = await batteryItemFor(model?._id || vehicle.model, input.batteryItemId, session);
+    const serialNo = item.serialTracked ? String(vehicle.batteryNumber || "").trim().toUpperCase() : "";
+    if (item.serialTracked && !serialNo) throw new ItemError("This vehicle has no battery number to put into stock");
+    const condition = input.condition === "DEFECTIVE" ? "DEFECTIVE" : "GOOD";
+    const at = opts.at || new Date();
+    const reasonText = BATTERY_REMOVAL_REASONS[input.reason];
+    await moveStock(session, user, {
+      item,
+      warehouse: wh._id,
+      condition,
+      qty: 1,
+      serials: serialNo ? [serialNo] : [],
+      type: "BATTERY_FROM_VEHICLE",
+      reason: reasonText,
+      reference: opts.sale?.saleCode || vehicle.chassisNumber,
+      party: `Vehicle ${vehicle.chassisNumber}`,
+      unitCost: item.purchasePrice || 0,
+      notes,
+      at,
+      source: "VEHICLE",
+      vehicle: vehicle._id,
+      allowReturning: true,
+    });
+    const [rec] = await BatteryRemoval.create(
+      [
+        {
+          vehicle: vehicle._id,
+          chassisNumber: vehicle.chassisNumber,
+          modelName: model ? `${model.name} ${model.variant}` : "",
+          item: item._id,
+          serialNo: serialNo || undefined,
+          warehouse: wh._id,
+          condition,
+          reason: input.reason,
+          notes,
+          status: "REMOVED",
+          sale: opts.sale?._id || null,
+          saleCode: opts.sale?.saleCode,
+          removedAt: at,
+          removedBy: oid(user.userId),
+          removedByName: user.name,
+        },
+      ],
+      { session: S(session) }
+    );
+    vehicle.batteryRemoved = true;
+    await vehicle.save({ session });
+    const { StockMovement } = await import("@/models/StockMovement");
+    await StockMovement.create(
+      [
+        {
+          vehicle: vehicle._id,
+          movementType: "BATTERY_REMOVED",
+          fromLocation: `Vehicle ${vehicle.chassisNumber}`,
+          toLocation: `${wh.name} (${condition === "GOOD" ? "battery stock" : "defective stock"})`,
+          performedBy: oid(user.userId),
+          reference: opts.sale?.saleCode || rec._id.toString(),
+          notes: `${reasonText} — ${notes}${serialNo ? ` · battery ${serialNo}` : ""}`,
+          timestamp: at,
+        },
+      ],
+      { session: S(session) }
+    );
+    return { record: rec, item, serialNo, warehouse: wh };
+  };
+  const out = opts.session !== undefined ? await run(opts.session) : await withTransaction(run);
+  if (opts.session === undefined) await logAudit({ user, action: "UPDATE", resource: "STOCK", resourceId: input.vehicleId, after: { batteryRemoved: true, reason: input.reason, notes } });
+  return out;
+}
+
+/**
+ * Put a battery back into a vehicle whose battery was taken out: a battery from good stock
+ * (the same one or another) leaves stock and the vehicle's battery number is updated.
+ */
+export async function refitBattery(
+  user: JWTPayload,
+  input: { vehicleId: string; itemId?: string | null; serialNo?: string; warehouseId?: string | null; notes?: string },
+  opts: { session?: Session; skipGuard?: boolean; allowSold?: boolean } = {}
+) {
+  const run = async (session: Session) => {
+    if (!mongoose.isValidObjectId(input.vehicleId)) throw new ItemError("Vehicle not found", 404);
+    const vehicle = await Vehicle.findById(input.vehicleId).session(S(session));
+    if (!vehicle) throw new ItemError("Vehicle not found", 404);
+    if (!vehicle.batteryRemoved) throw new ItemError("This vehicle already has its battery");
+    if (vehicle.status === "SOLD" && !opts.allowSold) throw new ItemError("This vehicle is sold — cancel the sale to refit the battery");
+    const rec = await BatteryRemoval.findOne({ vehicle: vehicle._id, status: "REMOVED" }).sort({ removedAt: -1 }).session(S(session));
+    const itemId = input.itemId || rec?.item;
+    const item = await loadItem(itemId, session);
+    if (item.category !== "BATTERY") throw new ItemError("Choose a battery item");
+    const whId = input.warehouseId && mongoose.isValidObjectId(input.warehouseId) ? input.warehouseId : rec?.warehouse || vehicle.warehouse;
+    const wh: any = opts.skipGuard ? await Warehouse.findById(whId).session(S(session)).lean() : await guardWarehouse(user, whId);
+    if (!wh) throw new ItemError("Choose the warehouse the battery comes from");
+    const serialNo = item.serialTracked ? String(input.serialNo || rec?.serialNo || "").trim().toUpperCase() : "";
+    if (item.serialTracked && !serialNo) throw new ItemError("Choose the battery serial number");
+    try {
+      await moveStock(session, user, {
+        item,
+        warehouse: wh._id,
+        qty: -1,
+        serials: serialNo ? [serialNo] : [],
+        type: "BATTERY_TO_VEHICLE",
+        reason: "Battery fitted back to the vehicle",
+        reference: vehicle.chassisNumber,
+        party: `Vehicle ${vehicle.chassisNumber}`,
+        unitCost: item.purchasePrice || 0,
+        notes: input.notes?.trim(),
+        outStatus: "FITTED",
+      });
+    } catch (e: any) {
+      throw new ItemError(`Battery not available to refit: ${e.message}`, e.status || 409);
+    }
+    const prev = vehicle.batteryNumber;
+    if (serialNo) vehicle.batteryNumber = serialNo;
+    vehicle.batteryRemoved = false;
+    await vehicle.save({ session });
+    if (rec) {
+      rec.status = "REFITTED";
+      rec.refit = { at: new Date(), byName: user.name, item: item._id as any, serialNo: serialNo || undefined, warehouse: wh._id, notes: input.notes?.trim() };
+      await rec.save({ session });
+    }
+    const { StockMovement } = await import("@/models/StockMovement");
+    await StockMovement.create(
+      [
+        {
+          vehicle: vehicle._id,
+          movementType: "BATTERY_REFITTED",
+          fromLocation: `${wh.name} (battery stock)`,
+          toLocation: `Vehicle ${vehicle.chassisNumber}`,
+          performedBy: oid(user.userId),
+          reference: rec?._id?.toString() || vehicle.chassisNumber,
+          notes: `${serialNo && serialNo !== prev ? `New battery ${serialNo} (was ${prev})` : `Battery ${serialNo || "refitted"}`}${input.notes?.trim() ? ` — ${input.notes.trim()}` : ""}`,
+          timestamp: new Date(),
+        },
+      ],
+      { session: S(session) }
+    );
+    return { vehicle, record: rec };
+  };
+  const out = opts.session !== undefined ? await run(opts.session) : await withTransaction(run);
+  if (opts.session === undefined) await logAudit({ user, action: "UPDATE", resource: "STOCK", resourceId: input.vehicleId, after: { batteryRefitted: true } });
+  return out;
+}
+
+export async function batteryRemovals(q: { status?: string; reason?: string; q?: string; vehicleId?: string }) {
+  const f: any = {};
+  if (q.status) f.status = q.status;
+  if (q.reason) f.reason = q.reason;
+  if (q.vehicleId && mongoose.isValidObjectId(q.vehicleId)) f.vehicle = oid(q.vehicleId);
+  if (q.q?.trim()) {
+    const rx = new RegExp(q.q.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    f.$or = [{ chassisNumber: rx }, { serialNo: rx }, { saleCode: rx }, { notes: rx }];
+  }
+  return BatteryRemoval.find(f)
+    .populate("item", "name code")
+    .populate("warehouse", "name")
+    .populate("refit.item", "name")
+    .sort({ removedAt: -1 })
+    .limit(500)
+    .lean();
+}

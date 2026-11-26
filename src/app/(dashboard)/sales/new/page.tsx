@@ -45,6 +45,7 @@ export default function NewSalePage() {
   const shelf = useItemsAt(itemsWh);
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [noBattery, setNoBattery] = useState(false);
+  const [batteryNote, setBatteryNote] = useState("");
   const [batteryItemId, setBatteryItemId] = useState("");
   const [batteryWh, setBatteryWh] = useState("");
   const [batteries, setBatteries] = useState<any[]>([]);
@@ -107,7 +108,8 @@ export default function NewSalePage() {
       setItemsWh(v.warehouse._id);
       setBatteryWh(v.warehouse._id);
     }
-    setNoBattery(false);
+    // A vehicle whose battery is already out can only be sold without battery.
+    setNoBattery(!!v.batteryRemoved);
     setBatteryItemId(v.model?.batteryItem ? String(v.model.batteryItem) : "");
   };
   const toggleNoBattery = (on: boolean) => {
@@ -147,6 +149,7 @@ export default function NewSalePage() {
         withoutBattery: noBattery,
         batteryItemId: noBattery ? batteryItemId || undefined : undefined,
         batteryWarehouseId: noBattery ? batteryWh || undefined : undefined,
+        batteryNote: noBattery ? batteryNote || undefined : undefined,
         paymentMode,
         initialPayment: { amount: paid === "" ? (paymentMode === "FINANCE" ? financier.downPayment : total) : Number(paid), reference: reference || undefined },
       };
@@ -305,13 +308,19 @@ export default function NewSalePage() {
                 <Input type="number" min={0} inputMode="decimal" value={price.insurance || ""} onChange={(e) => setPrice({ ...price, insurance: num(e.target.value) })} placeholder="0" />
               </Field>
               <label className="col-span-full flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                <input type="checkbox" className="mt-0.5" checked={noBattery} disabled={!vehicle} onChange={(e) => toggleNoBattery(e.target.checked)} />
+                <input type="checkbox" className="mt-0.5" checked={noBattery} disabled={!vehicle || !!vehicle?.batteryRemoved} onChange={(e) => toggleNoBattery(e.target.checked)} />
                 <span>
-                  <b>Sold without battery</b> — the vehicle&apos;s battery{vehicle?.batteryNumber ? ` (${vehicle.batteryNumber})` : ""} goes back into stock and can be sold separately. Adjust the ex-showroom price above.
+                  <b>Sold without battery</b> —{" "}
+                  {vehicle?.batteryRemoved
+                    ? "this vehicle's battery has already been taken out (see the Battery out register), so it can only be sold without battery."
+                    : `the vehicle's battery${vehicle?.batteryNumber ? ` (${vehicle.batteryNumber})` : ""} goes back into stock and can be sold separately at 18% GST. Adjust the ex-showroom price above.`}
                 </span>
               </label>
-              {noBattery && (
+              {noBattery && !vehicle?.batteryRemoved && (
                 <>
+                  <Field label="Why without battery? (optional note)" className="col-span-full">
+                    <Input value={batteryNote} onChange={(e) => setBatteryNote(e.target.value)} placeholder="e.g. customer already owns a battery" />
+                  </Field>
                   <Field label="Battery item" className="sm:col-span-2">
                     <select className="field" value={batteryItemId} onChange={(e) => setBatteryItemId(e.target.value)}>
                       <option value="">— choose the battery type —</option>

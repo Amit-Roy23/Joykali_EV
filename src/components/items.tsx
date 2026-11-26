@@ -121,7 +121,7 @@ export function ItemFormModal({ open, item, onClose, onSaved }: { open: boolean;
     setBusy(true);
     setErr(null);
     try {
-      const body = { ...f, gstRate: Number(f.gstRate), purchaseRupees: Number(f.purchaseRupees || 0), sellingRupees: Number(f.sellingRupees || 0), dealerRupees: f.dealerRupees === "" ? null : Number(f.dealerRupees), minStock: Number(f.minStock || 0) };
+      const body = { ...f, gstRate: f.category === "BATTERY" ? 18 : Number(f.gstRate), purchaseRupees: Number(f.purchaseRupees || 0), sellingRupees: Number(f.sellingRupees || 0), dealerRupees: f.dealerRupees === "" ? null : Number(f.dealerRupees), minStock: Number(f.minStock || 0) };
       if (editing) await api(`/api/items/${item._id}`, { method: "PUT", json: body });
       else await api("/api/items", { method: "POST", json: body });
       onSaved();
@@ -187,13 +187,14 @@ export function ItemFormModal({ open, item, onClose, onSaved }: { open: boolean;
               <Input id="it-hsn" inputMode="numeric" disabled={!canRates} value={f.hsnCode} onChange={(e) => setF({ ...f, hsnCode: e.target.value.replace(/\D/g, "") })} />
             </F>
             <F label="GST %">
-              <select id="it-gst" className="field" disabled={!canRates} value={f.gstRate} onChange={set("gstRate")}>
+              <select id="it-gst" className="field" disabled={!canRates || f.category === "BATTERY"} value={f.category === "BATTERY" ? 18 : f.gstRate} onChange={set("gstRate")}>
                 {[0, 5, 12, 18, 28].map((g) => (
                   <option key={g} value={g}>
                     {g}%
                   </option>
                 ))}
               </select>
+              {f.category === "BATTERY" && <p className="text-[11px] text-slate-500">Batteries are always billed at 18% GST.</p>}
             </F>
             {editing && canRates && (
               <F label="Reason for rate change">

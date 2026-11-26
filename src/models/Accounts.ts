@@ -127,6 +127,8 @@ export interface IVoucher extends Document {
   reference?: string;
   status: "POSTED" | "CANCELLED";
   cancelReason?: string;
+  /** The approved payment request this voucher carried out. */
+  request?: mongoose.Types.ObjectId | null;
   createdBy: mongoose.Types.ObjectId;
   createdByName: string;
   createdAt: Date;
@@ -146,8 +148,76 @@ export const Voucher = model<IVoucher>(
       reference: { type: String, trim: true },
       status: { type: String, enum: ["POSTED", "CANCELLED"], default: "POSTED", index: true },
       cancelReason: String,
+      request: ref("PaymentRequest", { default: null }),
       createdBy: ref("User", { required: true }),
       createdByName: { type: String, required: true },
+    },
+    { timestamps: true }
+  )
+);
+
+/* ---------------- Payment / fund-transfer requests ---------------- */
+/**
+ * Money going out, or moving between cash and bank, asked for first:
+ *   raised (by the cashier or any staff, with what it is for) → approved by the Admin, Business Head or
+ *   Managing Partner → carried out by the cashier (a payment or contra voucher) → everyone told.
+ * Raised by an approver, it is an instruction: approved at once and waiting for the cashier.
+ */
+export interface IPaymentRequest extends Document {
+  code: string; // JKRQ/2026-27/0001
+  type: "PAYMENT" | "TRANSFER";
+  amount: number; // paise
+  /** What the money is for (required). */
+  purpose: string;
+  /** Account head: expense category or non-expense head; transfers get the contra head. */
+  head: string;
+  payee?: string;
+  /** PAYMENT: suggested account (the cashier may pay from another). TRANSFER: money leaves this account. */
+  account?: mongoose.Types.ObjectId | null;
+  /** TRANSFER: money arrives in this account. */
+  toAccount?: mongoose.Types.ObjectId | null;
+  preferredMode?: string;
+  neededBy?: string; // YYYY-MM-DD
+  status: "PENDING" | "APPROVED" | "REJECTED" | "PAID" | "CANCELLED";
+  requestedBy: mongoose.Types.ObjectId;
+  requestedByName: string;
+  requestedByRole: string;
+  decision?: { by: mongoose.Types.ObjectId; byName: string; role: string; at: Date; note?: string } | null;
+  payment?: (PaymentStamp & { voucher: mongoose.Types.ObjectId; accountName: string }) | null;
+  cancelReason?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+export const PaymentRequest = model<IPaymentRequest>(
+  "PaymentRequest",
+  new Schema<IPaymentRequest>(
+    {
+      code: { type: String, required: true, unique: true },
+      type: { type: String, enum: ["PAYMENT", "TRANSFER"], required: true },
+      amount: { type: Number, required: true, min: 1 },
+      purpose: { type: String, required: true, trim: true },
+      head: { type: String, required: true, trim: true },
+      payee: { type: String, trim: true },
+      account: ref("MoneyAccount", { default: null }),
+      toAccount: ref("MoneyAccount", { default: null }),
+      preferredMode: String,
+      neededBy: String,
+      status: { type: String, enum: ["PENDING", "APPROVED", "REJECTED", "PAID", "CANCELLED"], default: "PENDING", index: true },
+      requestedBy: ref("User", { required: true }),
+      requestedByName: { type: String, required: true },
+      requestedByRole: { type: String, required: true },
+      decision: {
+        type: new Schema({ by: ref("User"), byName: String, role: String, at: Date, note: String }, { _id: false }),
+        default: null,
+      },
+      payment: {
+        type: new Schema(
+          { account: ref("MoneyAccount"), accountName: String, date: String, mode: String, reference: String, by: ref("User"), byName: String, at: Date, voucher: ref("Voucher") },
+          { _id: false }
+        ),
+        default: null,
+      },
+      cancelReason: String,
     },
     { timestamps: true }
   )

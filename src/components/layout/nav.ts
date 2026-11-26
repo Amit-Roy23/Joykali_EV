@@ -119,6 +119,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Vehicle Inventory", href: "/inventory", icon: Warehouse, permission: "inventory.view" },
       { title: "Parts & Accessories Stock", href: "/inventory/parts", icon: Wrench, permission: "inventory.view", audience: "staff" },
+      { title: "Battery Out Register", href: "/inventory/batteries", icon: BatteryCharging, permission: "inventory.view", audience: "staff" },
       { title: "Warehouses", href: "/warehouses", icon: Building, permission: "warehouse.view", audience: "staff" },
       { title: "Models & Pricing", href: "/inventory/models", icon: Layers, permission: "inventory.view" },
       { title: "Purchases", href: "/purchases", icon: PackagePlus, permission: "purchase.view" },
@@ -161,6 +162,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { title: "Cash & Bank Books", href: "/accounts/books", icon: BookOpenCheck, permission: "accounts.view", audience: "staff" },
       { title: "Profit & Loss", href: "/accounts/pnl", icon: LineChart, permission: "accounts.view", audience: "staff" },
       { title: "Expenses", href: "/accounts/expenses", icon: Receipt, permission: ["accounts.view", "expense.create"], audience: "staff" },
+      { title: "Payment Requests", href: "/accounts/requests", icon: HandCoins, permission: ["payment.approve", "expense.create", "accounts.manage"], audience: "staff" },
+      { title: "Bank & Cash Transfers", href: "/accounts/transfers", icon: Landmark, permission: "accounts.view", audience: "staff" },
       { title: "Outstanding", href: "/accounts/outstanding", icon: Scale, permission: "accounts.view", audience: "staff" },
       { title: "Budget vs Actual", href: "/accounts/budget", icon: PieChart, permission: "accounts.view", audience: "staff" },
     ],

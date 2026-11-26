@@ -334,6 +334,27 @@ export async function getDashboardData(user: JWTPayload) {
       actions.push({ kind: "approval", label: `${mine.length} approval${mine.length > 1 ? "s" : ""} waiting for your signature`, href: "/approvals", tone: "amber" });
     }
   }
+  // Payment / transfer requests waiting for the Admin, Business Head or Managing Partner.
+  if (["ADMIN", "BUSINESS_HEAD", "MANAGING_PARTNER"].includes(user.role)) {
+    const { PaymentRequest } = await import("@/models/Accounts");
+    const waiting = await PaymentRequest.find({ status: "PENDING", requestedBy: { $ne: new mongoose.Types.ObjectId(user.userId) } }).select("amount").lean();
+    if (waiting.length) {
+      const amt = waiting.reduce((s: number, r: any) => s + r.amount, 0);
+      actions.unshift({ kind: "payment", label: `${waiting.length} payment request${waiting.length > 1 ? "s" : ""} waiting for your approval (₹${Math.round(amt / 100).toLocaleString("en-IN")})`, href: "/accounts/requests", tone: "amber" });
+    }
+  }
+  // Approved money waiting for Accounts to pay (expenses, salaries, advances, F&F, supplier bills).
+  if (user.role === "ACCOUNTANT") {
+    const { pendingPayouts } = await import("./accountsService");
+    const due = await pendingPayouts();
+    const approvedSpend = due.filter((d) => d.kind !== "purchase");
+    if (approvedSpend.length) {
+      const amt = approvedSpend.reduce((s, d) => s + d.amount, 0);
+      actions.push({ kind: "payment", label: `${approvedSpend.length} approved payment${approvedSpend.length > 1 ? "s" : ""} waiting to be paid (₹${Math.round(amt / 100).toLocaleString("en-IN")})`, href: "/accounts", tone: "amber" });
+    }
+    const bills = due.filter((d) => d.kind === "purchase");
+    if (bills.length) actions.push({ kind: "payment", label: `${bills.length} supplier invoice${bills.length > 1 ? "s" : ""} unpaid`, href: "/accounts", tone: "brand" });
+  }
   const [doWaiting, fleet] = await Promise.all([
     DeliveryOrder.aggregate([{ $match: { status: { $in: ["SUBMITTED", "LOADED"] } } }, { $group: { _id: "$status", n: { $sum: 1 } } }]),
     FleetVehicle.find({ status: "ACTIVE" }).lean(),
